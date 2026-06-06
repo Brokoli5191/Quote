@@ -51,15 +51,7 @@ fun DailyScreen(viewModel: AuraViewModel) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f),
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.05f),
-                        MaterialTheme.colorScheme.background
-                    )
-                )
-            )
+            .background(MaterialTheme.colorScheme.background)
     ) {
         ElasticPullDownContainer(
             onTriggerRefresh = {
@@ -81,7 +73,8 @@ fun DailyScreen(viewModel: AuraViewModel) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 20.dp, end = 20.dp, top = 40.dp, bottom = 0.dp),
+                    .statusBarsPadding()
+                    .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 0.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Row(
@@ -346,7 +339,6 @@ fun DailyScreen(viewModel: AuraViewModel) {
                                         contentDescription = "Favorite",
                                         modifier = Modifier
                                             .size(24.dp)
-                                            .graphicsLayer(scaleX = heartScale, scaleY = heartScale)
                                     )
                                 }
 

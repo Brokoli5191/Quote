@@ -43,8 +43,10 @@ fun LibraryScreen(viewModel: AuraViewModel) {
     val filteredQuotes by viewModel.filteredQuotes.collectAsState()
     val allQuotes by viewModel.allQuotes.collectAsState()
     
+    val selectedCategories by viewModel.selectedCategories.collectAsState()
+    
     val scrollState = rememberScrollState()
-    var showAllCollectionsDialog by remember { mutableStateOf(false) }
+    var showCategoryFilterDialog by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
 
@@ -73,8 +75,9 @@ fun LibraryScreen(viewModel: AuraViewModel) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .statusBarsPadding()
                     .graphicsLayer { alpha = headerAlpha.value }
-                    .padding(start = 20.dp, end = 20.dp, top = 40.dp, bottom = 0.dp),
+                    .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 0.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Row(
@@ -89,11 +92,11 @@ fun LibraryScreen(viewModel: AuraViewModel) {
                         fontWeight = FontWeight.Bold
                     )
 
-                    // Slider settings icon (Tune) relocated to the top right of the Library screen
+                    // Category Filter list icon on the top right
                     IconButton(
                         onClick = {
-                            val randomCategory = listOf("Stoicism", "Resilience", "Joy", "Focus", "Love").random()
-                            selectCategoryWithHaptic(randomCategory)
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            showCategoryFilterDialog = true
                         },
                         modifier = Modifier
                             .size(40.dp)
@@ -103,8 +106,8 @@ fun LibraryScreen(viewModel: AuraViewModel) {
                             )
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Tune,
-                            contentDescription = "Random Shuffle",
+                            imageVector = Icons.Default.FilterList,
+                            contentDescription = "Filter Categories",
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
@@ -158,20 +161,20 @@ fun LibraryScreen(viewModel: AuraViewModel) {
             AnimatedContent(
                 targetState = (selectedCategory != null || searchQuery.isNotBlank()),
                 transitionSpec = {
-                    val exprSpring = spring<Float>(dampingRatio = 0.76f, stiffness = 180f)
-                    val exprOffsetSpring = spring<androidx.compose.ui.unit.IntOffset>(dampingRatio = 0.76f, stiffness = 180f)
+                    val exprSpring = spring<Float>(dampingRatio = 0.52f, stiffness = 220f)
+                    val exprOffsetSpring = spring<androidx.compose.ui.unit.IntOffset>(dampingRatio = 0.52f, stiffness = 220f)
                     if (targetState) {
                         // Sliding bento collapses, category content slides up with organic bounce
-                        (slideInVertically(animationSpec = exprOffsetSpring) { height -> (height * 0.12f).toInt() } +
+                        (slideInVertically(animationSpec = exprOffsetSpring) { height -> (height * 0.15f).toInt() } +
                          fadeIn(animationSpec = exprSpring) +
-                         scaleIn(initialScale = 0.95f, animationSpec = exprSpring))
+                         scaleIn(initialScale = 0.88f, animationSpec = exprSpring))
                         .togetherWith(
                          fadeOut(animationSpec = exprSpring) +
-                         scaleOut(targetScale = 0.95f, animationSpec = exprSpring))
+                         scaleOut(targetScale = 0.88f, animationSpec = exprSpring))
                     } else {
                         // Category back: slide out downwards cleanly, bento content fades in
                         (fadeIn(animationSpec = exprSpring) +
-                         scaleIn(initialScale = 0.95f, animationSpec = exprSpring))
+                         scaleIn(initialScale = 0.88f, animationSpec = exprSpring))
                         .togetherWith(
                          slideOutVertically(animationSpec = exprOffsetSpring) { height -> (height * 0.12f).toInt() } +
                          fadeOut(animationSpec = exprSpring) +
@@ -182,8 +185,13 @@ fun LibraryScreen(viewModel: AuraViewModel) {
                 modifier = Modifier.fillMaxSize()
             ) { isBrowsing ->
                 if (isBrowsing) {
+                    val categoryLabel = when {
+                        selectedCategories.size > 1 -> "${selectedCategories.size} categories"
+                        selectedCategories.size == 1 -> selectedCategories.first()
+                        else -> selectedCategory
+                    }
                     CategoryBrowseViewInPlace(
-                        category = selectedCategory,
+                        category = categoryLabel,
                         searchQuery = searchQuery,
                         quotes = filteredQuotes,
                         onBack = {
@@ -216,398 +224,199 @@ fun LibraryScreen(viewModel: AuraViewModel) {
                                 .padding(horizontal = 20.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            // 1. Stoicism (Large Hero Card)
-                            Card(
-                                onClick = { selectCategoryWithHaptic("Stoicism") },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(180.dp)
-                                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), RoundedCornerShape(24.dp)),
-                                shape = RoundedCornerShape(24.dp)
-                            ) {
-                                Box(modifier = Modifier.fillMaxSize()) {
-                                    AsyncImage(
-                                        model = "https://images.unsplash.com/photo-1518156677180-95a2893f3e9f?q=80&w=600",
-                                        contentDescription = "Stoicism",
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier.fillMaxSize()
+                            val bentoCategories = remember {
+                                listOf(
+                                    CategoryTileData(
+                                        name = "Inspirational",
+                                        description = "Ignite your inner fire, passion, and thrive",
+                                        imageUrl = "https://images.unsplash.com/photo-1499209974431-9dddcdce7f88?q=80&w=600",
+                                        icon = Icons.Default.Lightbulb,
+                                        tintColor = Color(0xFFFFF7EB),
+                                        isFullWidth = true
+                                    ),
+                                    CategoryTileData(
+                                        name = "Life",
+                                        description = "Existential reflections & daily journeys",
+                                        imageUrl = "https://images.unsplash.com/photo-1502082553048-f009c37129b9?q=80&w=600",
+                                        icon = Icons.Default.Nature,
+                                        tintColor = Color(0xFFA0D2AD)
+                                    ),
+                                    CategoryTileData(
+                                        name = "Humor",
+                                        description = "Laughter, wit, and cheeky observations",
+                                        imageUrl = "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?q=80&w=600",
+                                        icon = Icons.Default.WbSunny,
+                                        tintColor = Color(0xFFFFDB9C)
+                                    ),
+                                    CategoryTileData(
+                                        name = "Love",
+                                        description = "Compassion, human bonds, and high affection",
+                                        imageUrl = "https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?q=80&w=600",
+                                        icon = Icons.Default.Favorite,
+                                        tintColor = Color(0xFFFFB2C5)
+                                    ),
+                                    CategoryTileData(
+                                        name = "Books",
+                                        description = "A portable magic of printed pages",
+                                        imageUrl = "https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?q=80&w=600",
+                                        icon = Icons.Default.MenuBook,
+                                        tintColor = Color(0xFFFFDB9C)
+                                    ),
+                                    CategoryTileData(
+                                        name = "Truth",
+                                        description = "Honesty and direct paths without compromise",
+                                        imageUrl = "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?q=80&w=600",
+                                        icon = Icons.Default.CheckCircle,
+                                        tintColor = Color(0xFFADC6FF)
+                                    ),
+                                    CategoryTileData(
+                                        name = "Reading",
+                                        description = "The quiet art of continuous literature",
+                                        imageUrl = "https://images.unsplash.com/photo-1544947950-fa07a98d237f?q=80&w=600",
+                                        icon = Icons.Default.AutoStories,
+                                        tintColor = Color(0xFFFFDB9C)
+                                    ),
+                                    CategoryTileData(
+                                        name = "Wisdom",
+                                        description = "Centuries of knowledge and deep philosophy",
+                                        imageUrl = "https://images.unsplash.com/photo-1457369804613-52c61a468e7d?q=80&w=600",
+                                        icon = Icons.Default.Psychology,
+                                        tintColor = Color(0xFFFFDB9C)
+                                    ),
+                                    CategoryTileData(
+                                        name = "Happiness",
+                                        description = "Peace of mind and pure contentments",
+                                        imageUrl = "https://images.unsplash.com/photo-1490730141103-6cac27aaab94?q=80&w=600",
+                                        icon = Icons.Default.SentimentVerySatisfied,
+                                        tintColor = Color(0xFFFFDB9C)
+                                    ),
+                                    CategoryTileData(
+                                        name = "Writing",
+                                        description = "Sit down at typewriters and bleed",
+                                        imageUrl = "https://images.unsplash.com/photo-1455390582262-044cdead277a?q=80&w=600",
+                                        icon = Icons.Default.Edit,
+                                        tintColor = Color(0xFFADC6FF)
+                                    ),
+                                    CategoryTileData(
+                                        name = "Inspiration",
+                                        description = "Sudden bright bursts of creative idea",
+                                        imageUrl = "https://images.unsplash.com/photo-1456406644174-8dba4c7f27f2?q=80&w=600",
+                                        icon = Icons.Default.FlashOn,
+                                        tintColor = Color(0xFFFFF7EB)
+                                    ),
+                                    CategoryTileData(
+                                        name = "Philosophy",
+                                        description = "Socrates, Stoics, and search of meaning",
+                                        imageUrl = "https://images.unsplash.com/photo-1507679799987-c73779587ccf?q=80&w=600",
+                                        icon = Icons.Default.AccountBalance,
+                                        tintColor = Color(0xFFADC6FF)
+                                    ),
+                                    CategoryTileData(
+                                        name = "Death",
+                                        description = "The next great adventure and transition",
+                                        imageUrl = "https://images.unsplash.com/photo-1509114397022-ed747cca3f65?q=80&w=600",
+                                        icon = Icons.Default.RemoveCircle,
+                                        tintColor = Color(0xFFADC6FF)
+                                    ),
+                                    CategoryTileData(
+                                        name = "Poetry",
+                                        description = "Rhythms, lines, and feelings of the heart",
+                                        imageUrl = "https://images.unsplash.com/photo-1473186578172-c141e6798cf4?q=80&w=600",
+                                        icon = Icons.Default.Brush,
+                                        tintColor = Color(0xFFFFB2C5)
+                                    ),
+                                    CategoryTileData(
+                                        name = "Optimism",
+                                        description = "Gutter-born gazing toward bright stars",
+                                        imageUrl = "https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?q=80&w=600",
+                                        icon = Icons.Default.Star,
+                                        tintColor = Color(0xFFFFDB9C)
+                                    ),
+                                    CategoryTileData(
+                                        name = "Hope",
+                                        description = "Quiet tomorrow with no mistakes in yet",
+                                        imageUrl = "https://images.unsplash.com/photo-1488330890490-c291ec66277b?q=80&w=600",
+                                        icon = Icons.Default.BrightnessLow,
+                                        tintColor = Color(0xFFFFF7EB)
+                                    ),
+                                    CategoryTileData(
+                                        name = "Friendship",
+                                        description = "Loyal companions and chocolate moments",
+                                        imageUrl = "https://images.unsplash.com/photo-1461532242715-57f47ee568ad?q=80&w=600",
+                                        icon = Icons.Default.Group,
+                                        tintColor = Color(0xFFADC6FF)
+                                    ),
+                                    CategoryTileData(
+                                        name = "Education",
+                                        description = "Continuous school versus self learning",
+                                        imageUrl = "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?q=80&w=600",
+                                        icon = Icons.Default.School,
+                                        tintColor = Color(0xFFFFDB9C)
+                                    ),
+                                    CategoryTileData(
+                                        name = "Music",
+                                        description = "When it hits you, you feel no pain",
+                                        imageUrl = "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?q=80&w=600",
+                                        icon = Icons.Default.MusicNote,
+                                        tintColor = Color(0xFFA0D2AD)
+                                    ),
+                                    CategoryTileData(
+                                        name = "Women",
+                                        description = "Seldom well-behaved historic giants",
+                                        imageUrl = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=600",
+                                        icon = Icons.Default.Face,
+                                        tintColor = Color(0xFFFFB2C5),
+                                        isFullWidth = true
                                     )
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .background(
-                                                Brush.verticalGradient(
-                                                    listOf(
-                                                        Color.Black.copy(alpha = 0.3f),
-                                                        Color.Black.copy(alpha = 0.85f)
-                                                    )
-                                                )
-                                            )
-                                    )
-
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .padding(20.dp),
-                                        verticalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Balance,
-                                                contentDescription = "Philosophy",
-                                                tint = Color(0xFFFFDB9C),
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                            Text(
-                                                text = "PHILOSOPHY",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = Color(0xFFFFDB9C),
-                                                fontWeight = FontWeight.Bold,
-                                                letterSpacing = 1.sp
-                                            )
-                                        }
-
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Column {
-                                                Text(
-                                                    text = "Stoicism",
-                                                    style = MaterialTheme.typography.headlineLarge,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color.White
-                                                )
-                                                Text(
-                                                    text = "Daily discipline, logic, and self-mastery",
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = Color.White.copy(alpha = 0.8f)
-                                                )
-                                            }
-
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(40.dp)
-                                                    .background(Color.White.copy(alpha = 0.2f), CircleShape),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.AutoMirrored.Default.ArrowForward,
-                                                    contentDescription = "Open",
-                                                    tint = Color.White,
-                                                    modifier = Modifier.size(18.dp)
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
+                                )
                             }
 
-                            // 2. Resilience and Joy Row
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(16.dp)
-                            ) {
-                                Card(
-                                    onClick = { selectCategoryWithHaptic("Resilience") },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(160.dp)
-                                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), RoundedCornerShape(24.dp)),
-                                    shape = RoundedCornerShape(24.dp)
+                            // Render Inspirational (First large card)
+                            val inspirational = bentoCategories[0]
+                            CategoryBentoCard(
+                                name = inspirational.name,
+                                imageUrl = inspirational.imageUrl,
+                                icon = inspirational.icon,
+                                tintColor = inspirational.tintColor,
+                                height = 180.dp,
+                                onClick = { selectCategoryWithHaptic(inspirational.name) }
+                            )
+
+                            // Render rows of 2 for middle categories (1 to 18)
+                            val midCategories = bentoCategories.subList(1, 19)
+                            midCategories.chunked(2).forEach { pair ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                                 ) {
-                                    Box(modifier = Modifier.fillMaxSize()) {
-                                        AsyncImage(
-                                            model = "https://images.unsplash.com/photo-1519817650390-64a93db51149?q=80&w=600",
-                                            contentDescription = "Resilience",
-                                            contentScale = ContentScale.Crop,
-                                            modifier = Modifier.fillMaxSize()
-                                        )
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .background(
-                                                    Brush.verticalGradient(
-                                                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f))
-                                                    )
-                                                )
-                                        )
-
-                                        Column(
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .padding(16.dp),
-                                            verticalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.ElectricBolt,
-                                                contentDescription = "Resilience",
-                                                tint = Color(0xFFA0D2AD),
-                                                modifier = Modifier.size(24.dp)
+                                    pair.forEach { cat ->
+                                        Box(modifier = Modifier.weight(1f)) {
+                                            CategoryBentoCard(
+                                                name = cat.name,
+                                                imageUrl = cat.imageUrl,
+                                                icon = cat.icon,
+                                                tintColor = cat.tintColor,
+                                                height = 160.dp,
+                                                onClick = { selectCategoryWithHaptic(cat.name) }
                                             )
-
-                                            Column {
-                                                Text(
-                                                    text = "Resilience",
-                                                    style = MaterialTheme.typography.titleLarge,
-                                                    color = Color.White,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                                Text(
-                                                    text = "Stand firm",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = Color.White.copy(alpha = 0.8f)
-                                                )
-                                            }
                                         }
                                     }
-                                }
-
-                                Card(
-                                    onClick = { selectCategoryWithHaptic("Joy") },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(160.dp)
-                                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), RoundedCornerShape(24.dp)),
-                                    shape = RoundedCornerShape(24.dp)
-                                ) {
-                                    Box(modifier = Modifier.fillMaxSize()) {
-                                        AsyncImage(
-                                            model = "https://images.unsplash.com/photo-1490730141103-6cac27aaab94?q=80&w=600",
-                                            contentDescription = "Joy",
-                                            contentScale = ContentScale.Crop,
-                                            modifier = Modifier.fillMaxSize()
-                                        )
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .background(
-                                                    Brush.verticalGradient(
-                                                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f))
-                                                    )
-                                                )
-                                        )
-
-                                        Column(
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .padding(16.dp),
-                                            verticalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.WbSunny,
-                                                contentDescription = "Joy",
-                                                tint = Color(0xFFFFDB9C),
-                                                modifier = Modifier.size(24.dp)
-                                            )
-
-                                            Column {
-                                                Text(
-                                                    text = "Joy",
-                                                    style = MaterialTheme.typography.titleLarge,
-                                                    color = Color.White,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                                Text(
-                                                    text = "Light within",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = Color.White.copy(alpha = 0.8f)
-                                                )
-                                            }
-                                        }
+                                    if (pair.size == 1) {
+                                        Spacer(modifier = Modifier.weight(1f))
                                     }
                                 }
                             }
 
-                            // 3. Focus and Love Row
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(16.dp)
-                            ) {
-                                Card(
-                                    onClick = { selectCategoryWithHaptic("Focus") },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(160.dp)
-                                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), RoundedCornerShape(24.dp)),
-                                    shape = RoundedCornerShape(24.dp)
-                                ) {
-                                    Box(modifier = Modifier.fillMaxSize()) {
-                                        AsyncImage(
-                                            model = "https://images.unsplash.com/photo-1456406644174-8dba4c7f27f2?q=80&w=600",
-                                            contentDescription = "Focus",
-                                            contentScale = ContentScale.Crop,
-                                            modifier = Modifier.fillMaxSize()
-                                        )
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .background(
-                                                    Brush.verticalGradient(
-                                                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f))
-                                                    )
-                                                )
-                                        )
-
-                                        Column(
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .padding(16.dp),
-                                            verticalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.ShortText,
-                                                contentDescription = "Focus",
-                                                tint = Color(0xFFADC6FF),
-                                                modifier = Modifier.size(24.dp)
-                                            )
-
-                                            Column {
-                                                Text(
-                                                    text = "Focus",
-                                                    style = MaterialTheme.typography.titleLarge,
-                                                    color = Color.White,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                                Text(
-                                                    text = "Pure mind",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = Color.White.copy(alpha = 0.8f)
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-
-                                Card(
-                                    onClick = { selectCategoryWithHaptic("Love") },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(160.dp)
-                                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), RoundedCornerShape(24.dp)),
-                                    shape = RoundedCornerShape(24.dp)
-                                ) {
-                                    Box(modifier = Modifier.fillMaxSize()) {
-                                        AsyncImage(
-                                            model = "https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?q=80&w=600",
-                                            contentDescription = "Love",
-                                            contentScale = ContentScale.Crop,
-                                            modifier = Modifier.fillMaxSize()
-                                        )
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .background(
-                                                    Brush.verticalGradient(
-                                                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f))
-                                                    )
-                                                )
-                                        )
-
-                                        Column(
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .padding(16.dp),
-                                            verticalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Favorite,
-                                                contentDescription = "Love",
-                                                tint = Color(0xFFFFB2C5),
-                                                modifier = Modifier.size(24.dp)
-                                            )
-
-                                            Column {
-                                                Text(
-                                                    text = "Love",
-                                                    style = MaterialTheme.typography.titleLarge,
-                                                    color = Color.White,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                                Text(
-                                                    text = "Kindness",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = Color.White.copy(alpha = 0.8f)
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(30.dp))
-
-                        // Curated Collections
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 20.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.Bottom
-                            ) {
-                                Text(
-                                    text = "Curated Collections",
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.Bold
-                                )
-
-                                Text(
-                                    text = "View All",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.secondary,
-                                    modifier = Modifier.clickable {
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        showAllCollectionsDialog = true
-                                    }
-                                )
-                            }
-
-                            Row(
-                                modifier = Modifier
-                                    .horizontalScroll(rememberScrollState())
-                                    .padding(horizontal = 20.dp),
-                                horizontalArrangement = Arrangement.spacedBy(16.dp)
-                            ) {
-                                CollectionHeroItem(
-                                    title = "Morning Stillness",
-                                    desc = "Quiet dawn meditations",
-                                    badgeText = "Staff Pick",
-                                    image = "https://images.unsplash.com/photo-1506126613408-eca07ce68773?q=80&w=600",
-                                    badgeBgColor = MaterialTheme.colorScheme.secondary,
-                                    badgeTextColor = MaterialTheme.colorScheme.onSecondary,
-                                    onClick = { selectCategoryWithHaptic("Love") }
-                                )
-
-                                CollectionHeroItem(
-                                    title = "Digital Detox",
-                                    desc = "Disconnect to find clarity",
-                                    badgeText = "Trending",
-                                    image = "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=600",
-                                    badgeBgColor = MaterialTheme.colorScheme.tertiary,
-                                    badgeTextColor = MaterialTheme.colorScheme.onTertiary,
-                                    onClick = { selectCategoryWithHaptic("Resilience") }
-                                )
-
-                                CollectionHeroItem(
-                                    title = "Quiet Confidence",
-                                    desc = "Steadfast internal growth",
-                                    badgeText = "New",
-                                    image = "https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?q=80&w=600",
-                                    badgeBgColor = MaterialTheme.colorScheme.primary,
-                                    badgeTextColor = MaterialTheme.colorScheme.onPrimary,
-                                    onClick = { selectCategoryWithHaptic("Focus") }
-                                )
-                            }
+                            // Render Women (Last large card)
+                            val women = bentoCategories[19]
+                            CategoryBentoCard(
+                                name = women.name,
+                                imageUrl = women.imageUrl,
+                                icon = women.icon,
+                                tintColor = women.tintColor,
+                                height = 180.dp,
+                                onClick = { selectCategoryWithHaptic(women.name) }
+                            )
                         }
                     }
                 }
@@ -615,59 +424,129 @@ fun LibraryScreen(viewModel: AuraViewModel) {
         }
     }
 
-    // Curated popup dialog when "View All" is selected
-    if (showAllCollectionsDialog) {
+    // Category Filter Picker Dialog (allows selecting multiple categories at once)
+    if (showCategoryFilterDialog) {
         AlertDialog(
-            onDismissRequest = { showAllCollectionsDialog = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    showAllCollectionsDialog = false
-                }) {
-                    Text("Close")
-                }
-            },
+            onDismissRequest = { showCategoryFilterDialog = false },
+            modifier = Modifier.border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), RoundedCornerShape(28.dp)),
             title = {
                 Text(
-                    text = "Aura Collections",
+                    text = "Select Categories",
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.primary
                 )
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    listOf(
-                        Triple("Morning Stillness", "Graceful sunrise quotes to begin with focus.", "Love"),
-                        Triple("Digital Detox", "Escape modern notifications and return to nature.", "Resilience"),
-                        Triple("Quiet Confidence", "Self affirmation cards from Marcus Aurelius.", "Focus"),
-                        Triple("Golden Hour Reflections", "Celebrate simple existence with high joy.", "Joy")
-                    ).forEach { (title, desc, cat) ->
-                        Card(
-                            onClick = {
-                                selectCategoryWithHaptic(cat)
-                                showAllCollectionsDialog = false
-                            },
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Text(
-                                    text = title,
-                                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = desc,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Text(
+                        text = "Filter search findings by multiple selected categories below:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.7f)
+                    )
+                    
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val categoriesList = listOf(
+                            "Inspirational",
+                            "Life",
+                            "Humor",
+                            "Love",
+                            "Books",
+                            "Truth",
+                            "Reading",
+                            "Wisdom",
+                            "Happiness",
+                            "Writing",
+                            "Inspiration",
+                            "Philosophy",
+                            "Death",
+                            "Poetry",
+                            "Optimism",
+                            "Hope",
+                            "Friendship",
+                            "Education",
+                            "Music",
+                            "Women"
+                        )
+                        
+                        categoriesList.chunked(2).forEach { rowCategoryList ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                rowCategoryList.forEach { categoryName ->
+                                    val isSelected = selectedCategories.contains(categoryName)
+                                    FilterChip(
+                                        selected = isSelected,
+                                        onClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            viewModel.toggleCategorySelected(categoryName)
+                                        },
+                                        label = {
+                                            Text(
+                                                text = categoryName,
+                                                style = MaterialTheme.typography.labelMedium.copy(
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                                )
+                                            )
+                                        },
+                                        modifier = Modifier.weight(1f).height(46.dp),
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+                                            selectedLabelColor = MaterialTheme.colorScheme.primary,
+                                            containerColor = Color(0xFF1B1A21),
+                                            labelColor = Color.White.copy(alpha = 0.6f)
+                                        ),
+                                        border = FilterChipDefaults.filterChipBorder(
+                                            enabled = true,
+                                            selected = isSelected,
+                                            selectedBorderColor = MaterialTheme.colorScheme.primary,
+                                            borderColor = Color.White.copy(alpha = 0.08f)
+                                        )
+                                    )
+                                }
+                                if (rowCategoryList.size == 1) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
                             }
                         }
                     }
                 }
-            }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showCategoryFilterDialog = false },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Apply Filter")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        viewModel.clearCategorySelection()
+                        showCategoryFilterDialog = false
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.primary
+                    )
+                ) {
+                    Text("Clear All")
+                }
+            },
+            shape = RoundedCornerShape(28.dp),
+            containerColor = Color(0xFF111015),
+            tonalElevation = 8.dp
         )
     }
 }
@@ -953,8 +832,7 @@ fun QuoteBrowseItemCard(
                         Icon(
                             imageVector = if (quote.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                             contentDescription = "Favorite",
-                            tint = if (quote.isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.graphicsLayer(scaleX = heartScale, scaleY = heartScale)
+                            tint = if (quote.isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -1016,6 +894,126 @@ fun SimulatedExpressiveWidget(text: String, author: String) {
                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                 color = Color(0xFFA0D2AD)
             )
+        }
+    }
+}
+
+data class CategoryTileData(
+    val name: String,
+    val description: String,
+    val imageUrl: String,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val tintColor: Color,
+    val isFullWidth: Boolean = false
+)
+
+@Composable
+fun CategoryBentoCard(
+    name: String,
+    imageUrl: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    tintColor: Color,
+    height: androidx.compose.ui.unit.Dp,
+    onClick: () -> Unit
+) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(height)
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), RoundedCornerShape(24.dp)),
+        shape = RoundedCornerShape(24.dp)
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            // First show a beautiful default background as a placeholder
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                tintColor.copy(alpha = 0.35f),
+                                Color(0xFF1B1A21)
+                            )
+                        )
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = tintColor.copy(alpha = 0.25f),
+                    modifier = Modifier.size(56.dp)
+                )
+            }
+
+            coil.compose.SubcomposeAsyncImage(
+                model = imageUrl,
+                contentDescription = name,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+                loading = {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            color = tintColor,
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.dp
+                        )
+                    }
+                },
+                error = {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(
+                                        tintColor.copy(alpha = 0.45f),
+                                        Color(0xFF1B1A21)
+                                    )
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = tintColor.copy(alpha = 0.55f),
+                            modifier = Modifier.size(52.dp)
+                        )
+                    }
+                }
+            )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                Color.Transparent,
+                                Color.Black.copy(alpha = 0.70f)
+                            )
+                        )
+                    )
+            )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(20.dp),
+                contentAlignment = Alignment.BottomStart
+            ) {
+                Text(
+                    text = name,
+                    style = if (height >= 180.dp) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            }
         }
     }
 }

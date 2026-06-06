@@ -18,40 +18,79 @@ class QuoteRepository(private val quoteDao: QuoteDao) {
         quoteDao.deleteAllQuotes()
     }
 
+    private fun mapTagsToCategory(quoteText: String, author: String, tags: List<String>): String {
+        val allLowerTags = tags.map { it.lowercase().trim() }
+        val textLower = quoteText.lowercase()
+        
+        // Define our 20 specific categories requested by the user
+        val userCategories = listOf(
+            "Inspirational", "Life", "Humor", "Love", "Books", "Truth", "Reading", "Wisdom",
+            "Happiness", "Writing", "Inspiration", "Philosophy", "Death", "Poetry", "Optimism",
+            "Hope", "Friendship", "Education", "Music", "Women"
+        )
+        
+        // 1. Try to find an exact match in the tags first (after formatting)
+        for (category in userCategories) {
+            val categoryLower = category.lowercase()
+            if (allLowerTags.contains(categoryLower)) {
+                return category
+            }
+        }
+        
+        // 2. Try to match tags that contain the category word
+        for (category in userCategories) {
+            val categoryLower = category.lowercase()
+            if (allLowerTags.any { it.contains(categoryLower) }) {
+                return category
+            }
+        }
+        
+        // 3. Try to check the quote text for the category word
+        for (category in userCategories) {
+            val categoryLower = category.lowercase()
+            if (textLower.contains(categoryLower)) {
+                return category
+            }
+        }
+        
+        // 4. Default fallback: "Inspirational"
+        return "Inspirational"
+    }
+
     suspend fun preseedDatabase(context: Context) {
         try {
             val inputStream = context.resources.openRawResource(com.example.R.raw.quotes_seed)
-            val reader = java.io.BufferedReader(java.io.InputStreamReader(inputStream))
+            val jsonString = inputStream.bufferedReader().use { it.readText() }
+            val jsonArray = org.json.JSONArray(jsonString)
             val quoteEntities = mutableListOf<QuoteEntity>()
             
-            reader.useLines { lines ->
-                lines.forEach { line ->
-                    if (line.isNotBlank()) {
-                        val parts = line.split("|")
-                        if (parts.size >= 3) {
-                            val category = parts[0].trim()
-                            val text = parts[1].trim()
-                            val author = parts[2].trim()
-                            
-                            val cleanText = text.replace("\\'", "'")
-                            val cleanAuthor = author.replace("\\'", "'")
-                            
-                            val tags = category
-                            val aboutAuthor = "Famous reflection on $category."
-                            
-                            quoteEntities.add(
-                                QuoteEntity(
-                                    text = cleanText,
-                                    author = cleanAuthor,
-                                    category = category,
-                                    aboutAuthor = aboutAuthor,
-                                    tags = tags,
-                                    isFavorite = false
-                                )
-                            )
-                        }
-                    }
+            for (i in 0 until jsonArray.length()) {
+                val item = jsonArray.getJSONObject(i)
+                val quoteText = item.getString("quote")
+                val author = item.getString("author")
+                
+                val tagsArray = item.getJSONArray("tags")
+                val tagsList = mutableListOf<String>()
+                for (j in 0 until tagsArray.length()) {
+                    tagsList.add(tagsArray.getString(j))
                 }
+                
+                val category = mapTagsToCategory(quoteText, author, tagsList)
+                val cleanText = quoteText.replace("“", "").replace("”", "").trim()
+                val cleanAuthor = author.replace("“", "").replace("”", "").trim()
+                val tagsStr = tagsList.joinToString(", ")
+                val aboutAuthor = "Famous reflection on $category."
+                
+                quoteEntities.add(
+                    QuoteEntity(
+                        text = cleanText,
+                        author = cleanAuthor,
+                        category = category,
+                        aboutAuthor = aboutAuthor,
+                        tags = tagsStr,
+                        isFavorite = false
+                    )
+                )
             }
             
             // Set some favorites default
@@ -87,6 +126,10 @@ class QuoteRepository(private val quoteDao: QuoteDao) {
 
     suspend fun insertQuote(quote: QuoteEntity): Long {
         return quoteDao.insertQuote(quote)
+    }
+
+    suspend fun getAllQuotesSync(): List<QuoteEntity> {
+        return quoteDao.getAllQuotesSync()
     }
 
     suspend fun deleteQuote(id: Int) {
