@@ -31,6 +31,14 @@ import com.example.ui.AuraViewModel
 import com.example.widget.AuraWidgetProvider
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import android.content.pm.PackageManager
+import android.Manifest
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Warning
 
 @Composable
 fun WidgetSettingsScreen(viewModel: AuraViewModel) {
@@ -54,7 +62,8 @@ fun WidgetSettingsScreen(viewModel: AuraViewModel) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 20.dp, end = 20.dp, top = 40.dp, bottom = 0.dp),
+                    .statusBarsPadding()
+                    .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 0.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
@@ -202,6 +211,260 @@ fun WidgetSettingsScreen(viewModel: AuraViewModel) {
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            // Section 4: Daily Quote Reminders
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Daily Reflection Reminders",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.align(Alignment.Start)
+                )
+
+                val reminderEnabled by viewModel.dailyReminderEnabled.collectAsState()
+                val reminderHour by viewModel.dailyReminderHour.collectAsState()
+                val reminderMinute by viewModel.dailyReminderMinute.collectAsState()
+
+                // Permission launcher
+                val permissionLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestPermission(),
+                    onResult = { isGranted ->
+                        if (isGranted) {
+                            viewModel.setDailyReminderEnabled(context, true)
+                            Toast.makeText(context, "Daily Reminder scheduled! ✦", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(context, "Notifications permission is required to receive daily quotes.", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                )
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f), RoundedCornerShape(20.dp)),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
+                    ),
+                    shape = RoundedCornerShape(20.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.NotificationsActive,
+                                        contentDescription = "Daily Reminders",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Column(modifier = Modifier.padding(end = 8.dp)) {
+                                    Text(
+                                        text = "Inspirational Mornings",
+                                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "Start your day with a focused quote of the day notification.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                    )
+                                }
+                            }
+
+                            Switch(
+                                checked = reminderEnabled,
+                                onCheckedChange = { isChecked ->
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    if (isChecked) {
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                            val hasPermission = ContextCompat.checkSelfPermission(
+                                                context,
+                                                Manifest.permission.POST_NOTIFICATIONS
+                                            ) == PackageManager.PERMISSION_GRANTED
+
+                                            if (hasPermission) {
+                                                viewModel.setDailyReminderEnabled(context, true)
+                                                Toast.makeText(context, "Daily Reminder scheduled! ✦", Toast.LENGTH_SHORT).show()
+                                            } else {
+                                                permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                            }
+                                        } else {
+                                            viewModel.setDailyReminderEnabled(context, true)
+                                            Toast.makeText(context, "Daily Reminder scheduled! ✦", Toast.LENGTH_SHORT).show()
+                                        }
+                                    } else {
+                                        viewModel.setDailyReminderEnabled(context, false)
+                                        Toast.makeText(context, "Daily Reminder disabled", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            )
+                        }
+
+                        AnimatedVisibility(
+                            visible = reminderEnabled,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                                    .padding(14.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Text(
+                                    text = "Choose Notification Time",
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    // Hour Column
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        modifier = Modifier.width(60.dp)
+                                    ) {
+                                        Text(
+                                            text = "▲",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier
+                                                .clickable {
+                                                    val h = (reminderHour + 1) % 24
+                                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                    viewModel.updateDailyReminderTime(context, h, reminderMinute)
+                                                }
+                                                .padding(6.dp)
+                                        )
+
+                                        Text(
+                                            text = String.format("%02d", reminderHour),
+                                            style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+
+                                        Text(
+                                            text = "▼",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier
+                                                .clickable {
+                                                    var h = reminderHour - 1
+                                                    if (h < 0) h = 23
+                                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                    viewModel.updateDailyReminderTime(context, h, reminderMinute)
+                                                }
+                                                .padding(6.dp)
+                                        )
+                                    }
+
+                                    Text(
+                                        text = ":",
+                                        style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                                        modifier = Modifier.padding(horizontal = 12.dp)
+                                    )
+
+                                    // Minute Column
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        modifier = Modifier.width(60.dp)
+                                    ) {
+                                        Text(
+                                            text = "▲",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier
+                                                .clickable {
+                                                    val m = (reminderMinute + 5) % 60
+                                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                    viewModel.updateDailyReminderTime(context, reminderHour, m)
+                                                }
+                                                .padding(6.dp)
+                                        )
+
+                                        Text(
+                                            text = String.format("%02d", reminderMinute),
+                                            style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+
+                                        Text(
+                                            text = "▼",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier
+                                                .clickable {
+                                                    var m = reminderMinute - 5
+                                                    if (m < 0) m = 55
+                                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                    viewModel.updateDailyReminderTime(context, reminderHour, m)
+                                                }
+                                                .padding(6.dp)
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.width(16.dp))
+
+                                    // AM/PM Display Badge
+                                    val isAm = reminderHour < 12
+                                    val amPmLabel = if (isAm) "AM" else "PM"
+
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    ) {
+                                        Text(
+                                            text = amPmLabel,
+                                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }
+
+                                Text(
+                                    text = "Scheduled daily at ${if (reminderHour == 0) 12 else if (reminderHour > 12) reminderHour - 12 else reminderHour}:${String.format("%02d", reminderMinute)} ${if (reminderHour < 12) "AM" else "PM"}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }

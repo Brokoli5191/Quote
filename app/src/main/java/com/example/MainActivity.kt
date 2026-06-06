@@ -77,9 +77,13 @@ class MainActivity : ComponentActivity() {
                             onTabSelected = { viewModel.selectTab(it) }
                         )
                     },
-                    contentWindowInsets = WindowInsets.systemBars // respect systems navigation bar and status bar offsets properly
+                    contentWindowInsets = WindowInsets(0, 0, 0, 0)
                 ) { innerPadding ->
-                    Box(modifier = Modifier.padding(innerPadding)) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(bottom = innerPadding.calculateBottomPadding())
+                    ) {
                         AnimatedContent(
                             targetState = activeTab,
                             transitionSpec = {
@@ -100,26 +104,26 @@ class MainActivity : ComponentActivity() {
                                 
                                 val isForward = targetIdx > currentIdx
                                 
-                                // Material Expressive organic motions with dynamic spring physics
-                                val exprSpring = spring<Float>(dampingRatio = 0.76f, stiffness = 180f)
-                                val exprOffsetSpring = spring<androidx.compose.ui.unit.IntOffset>(dampingRatio = 0.76f, stiffness = 180f)
+                                // Material Expressive organic motions with dynamic bouncy spring physics
+                                val exprSpring = spring<Float>(dampingRatio = 0.52f, stiffness = 220f)
+                                val exprOffsetSpring = spring<androidx.compose.ui.unit.IntOffset>(dampingRatio = 0.52f, stiffness = 220f)
                                 
                                 if (isForward) {
-                                    (slideInHorizontally(animationSpec = exprOffsetSpring) { width -> (width * 0.15f).toInt() } +
+                                    (slideInHorizontally(animationSpec = exprOffsetSpring) { width -> (width * 0.18f).toInt() } +
                                      fadeIn(animationSpec = exprSpring) +
-                                     scaleIn(initialScale = 0.94f, animationSpec = exprSpring))
+                                     scaleIn(initialScale = 0.88f, animationSpec = exprSpring))
                                     .togetherWith(
-                                     slideOutHorizontally(animationSpec = exprOffsetSpring) { width -> -(width * 0.15f).toInt() } +
+                                     slideOutHorizontally(animationSpec = exprOffsetSpring) { width -> -(width * 0.18f).toInt() } +
                                      fadeOut(animationSpec = exprSpring) +
-                                     scaleOut(targetScale = 0.94f, animationSpec = exprSpring))
+                                     scaleOut(targetScale = 0.88f, animationSpec = exprSpring))
                                 } else {
-                                    (slideInHorizontally(animationSpec = exprOffsetSpring) { width -> -(width * 0.15f).toInt() } +
+                                    (slideInHorizontally(animationSpec = exprOffsetSpring) { width -> -(width * 0.18f).toInt() } +
                                      fadeIn(animationSpec = exprSpring) +
-                                     scaleIn(initialScale = 0.94f, animationSpec = exprSpring))
+                                     scaleIn(initialScale = 0.88f, animationSpec = exprSpring))
                                     .togetherWith(
-                                     slideOutHorizontally(animationSpec = exprOffsetSpring) { width -> (width * 0.15f).toInt() } +
+                                     slideOutHorizontally(animationSpec = exprOffsetSpring) { width -> (width * 0.18f).toInt() } +
                                      fadeOut(animationSpec = exprSpring) +
-                                     scaleOut(targetScale = 0.94f, animationSpec = exprSpring))
+                                     scaleOut(targetScale = 0.88f, animationSpec = exprSpring))
                                 }
                             },
                             label = "MainTabsTransition"

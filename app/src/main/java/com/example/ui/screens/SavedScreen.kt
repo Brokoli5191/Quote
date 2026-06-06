@@ -55,7 +55,8 @@ fun SavedScreen(viewModel: AuraViewModel) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 20.dp, end = 20.dp, top = 40.dp, bottom = 0.dp),
+                    .statusBarsPadding()
+                    .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 0.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
@@ -227,24 +228,29 @@ fun TabSelectorButton(
     onClick: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
-    Button(
-        onClick = {
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-            onClick()
-        },
-        colors = ButtonDefaults.buttonColors(
-            containerColor = if (isSelected)
-                MaterialTheme.colorScheme.primaryContainer
-                else Color.Transparent,
-            contentColor = if (isSelected)
-                MaterialTheme.colorScheme.onPrimaryContainer
-                else MaterialTheme.colorScheme.onSurfaceVariant
-        ),
-        shape = RoundedCornerShape(12.dp),
-        contentPadding = PaddingValues(vertical = 10.dp),
+    Box(
         modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                if (isSelected) MaterialTheme.colorScheme.primaryContainer
+                else Color.Transparent
+            )
+            .clickable {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                onClick()
+            }
+            .padding(vertical = 10.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Text(text = label, style = MaterialTheme.typography.labelLarge)
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = if (isSelected)
+                MaterialTheme.colorScheme.onPrimaryContainer
+            else
+                MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+        )
     }
 }
 
@@ -294,7 +300,7 @@ fun PremiumCollectionQuoteCard(
     // Border color based on categories/styles
     val strokeColor = if (isLightTheme) {
         MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
-    } else if (quote.category == "Resilience") {
+    } else if (quote.category == "Life") {
         MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
     } else {
         Color.White.copy(alpha = 0.04f)
@@ -449,8 +455,7 @@ fun PremiumCollectionQuoteCard(
                                 Icon(
                                     imageVector = if (quote.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                                     contentDescription = "Favorite",
-                                    tint = if (quote.isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.graphicsLayer(scaleX = heartScale, scaleY = heartScale)
+                                    tint = if (quote.isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
@@ -479,10 +484,31 @@ fun AddCustomQuoteDialog(
 ) {
     var text by remember { mutableStateOf("") }
     var author by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf("Love") } // Stoicism, Resilience, Joy, Focus, Love, Custom
+    var category by remember { mutableStateOf("Inspirational") }
     var tags by remember { mutableStateOf("") }
 
-    val categories = listOf("Stoicism", "Resilience", "Joy", "Focus", "Love")
+    val categories = listOf(
+        "Inspirational",
+        "Life",
+        "Humor",
+        "Love",
+        "Books",
+        "Truth",
+        "Reading",
+        "Wisdom",
+        "Happiness",
+        "Writing",
+        "Inspiration",
+        "Philosophy",
+        "Death",
+        "Poetry",
+        "Optimism",
+        "Hope",
+        "Friendship",
+        "Education",
+        "Music",
+        "Women"
+    )
     var expandedDropdown by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
 

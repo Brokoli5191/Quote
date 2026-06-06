@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.data.QuoteEntity
 import com.example.data.QuoteRepository
+import com.example.utils.NotificationScheduler
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -15,6 +16,9 @@ class AuraViewModel(private val repository: QuoteRepository) : ViewModel() {
     private val _dailyQuote = MutableStateFlow<QuoteEntity?>(null)
     val dailyQuote: StateFlow<QuoteEntity?> = _dailyQuote.asStateFlow()
 
+    private val _verificationResult = MutableStateFlow<com.example.utils.CategoryVerificationResult?>(null)
+    val verificationResult: StateFlow<com.example.utils.CategoryVerificationResult?> = _verificationResult.asStateFlow()
+
     private val _selectedTab = MutableStateFlow("Daily") // Daily, Library, Saved, Settings
     val selectedTab: StateFlow<String> = _selectedTab.asStateFlow()
 
@@ -24,6 +28,9 @@ class AuraViewModel(private val repository: QuoteRepository) : ViewModel() {
     private val _selectedCategory = MutableStateFlow<String?>(null)
     val selectedCategory: StateFlow<String?> = _selectedCategory.asStateFlow()
 
+    private val _selectedCategories = MutableStateFlow<Set<String>>(emptySet())
+    val selectedCategories: StateFlow<Set<String>> = _selectedCategories.asStateFlow()
+
     private val _widgetStyle = MutableStateFlow("Expressive") // Expressive, Minimal, Compact
     val widgetStyle: StateFlow<String> = _widgetStyle.asStateFlow()
 
@@ -32,6 +39,15 @@ class AuraViewModel(private val repository: QuoteRepository) : ViewModel() {
 
     private val _themeAccent = MutableStateFlow("Violet") // Violet, Amber, Green, Blue, Rose
     val themeAccent: StateFlow<String> = _themeAccent.asStateFlow()
+
+    private val _dailyReminderEnabled = MutableStateFlow(false)
+    val dailyReminderEnabled: StateFlow<Boolean> = _dailyReminderEnabled.asStateFlow()
+
+    private val _dailyReminderHour = MutableStateFlow(8)
+    val dailyReminderHour: StateFlow<Int> = _dailyReminderHour.asStateFlow()
+
+    private val _dailyReminderMinute = MutableStateFlow(0)
+    val dailyReminderMinute: StateFlow<Int> = _dailyReminderMinute.asStateFlow()
 
     val allQuotes: StateFlow<List<QuoteEntity>> = repository.allQuotes
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -45,10 +61,15 @@ class AuraViewModel(private val repository: QuoteRepository) : ViewModel() {
     val filteredQuotes: StateFlow<List<QuoteEntity>> = combine(
         allQuotes,
         searchQuery,
-        selectedCategory
-    ) { quotes, query, category ->
+        selectedCategory,
+        selectedCategories
+    ) { quotes, query, category, categories ->
         var list = quotes
-        if (category != null) {
+        if (categories.isNotEmpty()) {
+            list = list.filter { q ->
+                categories.any { cat -> q.category.equals(cat, ignoreCase = true) }
+            }
+        } else if (category != null) {
             list = list.filter { it.category.equals(category, ignoreCase = true) }
         }
         if (query.isNotEmpty()) {
@@ -63,19 +84,28 @@ class AuraViewModel(private val repository: QuoteRepository) : ViewModel() {
 
     init {
         loadDailyQuote()
+        runVerification()
+    }
+
+    fun runVerification() {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val result = com.example.utils.CategoryQuoteVerifier.verify(repository)
+            _verificationResult.value = result
+        }
     }
 
     fun checkAndSeedDatabase(context: android.content.Context) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             val prefs = context.getSharedPreferences("aura_prefs", android.content.Context.MODE_PRIVATE)
-            val isSeeded = prefs.getBoolean("database_fully_seeded_v5_batch", false)
+            val isSeeded = prefs.getBoolean("database_json_seeded_v4_0", false)
             val count = repository.getQuotesCount()
-            if (!isSeeded || count < 500) {
+            if (!isSeeded || count < 30) {
                 repository.clearAllQuotes()
                 repository.preseedDatabase(context)
-                prefs.edit().putBoolean("database_fully_seeded_v5_batch", true).apply()
+                prefs.edit().putBoolean("database_json_seeded_v4_0", true).apply()
                 loadDailyQuote()
             }
+            runVerification()
         }
     }
 
@@ -84,6 +114,9 @@ class AuraViewModel(private val repository: QuoteRepository) : ViewModel() {
         _themeMode.value = prefs.getString("theme_mode", "AMOLED") ?: "AMOLED"
         _themeAccent.value = prefs.getString("theme_accent", "Violet") ?: "Violet"
         _widgetStyle.value = prefs.getString("widget_style", "Expressive") ?: "Expressive"
+        _dailyReminderEnabled.value = prefs.getBoolean("daily_reminder_enabled", false)
+        _dailyReminderHour.value = prefs.getInt("daily_reminder_hour", 8)
+        _dailyReminderMinute.value = prefs.getInt("daily_reminder_minute", 0)
     }
 
     fun setThemeMode(context: android.content.Context, mode: String) {
@@ -128,6 +161,31 @@ class AuraViewModel(private val repository: QuoteRepository) : ViewModel() {
 
     fun selectCategory(category: String?) {
         _selectedCategory.value = category
+        if (category == null) {
+            _selectedCategories.value = emptySet()
+        } else {
+            _selectedCategories.value = setOf(category)
+        }
+    }
+
+    fun toggleCategorySelected(category: String) {
+        val currentSet = _selectedCategories.value
+        val newSet = if (currentSet.contains(category)) {
+            currentSet - category
+        } else {
+            currentSet + category
+        }
+        _selectedCategories.value = newSet
+        if (newSet.isEmpty()) {
+            _selectedCategory.value = null
+        } else {
+            _selectedCategory.value = newSet.first()
+        }
+    }
+
+    fun clearCategorySelection() {
+        _selectedCategories.value = emptySet()
+        _selectedCategory.value = null
     }
 
     fun setSearchQuery(query: String) {
@@ -165,6 +223,32 @@ class AuraViewModel(private val repository: QuoteRepository) : ViewModel() {
     fun deleteQuote(id: Int) {
         viewModelScope.launch {
             repository.deleteQuote(id)
+        }
+    }
+
+    fun setDailyReminderEnabled(context: android.content.Context, enabled: Boolean) {
+        _dailyReminderEnabled.value = enabled
+        val prefs = context.getSharedPreferences("aura_prefs", android.content.Context.MODE_PRIVATE)
+        prefs.edit().putBoolean("daily_reminder_enabled", enabled).apply()
+
+        if (enabled) {
+            NotificationScheduler.scheduleDailyNotification(context, _dailyReminderHour.value, _dailyReminderMinute.value)
+        } else {
+            NotificationScheduler.cancelDailyNotification(context)
+        }
+    }
+
+    fun updateDailyReminderTime(context: android.content.Context, hour: Int, minute: Int) {
+        _dailyReminderHour.value = hour
+        _dailyReminderMinute.value = minute
+        val prefs = context.getSharedPreferences("aura_prefs", android.content.Context.MODE_PRIVATE)
+        prefs.edit()
+            .putInt("daily_reminder_hour", hour)
+            .putInt("daily_reminder_minute", minute)
+            .apply()
+
+        if (_dailyReminderEnabled.value) {
+            NotificationScheduler.scheduleDailyNotification(context, hour, minute)
         }
     }
 }
