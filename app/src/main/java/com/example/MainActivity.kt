@@ -83,9 +83,44 @@ class MainActivity : ComponentActivity() {
                         AnimatedContent(
                             targetState = activeTab,
                             transitionSpec = {
-                                fadeIn(animationSpec = tween(150)) +
-                                scaleIn(initialScale = 0.98f, animationSpec = tween(150)) togetherWith
-                                fadeOut(animationSpec = tween(110))
+                                val currentIdx = when (initialState) {
+                                    "Daily" -> 0
+                                    "Library" -> 1
+                                    "Saved" -> 2
+                                    "Settings" -> 3
+                                    else -> 0
+                                }
+                                val targetIdx = when (targetState) {
+                                    "Daily" -> 0
+                                    "Library" -> 1
+                                    "Saved" -> 2
+                                    "Settings" -> 3
+                                    else -> 0
+                                }
+                                
+                                val isForward = targetIdx > currentIdx
+                                
+                                // Material Expressive organic motions with dynamic spring physics
+                                val exprSpring = spring<Float>(dampingRatio = 0.76f, stiffness = 180f)
+                                val exprOffsetSpring = spring<androidx.compose.ui.unit.IntOffset>(dampingRatio = 0.76f, stiffness = 180f)
+                                
+                                if (isForward) {
+                                    (slideInHorizontally(animationSpec = exprOffsetSpring) { width -> (width * 0.15f).toInt() } +
+                                     fadeIn(animationSpec = exprSpring) +
+                                     scaleIn(initialScale = 0.94f, animationSpec = exprSpring))
+                                    .togetherWith(
+                                     slideOutHorizontally(animationSpec = exprOffsetSpring) { width -> -(width * 0.15f).toInt() } +
+                                     fadeOut(animationSpec = exprSpring) +
+                                     scaleOut(targetScale = 0.94f, animationSpec = exprSpring))
+                                } else {
+                                    (slideInHorizontally(animationSpec = exprOffsetSpring) { width -> -(width * 0.15f).toInt() } +
+                                     fadeIn(animationSpec = exprSpring) +
+                                     scaleIn(initialScale = 0.94f, animationSpec = exprSpring))
+                                    .togetherWith(
+                                     slideOutHorizontally(animationSpec = exprOffsetSpring) { width -> (width * 0.15f).toInt() } +
+                                     fadeOut(animationSpec = exprSpring) +
+                                     scaleOut(targetScale = 0.94f, animationSpec = exprSpring))
+                                }
                             },
                             label = "MainTabsTransition"
                         ) { tab ->
@@ -107,13 +142,9 @@ class MainActivity : ComponentActivity() {
 fun BottomNavigationBar(activeTab: String, onTabSelected: (String) -> Unit) {
     val haptic = LocalHapticFeedback.current
     NavigationBar(
-        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
-        modifier = Modifier
-            .fillMaxWidth()
-            .navigationBarsPadding() // Safeguard clipping under gesture nav bars
-            .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-            .border(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f), RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)),
-        tonalElevation = 8.dp
+        containerColor = MaterialTheme.colorScheme.background,
+        modifier = Modifier.fillMaxWidth(),
+        tonalElevation = 0.dp
     ) {
         val items = listOf(
             Triple("Daily", Pair(Icons.Outlined.FormatQuote, Icons.Default.FormatQuote), "Daily"),

@@ -67,9 +67,13 @@ class AuraViewModel(private val repository: QuoteRepository) : ViewModel() {
 
     fun checkAndSeedDatabase(context: android.content.Context) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val prefs = context.getSharedPreferences("aura_prefs", android.content.Context.MODE_PRIVATE)
+            val isSeeded = prefs.getBoolean("database_fully_seeded_v5_batch", false)
             val count = repository.getQuotesCount()
-            if (count == 0) {
+            if (!isSeeded || count < 500) {
+                repository.clearAllQuotes()
                 repository.preseedDatabase(context)
+                prefs.edit().putBoolean("database_fully_seeded_v5_batch", true).apply()
                 loadDailyQuote()
             }
         }
