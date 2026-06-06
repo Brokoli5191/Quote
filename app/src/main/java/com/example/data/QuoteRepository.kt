@@ -14,6 +14,10 @@ class QuoteRepository(private val quoteDao: QuoteDao) {
         return quoteDao.getQuotesCount()
     }
 
+    suspend fun clearAllQuotes() {
+        quoteDao.deleteAllQuotes()
+    }
+
     suspend fun preseedDatabase(context: Context) {
         try {
             val inputStream = context.resources.openRawResource(com.example.R.raw.quotes_seed)
@@ -61,7 +65,8 @@ class QuoteRepository(private val quoteDao: QuoteDao) {
                 }
             }
             
-            quoteEntities.forEach { quoteDao.insertQuote(it) }
+            // Highly optimized batch insert in a single transaction
+            quoteDao.insertQuotes(quoteEntities)
         } catch (e: Exception) {
             e.printStackTrace()
         }

@@ -158,7 +158,25 @@ fun LibraryScreen(viewModel: AuraViewModel) {
             AnimatedContent(
                 targetState = (selectedCategory != null || searchQuery.isNotBlank()),
                 transitionSpec = {
-                    fadeIn(animationSpec = tween(220)) togetherWith fadeOut(animationSpec = tween(220))
+                    val exprSpring = spring<Float>(dampingRatio = 0.76f, stiffness = 180f)
+                    val exprOffsetSpring = spring<androidx.compose.ui.unit.IntOffset>(dampingRatio = 0.76f, stiffness = 180f)
+                    if (targetState) {
+                        // Sliding bento collapses, category content slides up with organic bounce
+                        (slideInVertically(animationSpec = exprOffsetSpring) { height -> (height * 0.12f).toInt() } +
+                         fadeIn(animationSpec = exprSpring) +
+                         scaleIn(initialScale = 0.95f, animationSpec = exprSpring))
+                        .togetherWith(
+                         fadeOut(animationSpec = exprSpring) +
+                         scaleOut(targetScale = 0.95f, animationSpec = exprSpring))
+                    } else {
+                        // Category back: slide out downwards cleanly, bento content fades in
+                        (fadeIn(animationSpec = exprSpring) +
+                         scaleIn(initialScale = 0.95f, animationSpec = exprSpring))
+                        .togetherWith(
+                         slideOutVertically(animationSpec = exprOffsetSpring) { height -> (height * 0.12f).toInt() } +
+                         fadeOut(animationSpec = exprSpring) +
+                         scaleOut(targetScale = 0.95f, animationSpec = exprSpring))
+                    }
                 },
                 label = "LibraryInPlaceTransition",
                 modifier = Modifier.fillMaxSize()

@@ -440,7 +440,7 @@ fun ElasticPullDownContainer(
                     },
                     onDragEnd = {
                         scope.launch {
-                            if (rawDragY > 450f) {
+                            if (rawDragY > 600f) {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 onTriggerRefresh()
                             }
@@ -475,8 +475,8 @@ fun ElasticPullDownContainer(
                             rawDragY = (rawDragY + dragAmount).coerceAtLeast(0f)
                             
                             // Exponential rubber-banding math: offset = maxOffset * (1 - e^-x)
-                            val maxOffset = 500f
-                            val resistanceFactor = 700f
+                            val maxOffset = 1200f
+                            val resistanceFactor = 1200f
                             val elasticOffset = maxOffset * (1f - kotlin.math.exp(-rawDragY / resistanceFactor))
                             
                             scope.launch {
@@ -484,10 +484,10 @@ fun ElasticPullDownContainer(
                             }
 
                             // Trigger tactile feedback ticks
-                            if (rawDragY > 450f && !hasTriggeredLimitHaptic) {
+                            if (rawDragY > 600f && !hasTriggeredLimitHaptic) {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 hasTriggeredLimitHaptic = true
-                            } else if (rawDragY <= 450f && hasTriggeredLimitHaptic) {
+                            } else if (rawDragY <= 600f && hasTriggeredLimitHaptic) {
                                 hasTriggeredLimitHaptic = false
                             }
                         }
@@ -497,7 +497,7 @@ fun ElasticPullDownContainer(
     ) {
         // Visual Pull-To-Refresh instruction pill at the top
         if (dragOffset.value > 5f) {
-            val progress = (rawDragY / 450f).coerceIn(0f, 1f)
+            val progress = (rawDragY / 600f).coerceIn(0f, 1f)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -528,7 +528,7 @@ fun ElasticPullDownContainer(
                     Icon(
                         imageVector = Icons.Default.Refresh,
                         contentDescription = "Pull To Refresh Indicator",
-                        tint = if (rawDragY > 450f) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer,
+                        tint = if (rawDragY > 600f) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier
                             .size(16.dp)
                             .graphicsLayer {
@@ -536,9 +536,9 @@ fun ElasticPullDownContainer(
                             }
                     )
                     Text(
-                        text = if (rawDragY > 450f) "Release for wisdom ✦" else "Pull for wisdom",
+                        text = if (rawDragY > 600f) "Release for wisdom ✦" else "Pull for wisdom",
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = if (rawDragY > 450f) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer
+                        color = if (rawDragY > 600f) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 }
             }
