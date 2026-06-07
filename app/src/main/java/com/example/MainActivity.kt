@@ -191,8 +191,8 @@ fun BottomNavigationBar(activeTab: String, lowPerformanceMode: Boolean, onTabSel
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(80.dp)
-                .navigationBarsPadding(),
+                .navigationBarsPadding()
+                .height(80.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceAround
         ) {

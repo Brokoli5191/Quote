@@ -92,16 +92,7 @@ class QuoteRepository(private val quoteDao: QuoteDao) {
                 )
             }
             
-            // Set some favorites default
-            if (quoteEntities.isNotEmpty()) {
-                quoteEntities[0] = quoteEntities[0].copy(isFavorite = true, savedDate = "2 days ago")
-                if (quoteEntities.size > 5) {
-                    quoteEntities[5] = quoteEntities[5].copy(isFavorite = true, savedDate = "2 days ago")
-                }
-                if (quoteEntities.size > 40) {
-                    quoteEntities[40] = quoteEntities[40].copy(isFavorite = true, savedDate = "1 day ago")
-                }
-            }
+
             
             // Highly optimized batch insert in a single transaction
             quoteDao.insertQuotes(quoteEntities)
