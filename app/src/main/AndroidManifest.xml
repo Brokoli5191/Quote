@@ -27,14 +27,23 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".widget.WidgetConfigureActivity"
+            android:exported="true"
+            android:theme="@style/Theme.MyApplication">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
         
         <receiver
-            android:name="com.example.widget.AuraWidgetProvider"
+            android:name="app.brokoli5191.quote.widget.AuraWidgetProvider"
             android:exported="true"
             android:label="quote Widget">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-                <action android:name="com.example.UPDATE_WIDGET" />
+                <action android:name="app.brokoli5191.quote.UPDATE_WIDGET" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
@@ -42,11 +51,11 @@
         </receiver>
 
         <receiver
-            android:name="com.example.utils.NotificationReceiver"
+            android:name="app.brokoli5191.quote.utils.NotificationReceiver"
             android:exported="false" />
 
         <receiver
-            android:name="com.example.utils.BootReceiver"
+            android:name="app.brokoli5191.quote.utils.BootReceiver"
             android:enabled="true"
             android:exported="true">
             <intent-filter>
