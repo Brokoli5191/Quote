@@ -14,7 +14,7 @@ An Android application for viewing, searching, and managing quotes. Includes a d
 ## Usage
 
 ### Widgets
-Long press home screen -> Widgets -> QuoteFlow. Choose Expressive, Minimal, or Compact styles in the app settings.
+Long press home screen -> Widgets -> QuoteFlow. Choose Quote, Minimal, or Compact styles in the app settings.
 
 ### Notifications
 Toggle "Daily Reminder" in Settings and select the notification time.
