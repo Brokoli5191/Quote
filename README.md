@@ -1,139 +1,42 @@
-<div align="center">
-<img width="1200" height="475" alt="QuoteFlow Banner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-
 # QuoteFlow
 
-Android application to view, search, and manage quotes.
+An Android application for viewing, searching, and managing quotes. Includes a daily quote widget and category browsing.
 
-[![Platform](https://img.shields.io/badge/Platform-Android-3DDC84?logo=android&logoColor=white)](https://developer.android.com)
-[![Min SDK](https://img.shields.io/badge/Min%20SDK-24-3DDC84)](https://developer.android.com/about/dashboards)
-[![Target SDK](https://img.shields.io/badge/Target%20SDK-36-3DDC84)](https://developer.android.com/about/versions/15)
-[![Language](https://img.shields.io/badge/Language-Kotlin-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
-[![UI](https://img.shields.io/badge/UI-Jetpack%20Compose-4285F4?logo=jetpackcompose&logoColor=white)](https://developer.android.com)
-[![Database](https://img.shields.io/badge/Database-Room-4285F4?logo=sqlite&logoColor=white)](https://developer.android.com/training/data-storage/room)
+## Features
 
-</div>
+- Daily quote selection with manual cycle/refresh
+- Filter by topics like Stoicism, Resilience, Joy, Focus, Love, and Custom entries
+- Text search across quote content, authors, and tags
+- Favorite quotes and custom quote creation
+- System themes (Light, Dark, AMOLED, and Dynamic/Material You) with Violet, Amber, Green, Blue, Rose accents
+- Low performance toggle to disable spring animations for older devices
 
----
+## Usage
 
-## Table of Contents
-1. [Features](#features-)
-2. [Usage](#usage-)
-3. [Build & Installation](#build--installation-)
-4. [Architecture & Tech Stack](#architecture--tech-stack-)
-5. [Contributing](#contributing-)
-6. [License](#license-)
+### Widgets
+Long press home screen -> Widgets -> QuoteFlow. Choose Expressive, Minimal, or Compact styles in the app settings.
 
----
+### Notifications
+Toggle "Daily Reminder" in Settings and select the notification time.
 
-## Features ✨
+### Backup
+Export/import custom quotes and favorites to JSON in Settings.
 
-- **Daily Quotes**: Automatically schedules a daily quote, with support for manual cycling.
-- **Categorized Library**: Multi-category filter support (Stoicism, Resilience, Joy, Focus, Love, Custom) and text search.
-- **Custom Quote Management**: Direct interface to add and delete user-authored quotes.
-- **Favorites Space**: One-tap bookmarking to organize saved quotes.
-- **Theming & Accents**: Light, Dark, AMOLED, and Dynamic (Material You) system colors. Accent color choices include Violet, Amber, Green, Blue, and Rose.
-- **Low Performance Toggle**: Settings option to disable spring physics and page slide animations for resource-constrained devices.
+## Build and Run
 
----
+### Download
+Get the APK from the GitHub releases page.
 
-## Usage 📱
+### From Source
+1. Add your Android SDK path to `local.properties`:
+   `sdk.dir=C:/Users/<Username>/AppData/Local/Android/Sdk`
+2. Decode the debug keystore:
+   `certutil -decode debug.keystore.base64 debug.keystore`
+3. Run `.\gradlew.bat assembleDebug` (Windows) or `./gradlew assembleDebug` (Mac/Linux).
 
-### Home Screen Widget
-1. Long-press on your device's home screen.
-2. Select **Widgets** and find **QuoteFlow**.
-3. Place the widget on your screen.
-4. Open the app settings tab to choose a widget style:
-   - **Expressive**: Rich card designs displaying text and author.
-   - **Minimal**: Plain, distraction-free quote layout.
-   - **Compact**: Small footprint layout.
+The APK is built at `app/build/outputs/apk/debug/app-debug.apk`.
 
-### Daily Reminders
-1. Navigate to the **Settings** tab.
-2. Toggle the **Daily Reminder** switch.
-3. Configure the specific hour and minute for notification delivery.
-
-### Backup & Restore
-1. Navigate to the **Settings** tab.
-2. Tap **Export Backup** to save your custom quotes and favorite states to a JSON file.
-3. Tap **Import Backup** and select your saved JSON file to restore the data.
-
----
-
-## Build & Installation 🛠️
-
-### Download APK
-You can download the pre-compiled APK directly from the GitHub releases page:
-
-<a href="https://github.com/Brokoli5191/Quote/releases">
-  <img src="https://raw.githubusercontent.com/NeoApplications/Neo-Backup/034b226cea5c1b30eb4f6a6f313e4dadcbb0ece4/badge_github.png" width="200" alt="Download from GitHub Releases">
-</a>
-
-### Building from Source
-
-#### Prerequisites
-- JDK 21
-- Android SDK
-
-#### Steps
-
-1. Configure the Android SDK path in `local.properties`:
-   ```properties
-   sdk.dir=C:/Users/<Username>/AppData/Local/Android/Sdk
-   ```
-
-2. Decode the keystore file for debug signing:
-   - **Windows**:
-     ```cmd
-     certutil -decode debug.keystore.base64 debug.keystore
-     ```
-   - **Linux / macOS**:
-     ```bash
-     base64 -d debug.keystore.base64 > debug.keystore
-     ```
-
-3. Build the debug APK:
-   - **Windows**:
-     ```powershell
-     .\gradlew.bat assembleDebug
-     ```
-   - **Linux / macOS**:
-     ```bash
-     ./gradlew assembleDebug
-     ```
-
-The output APK is generated at `app/build/outputs/apk/debug/app-debug.apk`.
-
----
-
-## Architecture & Tech Stack ⚙️
-
-- **Architecture**: MVVM pattern with Repository layer. Room database handles local SQLite persistence.
-- **UI Framework**: Jetpack Compose (Declarative UI)
-- **State Management**: Kotlin Coroutines and StateFlow
-- **Build System**: Gradle Kotlin DSL and Version Catalogs
-
----
-
-## Contributing 🤝
-
-1. Fork the repository.
-2. Create a feature branch:
-   ```bash
-   git checkout -b feature/your-feature
-   ```
-3. Commit your changes:
-   ```bash
-   git commit -m "Add your feature description"
-   ```
-4. Push to the branch:
-   ```bash
-   git push origin feature/your-feature
-   ```
-5. Open a Pull Request.
-
----
-
-## License 📄
-
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details (if available).
+## Tech Stack
+- Kotlin & Jetpack Compose
+- Room Database
+- Gradle Kotlin DSL
