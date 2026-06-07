@@ -14,9 +14,5 @@
         android:fillColor="#E9DDFF"
         android:pathData="M76,46 C76,58 66,66 56,72 L56,63 C63,58 67,51 67,46 H56 V30 H76 V46 Z" />
 
-    <!-- Twinkling Accent Star (sparkles in premium contrasting Amber Gold) -->
-    <path
-        android:fillColor="#FFDB9C"
-        android:pathData="M77,18 Q77,22 81,22 Q77,22 77,26 Q77,22 73,22 Q77,22 77,18 Z" />
 </vector>
 
