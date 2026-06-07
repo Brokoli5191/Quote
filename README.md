@@ -1,29 +1,12 @@
-# QuoteFlow
+<div align="center">
+<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
+<h1>QuoteFlow</h1>
+An Android application to view, search, and manage a collection of quotes.
+</div>
 
-Android application to view, search, and manage quotes.
+---
 
-## Usage
-
-- **Home Screen Widget**: Long press the home screen, select the QuoteFlow widget, and place it. Change styles (Expressive, Minimal, Compact) in the app settings.
-- **Daily Reminders**: Enable notifications in the settings tab and select a time.
-- **Backup / Restore**: Use the settings screen to export custom quotes and favorites to JSON, or import them back.
-
-## Features
-
-- **Daily Quote**: Displays a daily quote with manual cycling support.
-- **Library**: Quote filtering by text search and multiple categories (Stoicism, Resilience, Joy, Focus, Love, Custom).
-- **Custom Quotes**: User-added quotes can be created and deleted.
-- **Themes**: Supports Light, Dark, AMOLED, and Dynamic (Material You) modes with Violet, Amber, Green, Blue, and Rose accent colors.
-- **Low Performance Mode**: Toggle to disable spring animations and slide transitions on older devices.
-
-## Stack
-
-- **Language**: Kotlin
-- **UI**: Jetpack Compose
-- **Database**: Room
-- **Build System**: Gradle with Kotlin DSL
-
-## Build and Installation
+## Build & Installation 🛠️
 
 ### Prerequisites
 - JDK 21
@@ -57,3 +40,25 @@ Android application to view, search, and manage quotes.
      ```
 
 The output APK is generated at `app/build/outputs/apk/debug/app-debug.apk`.
+
+## Usage 📱
+
+- **Home Screen Widget**: Long press the home screen, select the QuoteFlow widget, and place it. Change styles (Expressive, Minimal, Compact) in the app settings.
+- **Daily Reminders**: Enable notifications in the settings tab and select a time.
+- **Backup / Restore**: Use the settings screen to export custom quotes and favorites to JSON, or import them back.
+
+## Features ✨
+
+- Curated daily quote with manual cycling support
+- Search and multi-category filtering (Stoicism, Resilience, Joy, Focus, Love, Custom)
+- Creation and deletion of custom quotes
+- Import and export collections via JSON backup
+- System themes (Light, Dark, AMOLED, Dynamic Material You) and accent colors (Violet, Amber, Green, Blue, Rose)
+- Low performance mode toggle to disable animations on older devices
+
+## Tech Stack ⚙️
+
+- **Language**: Kotlin
+- **UI Framework**: Jetpack Compose
+- **Database**: Room
+- **Build System**: Gradle with Kotlin DSL
