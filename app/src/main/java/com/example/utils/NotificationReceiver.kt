@@ -16,16 +16,13 @@ import kotlinx.coroutines.launch
 
 class NotificationReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
-            // Reschedule notification alarm on boot if it was enabled
-            val prefs = context.getSharedPreferences("aura_prefs", Context.MODE_PRIVATE)
-            val enabled = prefs.getBoolean("daily_reminder_enabled", false)
-            if (enabled) {
-                val hour = prefs.getInt("daily_reminder_hour", 8)
-                val minute = prefs.getInt("daily_reminder_minute", 0)
-                NotificationScheduler.scheduleDailyNotification(context, hour, minute)
-            }
-            return
+        // Reschedule alarm for the next day (since allow-while-idle alarms are one-shot)
+        val prefs = context.getSharedPreferences("aura_prefs", Context.MODE_PRIVATE)
+        val enabled = prefs.getBoolean("daily_reminder_enabled", false)
+        if (enabled) {
+            val hour = prefs.getInt("daily_reminder_hour", 8)
+            val minute = prefs.getInt("daily_reminder_minute", 0)
+            NotificationScheduler.scheduleDailyNotification(context, hour, minute)
         }
 
         // Fetch a daily quote asynchronously using coroutines

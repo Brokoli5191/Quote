@@ -38,16 +38,49 @@ object NotificationScheduler {
         }
 
         try {
-            // Using inexact repeating which is highly efficient and battery friendly
-            alarmManager.setInexactRepeating(
-                AlarmManager.RTC_WAKEUP,
-                calendar.timeInMillis,
-                AlarmManager.INTERVAL_DAY,
-                pendingIntent
-            )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                var isExactPossible = false
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    isExactPossible = alarmManager.canScheduleExactAlarms()
+                } else {
+                    isExactPossible = true
+                }
+
+                if (isExactPossible) {
+                    alarmManager.setExactAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        calendar.timeInMillis,
+                        pendingIntent
+                    )
+                } else {
+                    alarmManager.setAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        calendar.timeInMillis,
+                        pendingIntent
+                    )
+                }
+            } else {
+                alarmManager.set(
+                    AlarmManager.RTC_WAKEUP,
+                    calendar.timeInMillis,
+                    pendingIntent
+                )
+            }
             Log.d("NotificationScheduler", "Scheduled daily alarm at $hour:$minute")
         } catch (e: Exception) {
             e.printStackTrace()
+            // Fallback immediately to standard non-exact allow-while-idle if exact fails due to standby/security restrictions
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    alarmManager.setAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        calendar.timeInMillis,
+                        pendingIntent
+                    )
+                }
+            } catch (ex: Exception) {
+                ex.printStackTrace()
+            }
         }
     }
 

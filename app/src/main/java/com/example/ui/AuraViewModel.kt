@@ -49,6 +49,9 @@ class AuraViewModel(private val repository: QuoteRepository) : ViewModel() {
     private val _dailyReminderMinute = MutableStateFlow(0)
     val dailyReminderMinute: StateFlow<Int> = _dailyReminderMinute.asStateFlow()
 
+    private val _lowPerformanceMode = MutableStateFlow(false)
+    val lowPerformanceMode: StateFlow<Boolean> = _lowPerformanceMode.asStateFlow()
+
     val allQuotes: StateFlow<List<QuoteEntity>> = repository.allQuotes
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -76,7 +79,9 @@ class AuraViewModel(private val repository: QuoteRepository) : ViewModel() {
             list = list.filter {
                 it.text.contains(query, ignoreCase = true) ||
                 it.author.contains(query, ignoreCase = true) ||
-                it.tags.contains(query, ignoreCase = true)
+                it.tags.split(",").map { tag -> tag.trim() }.any { tag ->
+                    tag.contains(query, ignoreCase = true) && (!tag.contains("misattributed", ignoreCase = true) || query.contains("misattributed", ignoreCase = true))
+                }
             }
         }
         list
@@ -97,12 +102,12 @@ class AuraViewModel(private val repository: QuoteRepository) : ViewModel() {
     fun checkAndSeedDatabase(context: android.content.Context) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             val prefs = context.getSharedPreferences("aura_prefs", android.content.Context.MODE_PRIVATE)
-            val isSeeded = prefs.getBoolean("database_json_seeded_v4_0", false)
+            val isSeeded = prefs.getBoolean("database_json_seeded_v5_0", false)
             val count = repository.getQuotesCount()
             if (!isSeeded || count < 30) {
                 repository.clearAllQuotes()
                 repository.preseedDatabase(context)
-                prefs.edit().putBoolean("database_json_seeded_v4_0", true).apply()
+                prefs.edit().putBoolean("database_json_seeded_v5_0", true).apply()
                 loadDailyQuote()
             }
             runVerification()
@@ -117,6 +122,13 @@ class AuraViewModel(private val repository: QuoteRepository) : ViewModel() {
         _dailyReminderEnabled.value = prefs.getBoolean("daily_reminder_enabled", false)
         _dailyReminderHour.value = prefs.getInt("daily_reminder_hour", 8)
         _dailyReminderMinute.value = prefs.getInt("daily_reminder_minute", 0)
+        _lowPerformanceMode.value = prefs.getBoolean("low_performance_mode", false)
+    }
+
+    fun setLowPerformanceMode(context: android.content.Context, enabled: Boolean) {
+        _lowPerformanceMode.value = enabled
+        val prefs = context.getSharedPreferences("aura_prefs", android.content.Context.MODE_PRIVATE)
+        prefs.edit().putBoolean("low_performance_mode", enabled).apply()
     }
 
     fun setThemeMode(context: android.content.Context, mode: String) {
@@ -249,6 +261,107 @@ class AuraViewModel(private val repository: QuoteRepository) : ViewModel() {
 
         if (_dailyReminderEnabled.value) {
             NotificationScheduler.scheduleDailyNotification(context, hour, minute)
+        }
+    }
+
+    fun exportBackup(context: android.content.Context, uri: android.net.Uri, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val allQuotesList = repository.getAllQuotesSync()
+                val backupItems = allQuotesList.filter { it.isUserAdded || it.isFavorite }
+                
+                val jsonArray = org.json.JSONArray()
+                for (quote in backupItems) {
+                    val obj = org.json.JSONObject().apply {
+                        put("text", quote.text)
+                        put("author", quote.author)
+                        put("category", quote.category)
+                        put("isFavorite", quote.isFavorite)
+                        put("isUserAdded", quote.isUserAdded)
+                        put("timestamp", quote.timestamp)
+                        put("aboutAuthor", quote.aboutAuthor)
+                        put("tags", quote.tags)
+                        put("savedDate", quote.savedDate ?: "")
+                    }
+                    jsonArray.put(obj)
+                }
+                
+                context.contentResolver.openOutputStream(uri)?.use { os ->
+                    os.write(jsonArray.toString(4).toByteArray())
+                }
+                
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onSuccess()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onError(e.localizedMessage ?: "Unknown error")
+                }
+            }
+        }
+    }
+
+    fun importBackup(context: android.content.Context, uri: android.net.Uri, onSuccess: (insertedCustom: Int, updatedFavs: Int) -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val content = context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                    inputStream.bufferedReader().use { it.readText() }
+                } ?: throw Exception("Could not open file")
+                
+                val jsonArray = org.json.JSONArray(content)
+                val dbQuotes = repository.getAllQuotesSync()
+                
+                var insertedCustom = 0
+                var updatedFavs = 0
+                
+                for (i in 0 until jsonArray.length()) {
+                    val obj = jsonArray.getJSONObject(i)
+                    val text = obj.getString("text")
+                    val author = obj.getString("author")
+                    val category = obj.optString("category", "Stoicism")
+                    val isFavorite = obj.optBoolean("isFavorite", false)
+                    val isUserAdded = obj.optBoolean("isUserAdded", false)
+                    val timestamp = obj.optLong("timestamp", System.currentTimeMillis())
+                    val aboutAuthor = obj.optString("aboutAuthor", "")
+                    val tags = obj.optString("tags", "")
+                    val savedDate = obj.optString("savedDate", null).let { if (it.isNullOrEmpty()) null else it }
+                    
+                    if (isUserAdded) {
+                        val alreadyExists = dbQuotes.any { it.text.trim() == text.trim() && it.author.trim() == author.trim() }
+                        if (!alreadyExists) {
+                            val newQuote = QuoteEntity(
+                                text = text,
+                                author = author,
+                                category = category,
+                                isFavorite = isFavorite,
+                                isUserAdded = true,
+                                timestamp = timestamp,
+                                aboutAuthor = aboutAuthor,
+                                tags = tags,
+                                savedDate = savedDate
+                            )
+                            repository.insertQuote(newQuote)
+                            insertedCustom++
+                        }
+                    } else if (isFavorite) {
+                        val match = dbQuotes.find { it.text.trim() == text.trim() && it.author.trim() == author.trim() }
+                        if (match != null && !match.isFavorite) {
+                            repository.toggleFavorite(match.id, true)
+                            updatedFavs++
+                        }
+                    }
+                }
+                
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onSuccess(insertedCustom, updatedFavs)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onError(e.localizedMessage ?: "Unknown file format")
+                }
+            }
         }
     }
 }
