@@ -4,18 +4,19 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Left Quote Comma -->
+    <!-- Left Quote Comma (perfectly centered in X and visually adjusted in Y) -->
     <path
-        android:fillColor="#FFDB9C"
-        android:pathData="M50,49 C50,61 40,69 30,75 L30,66 C37,61 41,54 41,49 H30 V33 H50 V49 Z" />
+        android:fillColor="#E9DDFF"
+        android:pathData="M52,46 C52,58 42,66 32,72 L32,63 C39,58 43,51 43,46 H32 V30 H52 V46 Z" />
     
-    <!-- Right Quote Comma -->
+    <!-- Right Quote Comma (perfectly centered in X and visually adjusted in Y) -->
     <path
-        android:fillColor="#FFDB9C"
-        android:pathData="M74,49 C74,61 64,69 54,75 L54,66 C61,61 65,54 65,49 H54 V33 H74 V49 Z" />
+        android:fillColor="#E9DDFF"
+        android:pathData="M76,46 C76,58 66,66 56,72 L56,63 C63,58 67,51 67,46 H56 V30 H76 V46 Z" />
 
-    <!-- Twinkling Accent Star -->
+    <!-- Twinkling Accent Star (sparkles in premium contrasting Amber Gold) -->
     <path
         android:fillColor="#FFDB9C"
         android:pathData="M77,18 Q77,22 81,22 Q77,22 77,26 Q77,22 73,22 Q77,22 77,18 Z" />
 </vector>
+
