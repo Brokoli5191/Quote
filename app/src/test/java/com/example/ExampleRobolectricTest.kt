@@ -46,8 +46,7 @@ class ExampleRobolectricTest {
     
     val userCategories = listOf(
         "Inspirational", "Life", "Humor", "Love", "Books", "Truth", "Reading", "Wisdom",
-        "Happiness", "Writing", "Inspiration", "Philosophy", "Death", "Poetry", "Optimism",
-        "Hope", "Friendship", "Education", "Music", "Women"
+        "Happiness", "Writing", "Inspiration", "Philosophy", "Death", "Poetry", "Optimism"
     )
     
     val categoryCounts = userCategories.associateWith { 0 }.toMutableMap()
@@ -95,8 +94,7 @@ class ExampleRobolectricTest {
     
     val userCategories = listOf(
         "Inspirational", "Life", "Humor", "Love", "Books", "Truth", "Reading", "Wisdom",
-        "Happiness", "Writing", "Inspiration", "Philosophy", "Death", "Poetry", "Optimism",
-        "Hope", "Friendship", "Education", "Music", "Women"
+        "Happiness", "Writing", "Inspiration", "Philosophy", "Death", "Poetry", "Optimism"
     )
     
     for (category in userCategories) {

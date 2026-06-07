@@ -29,6 +29,10 @@ import com.example.ui.AuraViewModel
 import com.example.ui.theme.SerifFontFamily
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -502,150 +506,193 @@ fun AddCustomQuoteDialog(
         "Philosophy",
         "Death",
         "Poetry",
-        "Optimism",
-        "Hope",
-        "Friendship",
-        "Education",
-        "Music",
-        "Women"
+        "Optimism"
     )
-    var expandedDropdown by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
 
-    AlertDialog(
+    val nestedScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset {
+                return if (available.y > 0f) {
+                    Offset(0f, available.y)
+                } else {
+                    Offset.Zero
+                }
+            }
+        }
+    }
+
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = "Add Custom Affirmation",
-                style = MaterialTheme.typography.headlineMedium,
-                color = Color.White
-            )
-        },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = Color(0xFF111015),
+        tonalElevation = 8.dp,
+        dragHandle = { BottomSheetDefaults.DragHandle(color = Color.White.copy(alpha = 0.2f)) }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .nestedScroll(nestedScrollConnection)
+                .padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 24.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Quote text input
-                OutlinedTextField(
-                    value = text,
-                    onValueChange = { text = it },
-                    label = { Text("Affirmation Wisdom Text") },
-                    placeholder = { Text("What inspiring words would you like to add?") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
-                    )
+                Text(
+                    text = "New Custom Quote",
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.primary
                 )
-
-                // Author input
-                OutlinedTextField(
-                    value = author,
-                    onValueChange = { author = it },
-                    label = { Text("Author / Sage Name") },
-                    placeholder = { Text("Who said this? (e.g. Ancient Proverb, Self)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close",
+                        tint = Color.White.copy(alpha = 0.6f)
                     )
-                )
+                }
+            }
 
-                // Category selector dropdown list representing M3 selector
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    OutlinedTextField(
-                        value = category,
-                        onValueChange = {},
-                        label = { Text("Card Category Theme") },
-                        readOnly = true,
+            // Clean Quote Text
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                label = { Text("Quote / Affirmation") },
+                placeholder = { Text("Write inspiring words...") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White
+                )
+            )
+
+            // Author Input
+            OutlinedTextField(
+                value = author,
+                onValueChange = { author = it },
+                label = { Text("Author") },
+                placeholder = { Text("e.g. Marcus Aurelius, Self") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White
+                )
+            )
+
+            // Tags Input
+            OutlinedTextField(
+                value = tags,
+                onValueChange = { tags = it },
+                label = { Text("Tags") },
+                placeholder = { Text("e.g. wisdom, life (comma-separated)") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White
+                )
+            )
+
+            // Category Selection (Matches Library's grid style!)
+            Text(
+                text = "Select Category",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                categories.chunked(2).forEach { rowCategoryList ->
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        trailingIcon = {
-                            IconButton(onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                expandedDropdown = !expandedDropdown
-                            }) {
-                                Icon(
-                                    imageVector = if (expandedDropdown) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
-                                    contentDescription = "Dropdown"
-                                )
-                            }
-                        },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
-                        )
-                    )
-
-                    DropdownMenu(
-                        expanded = expandedDropdown,
-                        onDismissRequest = { expandedDropdown = false },
-                        modifier = Modifier
-                            .fillMaxWidth(0.9f)
-                            .background(MaterialTheme.colorScheme.surface)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        categories.forEach { cat ->
-                            DropdownMenuItem(
-                                text = { Text(cat, color = Color.White) },
+                        rowCategoryList.forEach { categoryName ->
+                            val isSelected = (category == categoryName)
+                            FilterChip(
+                                selected = isSelected,
                                 onClick = {
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    category = cat
-                                    expandedDropdown = false
-                                }
+                                    category = categoryName
+                                },
+                                label = {
+                                    Text(
+                                        text = categoryName,
+                                        style = MaterialTheme.typography.labelMedium.copy(
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    )
+                                },
+                                modifier = Modifier.weight(1f).height(46.dp),
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+                                    selectedLabelColor = MaterialTheme.colorScheme.primary,
+                                    containerColor = Color(0xFF1B1A21),
+                                    labelColor = Color.White.copy(alpha = 0.6f)
+                                ),
+                                border = FilterChipDefaults.filterChipBorder(
+                                    enabled = true,
+                                    selected = isSelected,
+                                    selectedBorderColor = MaterialTheme.colorScheme.primary,
+                                    borderColor = Color.White.copy(alpha = 0.08f)
+                                )
                             )
+                        }
+                        if (rowCategoryList.size == 1) {
+                            Spacer(modifier = Modifier.weight(1f))
                         }
                     }
                 }
+            }
 
-                // Tags CSV input
-                OutlinedTextField(
-                    value = tags,
-                    onValueChange = { tags = it },
-                    label = { Text("Hashtags / Labels (comma-separated)") },
-                    placeholder = { Text("e.g. Identity, SelfLove, Wisdom") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
-                    )
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    if (text.isNotBlank()) {
-                        onAdd(text, author, category, tags)
-                    }
-                },
-                enabled = text.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                ),
-                shape = RoundedCornerShape(12.dp)
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Add to Collection")
+                TextButton(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onDismiss()
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+                    modifier = Modifier.padding(end = 8.dp)
+                ) {
+                    Text("Cancel")
+                }
+
+                Button(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        if (text.isNotBlank()) {
+                            onAdd(text, author, category, tags)
+                        }
+                    },
+                    enabled = text.isNotBlank(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Add Quote")
+                }
             }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onDismiss()
-                },
-                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary)
-            ) {
-                Text("Cancel")
-            }
-        },
-        containerColor = MaterialTheme.colorScheme.surface
-    )
+        }
+    }
 }

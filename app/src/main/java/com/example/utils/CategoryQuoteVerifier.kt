@@ -13,8 +13,7 @@ data class CategoryVerificationResult(
 object CategoryQuoteVerifier {
     val categoryList = listOf(
         "Inspirational", "Life", "Humor", "Love", "Books", "Truth", "Reading", "Wisdom",
-        "Happiness", "Writing", "Inspiration", "Philosophy", "Death", "Poetry", "Optimism",
-        "Hope", "Friendship", "Education", "Music", "Women"
+        "Happiness", "Writing", "Inspiration", "Philosophy", "Death", "Poetry", "Optimism"
     )
 
     suspend fun verify(repository: QuoteRepository): CategoryVerificationResult {

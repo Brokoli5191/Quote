@@ -22,11 +22,10 @@ class QuoteRepository(private val quoteDao: QuoteDao) {
         val allLowerTags = tags.map { it.lowercase().trim() }
         val textLower = quoteText.lowercase()
         
-        // Define our 20 specific categories requested by the user
+        // Define our 15 specific categories requested by the user
         val userCategories = listOf(
             "Inspirational", "Life", "Humor", "Love", "Books", "Truth", "Reading", "Wisdom",
-            "Happiness", "Writing", "Inspiration", "Philosophy", "Death", "Poetry", "Optimism",
-            "Hope", "Friendship", "Education", "Music", "Women"
+            "Happiness", "Writing", "Inspiration", "Philosophy", "Death", "Poetry", "Optimism"
         )
         
         // 1. Try to find an exact match in the tags first (after formatting)

@@ -9,6 +9,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -65,6 +66,7 @@ class MainActivity : ComponentActivity() {
 
             val themeMode by viewModel.themeMode.collectAsState()
             val themeAccent by viewModel.themeAccent.collectAsState()
+            val lowPerformanceMode by viewModel.lowPerformanceMode.collectAsState()
 
             MyApplicationTheme(themeMode = themeMode, themeAccent = themeAccent) {
                 val activeTab by viewModel.selectedTab.collectAsState()
@@ -74,6 +76,7 @@ class MainActivity : ComponentActivity() {
                     bottomBar = {
                         BottomNavigationBar(
                             activeTab = activeTab,
+                            lowPerformanceMode = lowPerformanceMode,
                             onTabSelected = { viewModel.selectTab(it) }
                         )
                     },
@@ -87,43 +90,72 @@ class MainActivity : ComponentActivity() {
                         AnimatedContent(
                             targetState = activeTab,
                             transitionSpec = {
-                                val currentIdx = when (initialState) {
-                                    "Daily" -> 0
-                                    "Library" -> 1
-                                    "Saved" -> 2
-                                    "Settings" -> 3
-                                    else -> 0
-                                }
-                                val targetIdx = when (targetState) {
-                                    "Daily" -> 0
-                                    "Library" -> 1
-                                    "Saved" -> 2
-                                    "Settings" -> 3
-                                    else -> 0
-                                }
-                                
-                                val isForward = targetIdx > currentIdx
-                                
-                                // Material Expressive organic motions with dynamic bouncy spring physics
-                                val exprSpring = spring<Float>(dampingRatio = 0.52f, stiffness = 220f)
-                                val exprOffsetSpring = spring<androidx.compose.ui.unit.IntOffset>(dampingRatio = 0.52f, stiffness = 220f)
-                                
-                                if (isForward) {
-                                    (slideInHorizontally(animationSpec = exprOffsetSpring) { width -> (width * 0.18f).toInt() } +
-                                     fadeIn(animationSpec = exprSpring) +
-                                     scaleIn(initialScale = 0.88f, animationSpec = exprSpring))
-                                    .togetherWith(
-                                     slideOutHorizontally(animationSpec = exprOffsetSpring) { width -> -(width * 0.18f).toInt() } +
-                                     fadeOut(animationSpec = exprSpring) +
-                                     scaleOut(targetScale = 0.88f, animationSpec = exprSpring))
+                                if (lowPerformanceMode) {
+                                    val currentIdx = when (initialState) {
+                                        "Daily" -> 0
+                                        "Library" -> 1
+                                        "Saved" -> 2
+                                        "Settings" -> 3
+                                        else -> 0
+                                    }
+                                    val targetIdx = when (targetState) {
+                                        "Daily" -> 0
+                                        "Library" -> 1
+                                        "Saved" -> 2
+                                        "Settings" -> 3
+                                        else -> 0
+                                    }
+                                    val isForward = targetIdx > currentIdx
+                                    
+                                    val slideSpec = tween<androidx.compose.ui.unit.IntOffset>(durationMillis = 220, easing = androidx.compose.animation.core.FastOutSlowInEasing)
+                                    val fadeSpec = tween<Float>(durationMillis = 180)
+                                    
+                                    if (isForward) {
+                                        (slideInHorizontally(animationSpec = slideSpec) { width -> width } + fadeIn(animationSpec = fadeSpec))
+                                            .togetherWith(slideOutHorizontally(animationSpec = slideSpec) { width -> -width } + fadeOut(animationSpec = fadeSpec))
+                                    } else {
+                                        (slideInHorizontally(animationSpec = slideSpec) { width -> -width } + fadeIn(animationSpec = fadeSpec))
+                                            .togetherWith(slideOutHorizontally(animationSpec = slideSpec) { width -> width } + fadeOut(animationSpec = fadeSpec))
+                                    }
                                 } else {
-                                    (slideInHorizontally(animationSpec = exprOffsetSpring) { width -> -(width * 0.18f).toInt() } +
-                                     fadeIn(animationSpec = exprSpring) +
-                                     scaleIn(initialScale = 0.88f, animationSpec = exprSpring))
-                                    .togetherWith(
-                                     slideOutHorizontally(animationSpec = exprOffsetSpring) { width -> (width * 0.18f).toInt() } +
-                                     fadeOut(animationSpec = exprSpring) +
-                                     scaleOut(targetScale = 0.88f, animationSpec = exprSpring))
+                                    val currentIdx = when (initialState) {
+                                        "Daily" -> 0
+                                        "Library" -> 1
+                                        "Saved" -> 2
+                                        "Settings" -> 3
+                                        else -> 0
+                                    }
+                                    val targetIdx = when (targetState) {
+                                        "Daily" -> 0
+                                        "Library" -> 1
+                                        "Saved" -> 2
+                                        "Settings" -> 3
+                                        else -> 0
+                                    }
+                                    
+                                    val isForward = targetIdx > currentIdx
+                                    
+                                    // Material Expressive organic motions with dynamic bouncy spring physics
+                                    val exprSpring = spring<Float>(dampingRatio = 0.52f, stiffness = 220f)
+                                    val exprOffsetSpring = spring<androidx.compose.ui.unit.IntOffset>(dampingRatio = 0.52f, stiffness = 220f)
+                                    
+                                    if (isForward) {
+                                        (slideInHorizontally(animationSpec = exprOffsetSpring) { width -> (width * 0.18f).toInt() } +
+                                         fadeIn(animationSpec = exprSpring) +
+                                         scaleIn(initialScale = 0.88f, animationSpec = exprSpring))
+                                        .togetherWith(
+                                         slideOutHorizontally(animationSpec = exprOffsetSpring) { width -> -(width * 0.18f).toInt() } +
+                                         fadeOut(animationSpec = exprSpring) +
+                                         scaleOut(targetScale = 0.88f, animationSpec = exprSpring))
+                                    } else {
+                                        (slideInHorizontally(animationSpec = exprOffsetSpring) { width -> -(width * 0.18f).toInt() } +
+                                         fadeIn(animationSpec = exprSpring) +
+                                         scaleIn(initialScale = 0.88f, animationSpec = exprSpring))
+                                        .togetherWith(
+                                         slideOutHorizontally(animationSpec = exprOffsetSpring) { width -> (width * 0.18f).toInt() } +
+                                         fadeOut(animationSpec = exprSpring) +
+                                         scaleOut(targetScale = 0.88f, animationSpec = exprSpring))
+                                    }
                                 }
                             },
                             label = "MainTabsTransition"
@@ -143,60 +175,62 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun BottomNavigationBar(activeTab: String, onTabSelected: (String) -> Unit) {
+fun BottomNavigationBar(activeTab: String, lowPerformanceMode: Boolean, onTabSelected: (String) -> Unit) {
     val haptic = LocalHapticFeedback.current
-    NavigationBar(
-        containerColor = MaterialTheme.colorScheme.background,
-        modifier = Modifier.fillMaxWidth(),
-        tonalElevation = 0.dp
-    ) {
-        val items = listOf(
-            Triple("Daily", Pair(Icons.Outlined.FormatQuote, Icons.Default.FormatQuote), "Daily"),
-            Triple("Library", Pair(Icons.Outlined.AutoStories, Icons.Default.AutoStories), "Library"),
-            Triple("Saved", Pair(Icons.Default.FavoriteBorder, Icons.Default.Favorite), "Saved"),
-            Triple("Settings", Pair(Icons.Outlined.Settings, Icons.Default.Settings), "Settings")
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.16f))
         )
+        NavigationBar(
+            containerColor = MaterialTheme.colorScheme.background,
+            modifier = Modifier.fillMaxWidth(),
+            tonalElevation = 0.dp
+        ) {
+            val items = listOf(
+                Triple("Daily", Pair(Icons.Outlined.FormatQuote, Icons.Default.FormatQuote), "Daily"),
+                Triple("Library", Pair(Icons.Outlined.AutoStories, Icons.Default.AutoStories), "Library"),
+                Triple("Saved", Pair(Icons.Default.FavoriteBorder, Icons.Default.Favorite), "Saved"),
+                Triple("Settings", Pair(Icons.Outlined.Settings, Icons.Default.Settings), "Settings")
+            )
 
-        items.forEach { (tab, iconPair, label) ->
-            val isSelected = activeTab == tab
+            items.forEach { (tab, iconPair, label) ->
+                val isSelected = activeTab == tab
 
-            NavigationBarItem(
-                selected = isSelected,
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onTabSelected(tab)
-                },
-                icon = {
-                    Crossfade(
-                        targetState = isSelected,
-                        animationSpec = tween(durationMillis = 250),
-                        label = "icon_crossfade"
-                    ) { selected ->
-                        val targetIcon = if (selected) iconPair.second else iconPair.first
+                NavigationBarItem(
+                    selected = isSelected,
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onTabSelected(tab)
+                    },
+                    icon = {
+                        val targetIcon = if (isSelected && !lowPerformanceMode) iconPair.second else iconPair.first
                         Icon(
                             imageVector = targetIcon,
                             contentDescription = label,
                             modifier = Modifier.size(24.dp)
                         )
-                    }
-                },
-                label = {
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            fontSize = 11.sp
+                    },
+                    label = {
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                fontSize = 11.sp
+                            )
                         )
+                    },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        selectedTextColor = MaterialTheme.colorScheme.primary,
+                        indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
-                },
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    selectedTextColor = MaterialTheme.colorScheme.primary,
-                    indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                 )
-            )
+            }
         }
     }
 }

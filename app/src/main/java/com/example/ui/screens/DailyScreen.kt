@@ -40,7 +40,9 @@ import com.example.ui.theme.SerifFontFamily
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 
-@OptIn(ExperimentalAnimationApi::class)
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+
+@OptIn(ExperimentalAnimationApi::class, ExperimentalLayoutApi::class)
 @Composable
 fun DailyScreen(viewModel: AuraViewModel) {
     val quoteState by viewModel.dailyQuote.collectAsState()
@@ -252,10 +254,11 @@ fun DailyScreen(viewModel: AuraViewModel) {
 
                             Spacer(modifier = Modifier.height(16.dp))
 
-                            // Tags row
-                            Row(
+                            // Tags row (wrapped dynamically if too long)
+                            FlowRow(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 val splitTags = quote.tags.split(",").filter { it.isNotBlank() }
                                 if (splitTags.isNotEmpty()) {

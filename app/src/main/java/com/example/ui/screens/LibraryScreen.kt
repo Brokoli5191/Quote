@@ -34,6 +34,10 @@ import com.example.ui.AuraViewModel
 import com.example.ui.theme.SerifFontFamily
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,6 +48,7 @@ fun LibraryScreen(viewModel: AuraViewModel) {
     val allQuotes by viewModel.allQuotes.collectAsState()
     
     val selectedCategories by viewModel.selectedCategories.collectAsState()
+    val lowPerformanceMode by viewModel.lowPerformanceMode.collectAsState()
     
     val scrollState = rememberScrollState()
     var showCategoryFilterDialog by remember { mutableStateOf(false) }
@@ -161,24 +166,28 @@ fun LibraryScreen(viewModel: AuraViewModel) {
             AnimatedContent(
                 targetState = (selectedCategory != null || searchQuery.isNotBlank()),
                 transitionSpec = {
-                    val exprSpring = spring<Float>(dampingRatio = 0.52f, stiffness = 220f)
-                    val exprOffsetSpring = spring<androidx.compose.ui.unit.IntOffset>(dampingRatio = 0.52f, stiffness = 220f)
-                    if (targetState) {
-                        // Sliding bento collapses, category content slides up with organic bounce
-                        (slideInVertically(animationSpec = exprOffsetSpring) { height -> (height * 0.15f).toInt() } +
-                         fadeIn(animationSpec = exprSpring) +
-                         scaleIn(initialScale = 0.88f, animationSpec = exprSpring))
-                        .togetherWith(
-                         fadeOut(animationSpec = exprSpring) +
-                         scaleOut(targetScale = 0.88f, animationSpec = exprSpring))
+                    if (lowPerformanceMode) {
+                        fadeIn(animationSpec = tween(150)) togetherWith fadeOut(animationSpec = tween(150))
                     } else {
-                        // Category back: slide out downwards cleanly, bento content fades in
-                        (fadeIn(animationSpec = exprSpring) +
-                         scaleIn(initialScale = 0.88f, animationSpec = exprSpring))
-                        .togetherWith(
-                         slideOutVertically(animationSpec = exprOffsetSpring) { height -> (height * 0.12f).toInt() } +
-                         fadeOut(animationSpec = exprSpring) +
-                         scaleOut(targetScale = 0.95f, animationSpec = exprSpring))
+                        val exprSpring = spring<Float>(dampingRatio = 0.52f, stiffness = 220f)
+                        val exprOffsetSpring = spring<androidx.compose.ui.unit.IntOffset>(dampingRatio = 0.52f, stiffness = 220f)
+                        if (targetState) {
+                            // Sliding bento collapses, category content slides up with organic bounce
+                            (slideInVertically(animationSpec = exprOffsetSpring) { height -> (height * 0.15f).toInt() } +
+                             fadeIn(animationSpec = exprSpring) +
+                             scaleIn(initialScale = 0.88f, animationSpec = exprSpring))
+                            .togetherWith(
+                             fadeOut(animationSpec = exprSpring) +
+                             scaleOut(targetScale = 0.88f, animationSpec = exprSpring))
+                        } else {
+                            // Category back: slide out downwards cleanly, bento content fades in
+                            (fadeIn(animationSpec = exprSpring) +
+                             scaleIn(initialScale = 0.88f, animationSpec = exprSpring))
+                            .togetherWith(
+                             slideOutVertically(animationSpec = exprOffsetSpring) { height -> (height * 0.12f).toInt() } +
+                             fadeOut(animationSpec = exprSpring) +
+                             scaleOut(targetScale = 0.95f, animationSpec = exprSpring))
+                        }
                     }
                 },
                 label = "LibraryInPlaceTransition",
@@ -198,7 +207,8 @@ fun LibraryScreen(viewModel: AuraViewModel) {
                             selectCategoryWithHaptic(null)
                             viewModel.setSearchQuery("")
                         },
-                        onToggleFavorite = { viewModel.toggleFavorite(it) }
+                        onToggleFavorite = { viewModel.toggleFavorite(it) },
+                        lowPerformanceMode = lowPerformanceMode
                     )
                 } else {
                     Column(
@@ -229,144 +239,93 @@ fun LibraryScreen(viewModel: AuraViewModel) {
                                     CategoryTileData(
                                         name = "Inspirational",
                                         description = "Ignite your inner fire, passion, and thrive",
-                                        imageUrl = "https://images.unsplash.com/photo-1499209974431-9dddcdce7f88?q=80&w=600",
-                                        icon = Icons.Default.Lightbulb,
+                                        icon = Icons.Default.EmojiObjects,
                                         tintColor = Color(0xFFFFF7EB),
                                         isFullWidth = true
                                     ),
                                     CategoryTileData(
                                         name = "Life",
                                         description = "Existential reflections & daily journeys",
-                                        imageUrl = "https://images.unsplash.com/photo-1502082553048-f009c37129b9?q=80&w=600",
-                                        icon = Icons.Default.Nature,
+                                        icon = Icons.Default.Spa,
                                         tintColor = Color(0xFFA0D2AD)
                                     ),
                                     CategoryTileData(
                                         name = "Humor",
                                         description = "Laughter, wit, and cheeky observations",
-                                        imageUrl = "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?q=80&w=600",
-                                        icon = Icons.Default.WbSunny,
+                                        icon = Icons.Default.TheaterComedy,
                                         tintColor = Color(0xFFFFDB9C)
                                     ),
                                     CategoryTileData(
                                         name = "Love",
                                         description = "Compassion, human bonds, and high affection",
-                                        imageUrl = "https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?q=80&w=600",
                                         icon = Icons.Default.Favorite,
                                         tintColor = Color(0xFFFFB2C5)
                                     ),
                                     CategoryTileData(
                                         name = "Books",
                                         description = "A portable magic of printed pages",
-                                        imageUrl = "https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?q=80&w=600",
-                                        icon = Icons.Default.MenuBook,
+                                        icon = Icons.Default.LibraryBooks,
                                         tintColor = Color(0xFFFFDB9C)
                                     ),
                                     CategoryTileData(
                                         name = "Truth",
                                         description = "Honesty and direct paths without compromise",
-                                        imageUrl = "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?q=80&w=600",
-                                        icon = Icons.Default.CheckCircle,
+                                        icon = Icons.Default.Balance,
                                         tintColor = Color(0xFFADC6FF)
                                     ),
                                     CategoryTileData(
                                         name = "Reading",
                                         description = "The quiet art of continuous literature",
-                                        imageUrl = "https://images.unsplash.com/photo-1544947950-fa07a98d237f?q=80&w=600",
                                         icon = Icons.Default.AutoStories,
                                         tintColor = Color(0xFFFFDB9C)
                                     ),
                                     CategoryTileData(
                                         name = "Wisdom",
                                         description = "Centuries of knowledge and deep philosophy",
-                                        imageUrl = "https://images.unsplash.com/photo-1457369804613-52c61a468e7d?q=80&w=600",
-                                        icon = Icons.Default.Psychology,
+                                        icon = Icons.Default.SelfImprovement,
                                         tintColor = Color(0xFFFFDB9C)
                                     ),
                                     CategoryTileData(
                                         name = "Happiness",
                                         description = "Peace of mind and pure contentments",
-                                        imageUrl = "https://images.unsplash.com/photo-1490730141103-6cac27aaab94?q=80&w=600",
                                         icon = Icons.Default.SentimentVerySatisfied,
                                         tintColor = Color(0xFFFFDB9C)
                                     ),
                                     CategoryTileData(
                                         name = "Writing",
                                         description = "Sit down at typewriters and bleed",
-                                        imageUrl = "https://images.unsplash.com/photo-1455390582262-044cdead277a?q=80&w=600",
-                                        icon = Icons.Default.Edit,
+                                        icon = Icons.Default.DriveFileRenameOutline,
                                         tintColor = Color(0xFFADC6FF)
                                     ),
                                     CategoryTileData(
                                         name = "Inspiration",
                                         description = "Sudden bright bursts of creative idea",
-                                        imageUrl = "https://images.unsplash.com/photo-1456406644174-8dba4c7f27f2?q=80&w=600",
-                                        icon = Icons.Default.FlashOn,
+                                        icon = Icons.Default.AutoAwesome,
                                         tintColor = Color(0xFFFFF7EB)
                                     ),
                                     CategoryTileData(
                                         name = "Philosophy",
                                         description = "Socrates, Stoics, and search of meaning",
-                                        imageUrl = "https://images.unsplash.com/photo-1507679799987-c73779587ccf?q=80&w=600",
-                                        icon = Icons.Default.AccountBalance,
+                                        icon = Icons.Default.HistoryEdu,
                                         tintColor = Color(0xFFADC6FF)
                                     ),
                                     CategoryTileData(
                                         name = "Death",
                                         description = "The next great adventure and transition",
-                                        imageUrl = "https://images.unsplash.com/photo-1509114397022-ed747cca3f65?q=80&w=600",
-                                        icon = Icons.Default.RemoveCircle,
+                                        icon = Icons.Default.HourglassEmpty,
                                         tintColor = Color(0xFFADC6FF)
                                     ),
                                     CategoryTileData(
                                         name = "Poetry",
                                         description = "Rhythms, lines, and feelings of the heart",
-                                        imageUrl = "https://images.unsplash.com/photo-1473186578172-c141e6798cf4?q=80&w=600",
-                                        icon = Icons.Default.Brush,
+                                        icon = Icons.Default.Create,
                                         tintColor = Color(0xFFFFB2C5)
                                     ),
                                     CategoryTileData(
                                         name = "Optimism",
                                         description = "Gutter-born gazing toward bright stars",
-                                        imageUrl = "https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?q=80&w=600",
-                                        icon = Icons.Default.Star,
+                                        icon = Icons.Default.WbSunny,
                                         tintColor = Color(0xFFFFDB9C)
-                                    ),
-                                    CategoryTileData(
-                                        name = "Hope",
-                                        description = "Quiet tomorrow with no mistakes in yet",
-                                        imageUrl = "https://images.unsplash.com/photo-1488330890490-c291ec66277b?q=80&w=600",
-                                        icon = Icons.Default.BrightnessLow,
-                                        tintColor = Color(0xFFFFF7EB)
-                                    ),
-                                    CategoryTileData(
-                                        name = "Friendship",
-                                        description = "Loyal companions and chocolate moments",
-                                        imageUrl = "https://images.unsplash.com/photo-1461532242715-57f47ee568ad?q=80&w=600",
-                                        icon = Icons.Default.Group,
-                                        tintColor = Color(0xFFADC6FF)
-                                    ),
-                                    CategoryTileData(
-                                        name = "Education",
-                                        description = "Continuous school versus self learning",
-                                        imageUrl = "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?q=80&w=600",
-                                        icon = Icons.Default.School,
-                                        tintColor = Color(0xFFFFDB9C)
-                                    ),
-                                    CategoryTileData(
-                                        name = "Music",
-                                        description = "When it hits you, you feel no pain",
-                                        imageUrl = "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?q=80&w=600",
-                                        icon = Icons.Default.MusicNote,
-                                        tintColor = Color(0xFFA0D2AD)
-                                    ),
-                                    CategoryTileData(
-                                        name = "Women",
-                                        description = "Seldom well-behaved historic giants",
-                                        imageUrl = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=600",
-                                        icon = Icons.Default.Face,
-                                        tintColor = Color(0xFFFFB2C5),
-                                        isFullWidth = true
                                     )
                                 )
                             }
@@ -375,15 +334,15 @@ fun LibraryScreen(viewModel: AuraViewModel) {
                             val inspirational = bentoCategories[0]
                             CategoryBentoCard(
                                 name = inspirational.name,
-                                imageUrl = inspirational.imageUrl,
+                                description = inspirational.description,
                                 icon = inspirational.icon,
                                 tintColor = inspirational.tintColor,
-                                height = 180.dp,
+                                height = 150.dp,
                                 onClick = { selectCategoryWithHaptic(inspirational.name) }
                             )
 
-                            // Render rows of 2 for middle categories (1 to 18)
-                            val midCategories = bentoCategories.subList(1, 19)
+                            // Render rows of 2 for middle categories (1 to 14)
+                            val midCategories = bentoCategories.subList(1, 15)
                             midCategories.chunked(2).forEach { pair ->
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
@@ -393,10 +352,10 @@ fun LibraryScreen(viewModel: AuraViewModel) {
                                         Box(modifier = Modifier.weight(1f)) {
                                             CategoryBentoCard(
                                                 name = cat.name,
-                                                imageUrl = cat.imageUrl,
+                                                description = cat.description,
                                                 icon = cat.icon,
                                                 tintColor = cat.tintColor,
-                                                height = 160.dp,
+                                                height = 140.dp,
                                                 onClick = { selectCategoryWithHaptic(cat.name) }
                                             )
                                         }
@@ -406,17 +365,6 @@ fun LibraryScreen(viewModel: AuraViewModel) {
                                     }
                                 }
                             }
-
-                            // Render Women (Last large card)
-                            val women = bentoCategories[19]
-                            CategoryBentoCard(
-                                name = women.name,
-                                imageUrl = women.imageUrl,
-                                icon = women.icon,
-                                tintColor = women.tintColor,
-                                height = 180.dp,
-                                onClick = { selectCategoryWithHaptic(women.name) }
-                            )
                         }
                     }
                 }
@@ -424,130 +372,166 @@ fun LibraryScreen(viewModel: AuraViewModel) {
         }
     }
 
-    // Category Filter Picker Dialog (allows selecting multiple categories at once)
+    // Category Filter Picker Sheet (allows selecting multiple categories at once)
     if (showCategoryFilterDialog) {
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { showCategoryFilterDialog = false },
-            modifier = Modifier.border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), RoundedCornerShape(28.dp)),
-            title = {
-                Text(
-                    text = "Select Categories",
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.primary
-                )
-            },
-            text = {
-                Column(
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = Color(0xFF111015),
+            tonalElevation = 8.dp,
+            dragHandle = { BottomSheetDefaults.DragHandle(color = Color.White.copy(alpha = 0.2f)) }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Filter search findings by multiple selected categories below:",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.7f)
+                        text = "Select Categories",
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.primary
                     )
-                    
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        val categoriesList = listOf(
-                            "Inspirational",
-                            "Life",
-                            "Humor",
-                            "Love",
-                            "Books",
-                            "Truth",
-                            "Reading",
-                            "Wisdom",
-                            "Happiness",
-                            "Writing",
-                            "Inspiration",
-                            "Philosophy",
-                            "Death",
-                            "Poetry",
-                            "Optimism",
-                            "Hope",
-                            "Friendship",
-                            "Education",
-                            "Music",
-                            "Women"
+                    IconButton(onClick = { showCategoryFilterDialog = false }) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = Color.White.copy(alpha = 0.6f)
                         )
-                        
-                        categoriesList.chunked(2).forEach { rowCategoryList ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                rowCategoryList.forEach { categoryName ->
-                                    val isSelected = selectedCategories.contains(categoryName)
-                                    FilterChip(
-                                        selected = isSelected,
-                                        onClick = {
-                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            viewModel.toggleCategorySelected(categoryName)
-                                        },
-                                        label = {
-                                            Text(
-                                                text = categoryName,
-                                                style = MaterialTheme.typography.labelMedium.copy(
-                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                                )
-                                            )
-                                        },
-                                        modifier = Modifier.weight(1f).height(46.dp),
-                                        colors = FilterChipDefaults.filterChipColors(
-                                            selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
-                                            selectedLabelColor = MaterialTheme.colorScheme.primary,
-                                            containerColor = Color(0xFF1B1A21),
-                                            labelColor = Color.White.copy(alpha = 0.6f)
-                                        ),
-                                        border = FilterChipDefaults.filterChipBorder(
-                                            enabled = true,
-                                            selected = isSelected,
-                                            selectedBorderColor = MaterialTheme.colorScheme.primary,
-                                            borderColor = Color.White.copy(alpha = 0.08f)
-                                        )
-                                    )
-                                }
-                                if (rowCategoryList.size == 1) {
-                                    Spacer(modifier = Modifier.weight(1f))
-                                }
+                    }
+                }
+
+                Text(
+                    text = "Filter search findings by multiple selected categories below:",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.7f)
+                )
+
+                val nestedScrollConnection = remember {
+                    object : NestedScrollConnection {
+                        override fun onPostScroll(
+                            consumed: Offset,
+                            available: Offset,
+                            source: NestedScrollSource
+                        ): Offset {
+                            return if (available.y > 0f) {
+                                Offset(0f, available.y)
+                            } else {
+                                Offset.Zero
                             }
                         }
                     }
                 }
-            },
-            confirmButton = {
-                Button(
-                    onClick = { showCategoryFilterDialog = false },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    ),
-                    shape = RoundedCornerShape(12.dp)
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 280.dp)
+                        .nestedScroll(nestedScrollConnection)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("Apply Filter")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        viewModel.clearCategorySelection()
-                        showCategoryFilterDialog = false
-                    },
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.primary
+                    val categoriesList = listOf(
+                        "Inspirational",
+                        "Life",
+                        "Humor",
+                        "Love",
+                        "Books",
+                        "Truth",
+                        "Reading",
+                        "Wisdom",
+                        "Happiness",
+                        "Writing",
+                        "Inspiration",
+                        "Philosophy",
+                        "Death",
+                        "Poetry",
+                        "Optimism"
                     )
-                ) {
-                    Text("Clear All")
+
+                    categoriesList.chunked(2).forEach { rowCategoryList ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            rowCategoryList.forEach { categoryName ->
+                                val isSelected = selectedCategories.contains(categoryName)
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        viewModel.toggleCategorySelected(categoryName)
+                                    },
+                                    label = {
+                                        Text(
+                                            text = categoryName,
+                                            style = MaterialTheme.typography.labelMedium.copy(
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        )
+                                    },
+                                    modifier = Modifier.weight(1f).height(46.dp),
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+                                        selectedLabelColor = MaterialTheme.colorScheme.primary,
+                                        containerColor = Color(0xFF1B1A21),
+                                        labelColor = Color.White.copy(alpha = 0.6f)
+                                    ),
+                                    border = FilterChipDefaults.filterChipBorder(
+                                        enabled = true,
+                                        selected = isSelected,
+                                        selectedBorderColor = MaterialTheme.colorScheme.primary,
+                                        borderColor = Color.White.copy(alpha = 0.08f)
+                                    )
+                                )
+                            }
+                            if (rowCategoryList.size == 1) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
                 }
-            },
-            shape = RoundedCornerShape(28.dp),
-            containerColor = Color(0xFF111015),
-            tonalElevation = 8.dp
-        )
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            viewModel.clearCategorySelection()
+                            showCategoryFilterDialog = false
+                        },
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.primary
+                        ),
+                        modifier = Modifier.padding(end = 8.dp)
+                    ) {
+                        Text("Clear All")
+                    }
+
+                    Button(
+                        onClick = { showCategoryFilterDialog = false },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Apply Filter")
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -557,7 +541,8 @@ fun CategoryBrowseViewInPlace(
     searchQuery: String,
     quotes: List<QuoteEntity>,
     onBack: () -> Unit,
-    onToggleFavorite: (QuoteEntity) -> Unit
+    onToggleFavorite: (QuoteEntity) -> Unit,
+    lowPerformanceMode: Boolean = false
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
@@ -579,20 +564,18 @@ fun CategoryBrowseViewInPlace(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            SuggestionChip(
-                onClick = onBackWithHaptic,
-                label = {
-                    Text(
-                        text = if (category != null) "$category ✕" else "Search results ✕",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
-                    )
-                },
-                colors = SuggestionChipDefaults.suggestionChipColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
-                    labelColor = MaterialTheme.colorScheme.onPrimaryContainer
-                ),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
-            )
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(32.dp))
+                    .background(MaterialTheme.colorScheme.primary)
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = if (category != null) category else "Search results",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+            }
 
             TextButton(onClick = onBackWithHaptic) {
                 Text(
@@ -604,32 +587,174 @@ fun CategoryBrowseViewInPlace(
         }
 
         if (quotes.isEmpty()) {
+            val infiniteTransition = rememberInfiniteTransition(label = "EmptyStateAnimation")
+            
+            // Smoother floating micro-animations
+            val floatAnim by if (lowPerformanceMode) {
+                remember { mutableStateOf(0f) }
+            } else {
+                infiniteTransition.animateFloat(
+                    initialValue = -8f,
+                    targetValue = 8f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(2200, easing = FastOutSlowInEasing),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "FloatingAnimation"
+                )
+            }
+            
+            val scaleAnim by if (lowPerformanceMode) {
+                remember { mutableStateOf(1f) }
+            } else {
+                infiniteTransition.animateFloat(
+                    initialValue = 0.95f,
+                    targetValue = 1.05f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(3000, easing = FastOutSlowInEasing),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "ScalingAnimation"
+                )
+            }
+
+            val alphaPulse by if (lowPerformanceMode) {
+                infiniteTransition.animateFloat(
+                    initialValue = 0.65f,
+                    targetValue = 1f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(2500, easing = LinearEasing),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "AlphaPulseAnimation"
+                )
+            } else {
+                remember { mutableStateOf(1f) }
+            }
+
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(vertical = 48.dp),
+                    .padding(vertical = 32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.SearchOff,
-                    contentDescription = "Empty",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-                    modifier = Modifier.size(64.dp)
-                )
-                Spacer(modifier = Modifier.height(12.dp))
+                // Beautiful Multi-layer Material Illustration Frame
+                Box(
+                    modifier = Modifier
+                        .size(160.dp)
+                        .graphicsLayer {
+                            translationY = floatAnim
+                            scaleX = scaleAnim
+                            scaleY = scaleAnim
+                            alpha = alphaPulse
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    // Soft glowing background aura circle
+                    Box(
+                        modifier = Modifier
+                            .size(120.dp)
+                            .background(
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f),
+                                shape = CircleShape
+                            )
+                    )
+                    
+                    // Stacked decorative card representing missing quotes
+                    Box(
+                        modifier = Modifier
+                            .size(80.dp)
+                            .graphicsLayer { rotationZ = -12f }
+                            .background(
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                shape = RoundedCornerShape(16.dp)
+                            )
+                    )
+                    
+                    Box(
+                        modifier = Modifier
+                            .size(80.dp)
+                            .graphicsLayer { rotationZ = 8f }
+                            .background(
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                shape = RoundedCornerShape(16.dp)
+                            )
+                            .border(
+                                1.5.dp,
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+                                RoundedCornerShape(16.dp)
+                            )
+                    )
+                    
+                    // Main illustration icon
+                    Icon(
+                        imageVector = Icons.Default.SearchOff,
+                        contentDescription = "Search Off Icon",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(56.dp)
+                    )
+                    
+                    // Micro-interaction star on upper right
+                    Icon(
+                        imageVector = Icons.Default.AutoAwesome,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f),
+                        modifier = Modifier
+                            .size(18.dp)
+                            .align(Alignment.TopEnd)
+                            .graphicsLayer {
+                                translationX = -20f
+                                translationY = 15f
+                            }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+                
                 Text(
-                    text = "No wisdom found",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Try adjusting tags or search keywords.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    text = "No Wisdom Matches",
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = SerifFontFamily
+                    ),
+                    color = MaterialTheme.colorScheme.onBackground,
                     textAlign = TextAlign.Center
                 )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Text(
+                    text = "We couldn't find any quotes matching your interest. Reset the filters to explore other profound areas of wisdom.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth(0.85f)
+                        .padding(bottom = 24.dp)
+                )
+
+                // Beautiful interactive button to clear filters
+                Button(
+                    onClick = onBackWithHaptic,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
+                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
+                    shape = RoundedCornerShape(24.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Reset All Filters",
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+                    )
+                }
             }
         } else {
             LazyColumn(
@@ -901,7 +1026,6 @@ fun SimulatedExpressiveWidget(text: String, author: String) {
 data class CategoryTileData(
     val name: String,
     val description: String,
-    val imageUrl: String,
     val icon: androidx.compose.ui.graphics.vector.ImageVector,
     val tintColor: Color,
     val isFullWidth: Boolean = false
@@ -910,7 +1034,7 @@ data class CategoryTileData(
 @Composable
 fun CategoryBentoCard(
     name: String,
-    imageUrl: String,
+    description: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     tintColor: Color,
     height: androidx.compose.ui.unit.Dp,
@@ -921,97 +1045,79 @@ fun CategoryBentoCard(
         modifier = Modifier
             .fillMaxWidth()
             .height(height)
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), RoundedCornerShape(24.dp)),
-        shape = RoundedCornerShape(24.dp)
+            .border(
+                width = 1.dp,
+                color = tintColor.copy(alpha = 0.15f),
+                shape = RoundedCornerShape(20.dp)
+            ),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFF131217)
+        )
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            // First show a beautiful default background as a placeholder
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            tintColor.copy(alpha = 0.08f),
+                            Color(0xFF111015)
+                        )
+                    )
+                )
+                .padding(16.dp)
+        ) {
+            // Elegant large top-right or center-right glowing background icon
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                tintColor.copy(alpha = 0.35f),
-                                Color(0xFF1B1A21)
-                            )
-                        )
-                    ),
-                contentAlignment = Alignment.Center
+                    .align(Alignment.TopEnd)
+                    .offset(x = 10.dp, y = (-10).dp)
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = tintColor.copy(alpha = 0.25f),
-                    modifier = Modifier.size(56.dp)
+                    tint = tintColor.copy(alpha = 0.12f),
+                    modifier = Modifier.size(72.dp)
                 )
             }
 
-            coil.compose.SubcomposeAsyncImage(
-                model = imageUrl,
-                contentDescription = name,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-                loading = {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(
-                            color = tintColor,
-                            modifier = Modifier.size(24.dp),
-                            strokeWidth = 2.dp
-                        )
-                    }
-                },
-                error = {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.verticalGradient(
-                                    listOf(
-                                        tintColor.copy(alpha = 0.45f),
-                                        Color(0xFF1B1A21)
-                                    )
-                                )
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = null,
-                            tint = tintColor.copy(alpha = 0.55f),
-                            modifier = Modifier.size(52.dp)
-                        )
-                    }
-                }
-            )
-
+            // Primary visual crisp icon in top-left
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .align(Alignment.TopStart)
                     .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                Color.Transparent,
-                                Color.Black.copy(alpha = 0.70f)
-                            )
-                        )
+                        color = tintColor.copy(alpha = 0.1f),
+                        shape = RoundedCornerShape(12.dp)
                     )
-            )
+                    .padding(8.dp)
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = tintColor,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
 
-            Box(
+            // Bottom descriptive and label texts
+            Column(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(20.dp),
-                contentAlignment = Alignment.BottomStart
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
             ) {
                 Text(
                     text = name,
-                    style = if (height >= 180.dp) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = Color.White
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.5f),
+                    maxLines = 2,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
             }
         }
