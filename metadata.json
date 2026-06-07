@@ -2,5 +2,5 @@
   "name": "Quote",
   "description": "Tägliche Zitate als expressive Homescreen-Widgets und zum Stöbern in der App – wunderschön gestaltet im Material Expressive Design mit hochwertigen Animationen.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": []
 }
