@@ -9,7 +9,7 @@ Android application to view, search, and manage quotes.
 [![Min SDK](https://img.shields.io/badge/Min%20SDK-24-3DDC84)](https://developer.android.com/about/dashboards)
 [![Target SDK](https://img.shields.io/badge/Target%20SDK-36-3DDC84)](https://developer.android.com/about/versions/15)
 [![Language](https://img.shields.io/badge/Language-Kotlin-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
-[![UI](https://img.shields.io/badge/UI-Jetpack%20Compose-4285F4?logo=jetpackcompose&logoColor=white)](https://developer.android.com/compose)
+[![UI](https://img.shields.io/badge/UI-Jetpack%20Compose-4285F4?logo=jetpackcompose&logoColor=white)](https://developer.android.com)
 [![Database](https://img.shields.io/badge/Database-Room-4285F4?logo=sqlite&logoColor=white)](https://developer.android.com/training/data-storage/room)
 
 </div>
@@ -17,22 +17,65 @@ Android application to view, search, and manage quotes.
 ---
 
 ## Table of Contents
-1. [Build & Installation](#build--installation-)
+1. [Features](#features-)
 2. [Usage](#usage-)
-3. [Features](#features-)
+3. [Build & Installation](#build--installation-)
 4. [Architecture & Tech Stack](#architecture--tech-stack-)
 5. [Contributing](#contributing-)
 6. [License](#license-)
 
 ---
 
+## Features ✨
+
+- **Daily Quotes**: Automatically schedules a daily quote, with support for manual cycling.
+- **Categorized Library**: Multi-category filter support (Stoicism, Resilience, Joy, Focus, Love, Custom) and text search.
+- **Custom Quote Management**: Direct interface to add and delete user-authored quotes.
+- **Favorites Space**: One-tap bookmarking to organize saved quotes.
+- **Theming & Accents**: Light, Dark, AMOLED, and Dynamic (Material You) system colors. Accent color choices include Violet, Amber, Green, Blue, and Rose.
+- **Low Performance Toggle**: Settings option to disable spring physics and page slide animations for resource-constrained devices.
+
+---
+
+## Usage 📱
+
+### Home Screen Widget
+1. Long-press on your device's home screen.
+2. Select **Widgets** and find **QuoteFlow**.
+3. Place the widget on your screen.
+4. Open the app settings tab to choose a widget style:
+   - **Expressive**: Rich card designs displaying text and author.
+   - **Minimal**: Plain, distraction-free quote layout.
+   - **Compact**: Small footprint layout.
+
+### Daily Reminders
+1. Navigate to the **Settings** tab.
+2. Toggle the **Daily Reminder** switch.
+3. Configure the specific hour and minute for notification delivery.
+
+### Backup & Restore
+1. Navigate to the **Settings** tab.
+2. Tap **Export Backup** to save your custom quotes and favorite states to a JSON file.
+3. Tap **Import Backup** and select your saved JSON file to restore the data.
+
+---
+
 ## Build & Installation 🛠️
 
-### Prerequisites
+### Download APK
+You can download the pre-compiled APK directly from the GitHub releases page:
+
+<a href="https://github.com/Brokoli5191/Quote/releases">
+  <img src="https://raw.githubusercontent.com/NeoApplications/Neo-Backup/034b226cea5c1b30eb4f6a6f313e4dadcbb0ece4/badge_github.png" width="200" alt="Download from GitHub Releases">
+</a>
+
+### Building from Source
+
+#### Prerequisites
 - JDK 21
 - Android SDK
 
-### Steps
+#### Steps
 
 1. Configure the Android SDK path in `local.properties`:
    ```properties
@@ -60,40 +103,6 @@ Android application to view, search, and manage quotes.
      ```
 
 The output APK is generated at `app/build/outputs/apk/debug/app-debug.apk`.
-
----
-
-## Usage 📱
-
-### Home Screen Widget
-1. Long-press on your device's home screen.
-2. Select **Widgets** and find **QuoteFlow**.
-3. Place the widget on your screen.
-4. Open the app settings tab to choose a widget style:
-   - **Expressive**: Rich card designs displaying text and author.
-   - **Minimal**: Plain, distraction-free quote layout.
-   - **Compact**: Small footprint layout.
-
-### Daily Reminders
-1. Navigate to the **Settings** tab.
-2. Toggle the **Daily Reminder** switch.
-3. Configure the specific hour and minute for notification delivery.
-
-### Backup & Restore
-1. Navigate to the **Settings** tab.
-2. Tap **Export Backup** to save your custom quotes and favorite states to a JSON file.
-3. Tap **Import Backup** and select your saved JSON file to restore the data.
-
----
-
-## Features ✨
-
-- **Daily Quotes**: Automatically schedules a daily quote, with support for manual cycling.
-- **Categorized Library**: Multi-category filter support (Stoicism, Resilience, Joy, Focus, Love, Custom) and text search.
-- **Custom Quote Management**: Direct interface to add and delete user-authored quotes.
-- **Favorites Space**: One-tap bookmarking to organize saved quotes.
-- **Theming & Accents**: Light, Dark, AMOLED, and Dynamic (Material You) system colors. Accent color choices include Violet, Amber, Green, Blue, and Rose.
-- **Low Performance Toggle**: Settings option to disable spring physics and page slide animations for resource-constrained devices.
 
 ---
 
