@@ -1,5 +1,7 @@
 package app.brokoli5191.quote.ui.screens
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import androidx.compose.animation.*
@@ -43,10 +45,9 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 @Composable
 fun LibraryScreen(viewModel: AuraViewModel) {
     val searchQuery by viewModel.searchQuery.collectAsState()
-    val selectedCategory by viewModel.selectedCategory.collectAsState()
     val filteredQuotes by viewModel.filteredQuotes.collectAsState()
     val allQuotes by viewModel.allQuotes.collectAsState()
-    
+
     val selectedCategories by viewModel.selectedCategories.collectAsState()
     val lowPerformanceMode by viewModel.lowPerformanceMode.collectAsState()
     
@@ -142,7 +143,8 @@ fun LibraryScreen(viewModel: AuraViewModel) {
                     Icon(
                         imageVector = Icons.Default.Search,
                         contentDescription = "Search",
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(start = 8.dp)
                     )
                 },
                 trailingIcon = {
@@ -164,7 +166,7 @@ fun LibraryScreen(viewModel: AuraViewModel) {
 
             // 3. Main sliding bento content vs list view in same composition
             AnimatedContent(
-                targetState = (selectedCategory != null || searchQuery.isNotBlank()),
+                targetState = (selectedCategories.isNotEmpty() || searchQuery.isNotBlank()),
                 transitionSpec = {
                     if (lowPerformanceMode) {
                         fadeIn(animationSpec = tween(150)) togetherWith fadeOut(animationSpec = tween(150))
@@ -197,7 +199,7 @@ fun LibraryScreen(viewModel: AuraViewModel) {
                     val categoryLabel = when {
                         selectedCategories.size > 1 -> "${selectedCategories.size} categories"
                         selectedCategories.size == 1 -> selectedCategories.first()
-                        else -> selectedCategory
+                        else -> null
                     }
                     CategoryBrowseViewInPlace(
                         category = categoryLabel,
@@ -551,6 +553,10 @@ fun CategoryBrowseViewInPlace(
         onBack()
     }
 
+    // Don't flash empty-state on first frame before filteredQuotes arrives
+    var hasReceivedQuotes by remember { mutableStateOf(quotes.isNotEmpty()) }
+    LaunchedEffect(quotes) { if (quotes.isNotEmpty()) hasReceivedQuotes = true }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -586,7 +592,7 @@ fun CategoryBrowseViewInPlace(
             }
         }
 
-        if (quotes.isEmpty()) {
+        if (hasReceivedQuotes && quotes.isEmpty()) {
             val infiniteTransition = rememberInfiniteTransition(label = "EmptyStateAnimation")
             
             // Smoother floating micro-animations
@@ -619,6 +625,8 @@ fun CategoryBrowseViewInPlace(
             }
 
             val alphaPulse by if (lowPerformanceMode) {
+                remember { mutableStateOf(1f) }
+            } else {
                 infiniteTransition.animateFloat(
                     initialValue = 0.65f,
                     targetValue = 1f,
@@ -628,8 +636,6 @@ fun CategoryBrowseViewInPlace(
                     ),
                     label = "AlphaPulseAnimation"
                 )
-            } else {
-                remember { mutableStateOf(1f) }
             }
 
             Column(
@@ -780,90 +786,6 @@ fun CategoryBrowseViewInPlace(
     }
 }
 
-@Composable
-fun CollectionHeroItem(
-    title: String,
-    desc: String,
-    badgeText: String,
-    image: String,
-    badgeBgColor: Color,
-    badgeTextColor: Color,
-    onClick: () -> Unit
-) {
-    val haptic = LocalHapticFeedback.current
-    Card(
-        onClick = {
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-            onClick()
-        },
-        modifier = Modifier
-            .width(260.dp)
-            .height(200.dp)
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), RoundedCornerShape(24.dp)),
-        shape = RoundedCornerShape(24.dp)
-    ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            AsyncImage(
-                model = image,
-                contentDescription = title,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                Color.Transparent,
-                                Color.Black.copy(alpha = 0.4f),
-                                Color.Black.copy(alpha = 0.85f)
-                            )
-                        )
-                    )
-            )
-
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.Bottom
-            ) {
-                Box(
-                    modifier = Modifier
-                        .background(badgeBgColor, shape = RoundedCornerShape(6.dp))
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        text = badgeText.uppercase(),
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 10.sp
-                        ),
-                        color = badgeTextColor
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Spacer(modifier = Modifier.height(2.dp))
-
-                Text(
-                    text = desc,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.8f)
-                )
-            }
-        }
-    }
-}
 
 @Composable
 fun QuoteBrowseItemCard(
@@ -872,6 +794,7 @@ fun QuoteBrowseItemCard(
     onShare: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
+    val context = LocalContext.current
     val offsetX = remember { Animatable(80f) }
     val alphaAnim = remember { Animatable(0f) }
 
@@ -933,6 +856,18 @@ fun QuoteBrowseItemCard(
                 ) {
                     IconButton(onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        clipboard.setPrimaryClip(ClipData.newPlainText("quote", "\"${quote.text}\" — ${quote.author}"))
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.ContentCopy,
+                            contentDescription = "Copy",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    IconButton(onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         onShare()
                     }) {
                         Icon(
@@ -966,62 +901,6 @@ fun QuoteBrowseItemCard(
     }
 }
 
-@Composable
-fun SimulatedQuoteWidget(text: String, author: String) {
-    Box(
-        modifier = Modifier
-            .width(280.dp)
-            .height(140.dp)
-            .clip(RoundedCornerShape(24.dp))
-            .background(
-                Brush.linearGradient(
-                    listOf(Color(0xFF594983), Color(0xFF37265E))
-                )
-            )
-            .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(24.dp))
-            .padding(16.dp)
-    ) {
-        // Star decoration top right
-        Text(
-            text = "✦",
-            style = MaterialTheme.typography.labelLarge,
-            color = Color(0xFFD0BCFF).copy(alpha = 0.6f),
-            modifier = Modifier.align(Alignment.TopEnd)
-        )
-
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            // Header
-            Text(
-                text = "QUOTE",
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
-                color = Color(0xFFD0BCFF)
-            )
-
-            // Quote text
-            Text(
-                text = "\"$text\"",
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontFamily = SerifFontFamily,
-                    fontStyle = FontStyle.Italic,
-                    lineHeight = 18.sp
-                ),
-                color = Color(0xFFE9DDFF),
-                maxLines = 3,
-                modifier = Modifier.padding(vertical = 4.dp)
-            )
-
-            // Author
-            Text(
-                text = "— ${author.uppercase()}",
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                color = Color(0xFFA0D2AD)
-            )
-        }
-    }
-}
 
 data class CategoryTileData(
     val name: String,

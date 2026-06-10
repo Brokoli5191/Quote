@@ -1,7 +1,13 @@
 package app.brokoli5191.quote.ui.screens
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import androidx.compose.animation.*
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.*
@@ -12,11 +18,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -49,6 +55,17 @@ fun DailyScreen(viewModel: AuraViewModel) {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
     val haptic = LocalHapticFeedback.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshDailyQuoteIfNeeded()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     Box(
         modifier = Modifier
@@ -57,7 +74,7 @@ fun DailyScreen(viewModel: AuraViewModel) {
     ) {
         ElasticPullDownContainer(
             onTriggerRefresh = {
-                viewModel.cycleDailyQuote(context)
+                viewModel.cycleDailyQuote()
             },
             scrollState = scrollState,
             modifier = Modifier.fillMaxSize()
@@ -79,108 +96,82 @@ fun DailyScreen(viewModel: AuraViewModel) {
                     .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 0.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Daily Quote",
-                        style = MaterialTheme.typography.headlineLarge,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    IconButton(
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            viewModel.cycleDailyQuote(context)
-                        },
-                        modifier = Modifier
-                            .size(40.dp)
-                            .background(
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                shape = CircleShape
-                            )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Cycle Daily Quote",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
+                Text(
+                    text = "Daily Quote",
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontWeight = FontWeight.Bold
+                )
             }
 
-            // Big Centerpiece Quote with Fade In Reveal
-            quoteState?.let { quote ->
-                AnimatedVisibility(
-                    visible = true,
-                    enter = fadeIn(animationSpec = spring(dampingRatio = 0.8f)) + slideInVertically(initialOffsetY = { 40 }),
+            // Big Centerpiece Quote — AnimatedContent so transitions fire on quote change
+            AnimatedContent(
+                targetState = quoteState,
+                transitionSpec = {
+                    (fadeIn(animationSpec = spring(dampingRatio = 0.8f)) +
+                     slideInVertically(initialOffsetY = { 32 }))
+                        .togetherWith(fadeOut(animationSpec = spring(dampingRatio = 0.8f)) +
+                         slideOutVertically(targetOffsetY = { -32 }))
+                },
+                label = "DailyQuoteTransition",
+                modifier = Modifier.fillMaxWidth()
+            ) { quote ->
+            quote?.let {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(start = 30.dp, end = 30.dp, top = 2.dp, bottom = 12.dp)
+                        .padding(vertical = 4.dp)
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
+                    // Giant Opening Quote Mark in a compact-height Box so it does not push the content down
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp)
+                            .height(30.dp)
                     ) {
-                        // Giant Opening Quote Mark in a compact-height Box so it does not push the content down
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(30.dp)
-                        ) {
-                            Text(
-                                text = "“",
-                                fontFamily = SerifFontFamily,
-                                fontSize = 110.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-                                modifier = Modifier.offset(y = (-45).dp)
-                            )
-                        }
-
                         Text(
-                            text = quote.text,
-                            style = MaterialTheme.typography.displayMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 8.dp),
-                            lineHeight = 38.sp
-                        )
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        Text(
-                            text = "— ${quote.author.uppercase()}",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            letterSpacing = 2.sp
+                            text = "“",
+                            fontFamily = SerifFontFamily,
+                            fontSize = 110.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                            modifier = Modifier.offset(y = (-45).dp)
                         )
                     }
+
+                    Text(
+                        text = quote.text,
+                        style = MaterialTheme.typography.displayMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp),
+                        lineHeight = 38.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "— ${quote.author.uppercase()}",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        letterSpacing = 2.sp
+                    )
                 }
 
                 // Daily Insight Card
-                AnimatedVisibility(
-                    visible = true,
-                    enter = fadeIn(animationSpec = spring(stiffness = 100f)) + expandVertically(),
+                Card(
                     modifier = Modifier
-                        .padding(horizontal = 20.dp)
                         .fillMaxWidth()
+                        .padding(horizontal = 20.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                        .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(24.dp)),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
+                    )
                 ) {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(24.dp))
-                            .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(24.dp)),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
-                        )
-                    ) {
                         Column(
                             modifier = Modifier.padding(16.dp)
                         ) {
@@ -348,6 +339,27 @@ fun DailyScreen(viewModel: AuraViewModel) {
                                 Button(
                                     onClick = {
                                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                        clipboard.setPrimaryClip(ClipData.newPlainText("quote", "\"${quote.text}\" — ${quote.author}"))
+                                    },
+                                    modifier = Modifier.size(56.dp),
+                                    shape = CircleShape,
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                        contentColor = MaterialTheme.colorScheme.primary
+                                    ),
+                                    contentPadding = PaddingValues(0.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ContentCopy,
+                                        contentDescription = "Copy Quote",
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+
+                                Button(
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                         val url = "https://en.wikipedia.org/wiki/${quote.author.replace(" ", "_")}"
                                         val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))
                                         context.startActivity(intent)
@@ -375,11 +387,13 @@ fun DailyScreen(viewModel: AuraViewModel) {
                                 }
                             }
                         }
-                    }
+                }
                 }
             }
             }
         }
+            }
+
 
         // Floating share FAB in bottom corner (higher visual hierarchy)
         quoteState?.let { quote ->

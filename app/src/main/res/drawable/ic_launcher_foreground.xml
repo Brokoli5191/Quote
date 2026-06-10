@@ -4,15 +4,12 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Left Quote Comma (perfectly centered in X and visually adjusted in Y) -->
     <path
         android:fillColor="#E9DDFF"
-        android:pathData="M52,46 C52,58 42,66 32,72 L32,63 C39,58 43,51 43,46 H32 V30 H52 V46 Z" />
-    
-    <!-- Right Quote Comma (perfectly centered in X and visually adjusted in Y) -->
+        android:pathData="M52,49 C52,61 42,69 32,75 L32,66 C39,61 43,54 43,49 H32 V33 H52 V49 Z" />
     <path
         android:fillColor="#E9DDFF"
-        android:pathData="M76,46 C76,58 66,66 56,72 L56,63 C63,58 67,51 67,46 H56 V30 H76 V46 Z" />
+        android:pathData="M76,49 C76,61 66,69 56,75 L56,66 C63,61 67,54 67,49 H56 V33 H76 V49 Z" />
 
 </vector>
 

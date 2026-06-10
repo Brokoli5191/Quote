@@ -1,6 +1,12 @@
 package app.brokoli5191.quote.ui.screens
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
+import java.text.SimpleDateFormat
+import java.util.*
+import kotlinx.coroutines.delay
 import androidx.compose.animation.*
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.*
@@ -266,6 +272,16 @@ fun PremiumCollectionQuoteCard(
     onShare: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
+    val context = LocalContext.current
+
+    // Tick every 30s so relative timestamps stay fresh
+    var tick by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(30_000)
+            tick = System.currentTimeMillis()
+        }
+    }
     // Elegant fly-in enter animation from the side
     val offsetX = remember { androidx.compose.animation.core.Animatable(80f) }
     val alpha = remember { androidx.compose.animation.core.Animatable(0f) }
@@ -355,9 +371,8 @@ fun PremiumCollectionQuoteCard(
                         }
                     }
 
-                    // Display date or status indicator (e.g. "Saved 2 days ago" mockup)
                     Text(
-                        text = quote.savedDate ?: "quote Collection",
+                        text = formatSavedDate(quote.savedDate, tick),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                     )
@@ -423,6 +438,18 @@ fun PremiumCollectionQuoteCard(
                     ) {
                         IconButton(onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText("quote", "\"${quote.text}\" — ${quote.author}"))
+                        }) {
+                            Icon(
+                                imageVector = Icons.Default.ContentCopy,
+                                contentDescription = "Copy",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        IconButton(onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             onShare()
                         }) {
                             Icon(
@@ -444,16 +471,8 @@ fun PremiumCollectionQuoteCard(
                                 )
                             }
                         } else {
-                            var isLikedAnim by remember { mutableStateOf(false) }
-                            val heartScale by androidx.compose.animation.core.animateFloatAsState(
-                                targetValue = if (isLikedAnim) 1.35f else 1.0f,
-                                animationSpec = spring(stiffness = 500f, dampingRatio = 0.5f),
-                                finishedListener = { isLikedAnim = false }
-                            )
-
                             IconButton(onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                isLikedAnim = true
                                 onToggleFavorite()
                             }) {
                                 Icon(
@@ -467,6 +486,21 @@ fun PremiumCollectionQuoteCard(
                 }
             }
         }
+    }
+}
+
+private fun formatSavedDate(savedDate: String?, now: Long = System.currentTimeMillis()): String {
+    if (savedDate == null) return ""
+    val millis = savedDate.toLongOrNull()
+        ?: return savedDate  // backwards compat: old "dd MMM yyyy" strings shown as-is
+    val diff = now - millis
+    return when {
+        diff < 60_000L -> "just now"
+        diff < 3_600_000L -> "${diff / 60_000} min ago"
+        diff < 86_400_000L -> "${diff / 3_600_000} h ago"
+        diff < 172_800_000L -> "yesterday"
+        diff < 2_592_000_000L -> "${diff / 86_400_000} days ago"
+        else -> SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(Date(millis))
     }
 }
 

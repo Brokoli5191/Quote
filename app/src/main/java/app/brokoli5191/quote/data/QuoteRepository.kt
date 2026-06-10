@@ -2,8 +2,6 @@ package app.brokoli5191.quote.data
 
 import android.content.Context
 import kotlinx.coroutines.flow.Flow
-import java.text.SimpleDateFormat
-import java.util.*
 
 class QuoteRepository(private val quoteDao: QuoteDao) {
     val allQuotes: Flow<List<QuoteEntity>> = quoteDao.getAllQuotes()
@@ -75,19 +73,19 @@ class QuoteRepository(private val quoteDao: QuoteDao) {
                 }
                 
                 val category = mapTagsToCategory(quoteText, author, tagsList)
-                val cleanText = quoteText.replace("“", "").replace("”", "").trim()
-                val cleanAuthor = author.replace("“", "").replace("”", "").trim()
+                val cleanText = quoteText.replace("\"", "").replace("“", "").replace("”", "").trim()
+                val cleanAuthor = author.replace("\"", "").replace("“", "").replace("”", "").trim()
                 val tagsStr = tagsList.joinToString(", ")
-                val aboutAuthor = "Famous reflection on $category."
-                
+
                 quoteEntities.add(
                     QuoteEntity(
                         text = cleanText,
                         author = cleanAuthor,
                         category = category,
-                        aboutAuthor = aboutAuthor,
+                        aboutAuthor = "",
                         tags = tagsStr,
-                        isFavorite = false
+                        isFavorite = false,
+                        timestamp = System.currentTimeMillis()
                     )
                 )
             }
@@ -110,7 +108,7 @@ class QuoteRepository(private val quoteDao: QuoteDao) {
     }
 
     suspend fun toggleFavorite(id: Int, isFav: Boolean) {
-        val savedString = if (isFav) "Saved just now" else null
+        val savedString = if (isFav) System.currentTimeMillis().toString() else null
         quoteDao.updateFavorite(id, isFav, savedString)
     }
 
@@ -149,10 +147,14 @@ class QuoteRepository(private val quoteDao: QuoteDao) {
             )
         }
 
-        // Choose randomly based on date hash to make it stable but random per date fallback
-        val seed = date.hashCode().absoluteValue
-        val selectedIdx = seed % all.size
-        val selectedQuote = all[selectedIdx]
+        // Exclude previously used daily quotes to avoid repeats
+        val usedIds = quoteDao.getAllDailySelectionIds().toSet()
+        val available = all.filter { it.id !in usedIds }
+        val pool = if (available.isEmpty()) all else available
+
+        val seed = kotlin.math.abs(date.hashCode())
+        val selectedIdx = seed % pool.size
+        val selectedQuote = pool[selectedIdx]
 
         // Save selection for today
         quoteDao.insertDailySelection(DailySelectionEntity(date, selectedQuote.id))
@@ -186,5 +188,4 @@ class QuoteRepository(private val quoteDao: QuoteDao) {
         return nextQuote
     }
 
-    private val Int.absoluteValue: Int get() = if (this < 0) -this else this
 }
