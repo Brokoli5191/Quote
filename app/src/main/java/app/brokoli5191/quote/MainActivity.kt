@@ -83,37 +83,38 @@ class MainActivity : ComponentActivity() {
                 val backProgress = backProgressAnim.value
 
                 var isCompletingPredictiveBack by remember { mutableStateOf(false) }
+                var isCompletingDevBack by remember { mutableStateOf(false) }
                 var completionPreviewTab by remember { mutableStateOf<String?>(null) }
 
                 PredictiveBackHandler(enabled = hasBackStack) { progress ->
                     var capturedIsFilterClear = false
+                    var capturedIsDevBack = false
                     var capturedPreviewTab: String? = null
                     try {
                         progress.collect { event ->
                             backProgressAnim.snapTo(event.progress)
+                            capturedIsDevBack = showDevScreen
                             capturedIsFilterClear = !showDevScreen && activeTab == "Library"
                                 && (selectedCategories.isNotEmpty() || searchQuery.isNotBlank())
                             capturedPreviewTab = if (!capturedIsFilterClear && !showDevScreen && activeTab != "Daily") "Daily" else null
                         }
                         if (capturedIsFilterClear) {
-                            // Filter-clear back: snap to 0, update state, no visual transition
                             backProgressAnim.snapTo(0f)
                             viewModel.popBackStack()
                             return@PredictiveBackHandler
                         }
-                        // Real navigation: preview already visible; animate to full completion BEFORE state change
                         completionPreviewTab = capturedPreviewTab
                         isCompletingPredictiveBack = true
+                        if (capturedIsDevBack) isCompletingDevBack = true
                         backProgressAnim.animateTo(1f, animationSpec = spring(dampingRatio = 0.9f, stiffness = 500f))
                         viewModel.popBackStack()
-                        // Yield to let Compose process the state change while isCompletingPredictiveBack=true,
-                        // so AnimatedContent suppresses its default transition
                         kotlinx.coroutines.delay(50L)
                     } finally {
                         kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
                             backProgressAnim.snapTo(0f)
                         }
                         isCompletingPredictiveBack = false
+                        isCompletingDevBack = false
                         completionPreviewTab = null
                     }
                 }
@@ -262,7 +263,7 @@ class MainActivity : ComponentActivity() {
 
                     // Developer screen — exit is instant so predictive back graphicsLayer is authoritative
                     AnimatedVisibility(
-                        visible = showDevScreen || isCompletingPredictiveBack,
+                        visible = showDevScreen || isCompletingDevBack,
                         enter = slideInVertically { it } + fadeIn(),
                         exit = ExitTransition.None
                     ) {
