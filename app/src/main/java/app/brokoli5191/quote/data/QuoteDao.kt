@@ -42,6 +42,9 @@ interface QuoteDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertDailySelection(selection: DailySelectionEntity)
 
+    @Query("SELECT quoteId FROM daily_selections")
+    suspend fun getAllDailySelectionIds(): List<Int>
+
     // Static synchronous helpers
     @Query("SELECT * FROM quotes")
     suspend fun getAllQuotesSync(): List<QuoteEntity>

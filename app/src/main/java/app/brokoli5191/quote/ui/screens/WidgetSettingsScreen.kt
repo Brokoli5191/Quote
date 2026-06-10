@@ -1,46 +1,37 @@
 package app.brokoli5191.quote.ui.screens
 
-import android.app.PendingIntent
-import android.appwidget.AppWidgetManager
-import android.content.ComponentName
 import android.content.Context
-import android.content.Intent
 import android.os.Build
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.compose.animation.*
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoStories
-import androidx.compose.material.icons.filled.FormatQuote
-import androidx.compose.material.icons.filled.ShortText
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import app.brokoli5191.quote.ui.AuraViewModel
-import app.brokoli5191.quote.widget.AuraWidgetProvider
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
-import android.content.pm.PackageManager
-import android.Manifest
-import androidx.compose.material.icons.filled.NotificationsActive
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Add
+import app.brokoli5191.quote.BuildConfig
+import app.brokoli5191.quote.ui.AuraViewModel
+import app.brokoli5191.quote.utils.UpdateStatus
 
 @Composable
 fun WidgetSettingsScreen(viewModel: AuraViewModel) {
@@ -108,7 +99,7 @@ fun WidgetSettingsScreen(viewModel: AuraViewModel) {
                         Button(
                             onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                viewModel.setThemeMode(context, mode)
+                                viewModel.setThemeMode(mode)
                             },
                             modifier = Modifier
                                 .weight(1f)
@@ -185,7 +176,7 @@ fun WidgetSettingsScreen(viewModel: AuraViewModel) {
                                 )
                                 .clickable(enabled = !isDynamic) { 
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    viewModel.setThemeAccent(context, color) 
+                                    viewModel.setThemeAccent(color)
                                 },
                             contentAlignment = Alignment.Center
                         ) {
@@ -241,7 +232,7 @@ fun WidgetSettingsScreen(viewModel: AuraViewModel) {
                     contract = ActivityResultContracts.RequestPermission(),
                     onResult = { isGranted ->
                         if (isGranted) {
-                            viewModel.setDailyReminderEnabled(context, true)
+                            viewModel.setDailyReminderEnabled(true)
                             Toast.makeText(context, "Daily Reminder scheduled! ✦", Toast.LENGTH_SHORT).show()
                         } else {
                             Toast.makeText(context, "Notifications permission is required to receive daily quotes.", Toast.LENGTH_LONG).show()
@@ -313,17 +304,17 @@ fun WidgetSettingsScreen(viewModel: AuraViewModel) {
                                             ) == PackageManager.PERMISSION_GRANTED
 
                                             if (hasPermission) {
-                                                viewModel.setDailyReminderEnabled(context, true)
+                                                viewModel.setDailyReminderEnabled(true)
                                                 Toast.makeText(context, "Daily Reminder scheduled! ✦", Toast.LENGTH_SHORT).show()
                                             } else {
                                                 permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                                             }
                                         } else {
-                                            viewModel.setDailyReminderEnabled(context, true)
+                                            viewModel.setDailyReminderEnabled(true)
                                             Toast.makeText(context, "Daily Reminder scheduled! ✦", Toast.LENGTH_SHORT).show()
                                         }
                                     } else {
-                                        viewModel.setDailyReminderEnabled(context, false)
+                                        viewModel.setDailyReminderEnabled(false)
                                         Toast.makeText(context, "Daily Reminder disabled", Toast.LENGTH_SHORT).show()
                                     }
                                 }
@@ -367,7 +358,7 @@ fun WidgetSettingsScreen(viewModel: AuraViewModel) {
                                                 .clickable {
                                                     val h = (reminderHour + 1) % 24
                                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                    viewModel.updateDailyReminderTime(context, h, reminderMinute)
+                                                    viewModel.updateDailyReminderTime(h, reminderMinute)
                                                 }
                                                 .padding(6.dp)
                                         )
@@ -387,7 +378,7 @@ fun WidgetSettingsScreen(viewModel: AuraViewModel) {
                                                     var h = reminderHour - 1
                                                     if (h < 0) h = 23
                                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                    viewModel.updateDailyReminderTime(context, h, reminderMinute)
+                                                    viewModel.updateDailyReminderTime(h, reminderMinute)
                                                 }
                                                 .padding(6.dp)
                                         )
@@ -413,7 +404,7 @@ fun WidgetSettingsScreen(viewModel: AuraViewModel) {
                                                 .clickable {
                                                     val m = (reminderMinute + 5) % 60
                                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                    viewModel.updateDailyReminderTime(context, reminderHour, m)
+                                                    viewModel.updateDailyReminderTime(reminderHour, m)
                                                 }
                                                 .padding(6.dp)
                                         )
@@ -433,7 +424,7 @@ fun WidgetSettingsScreen(viewModel: AuraViewModel) {
                                                     var m = reminderMinute - 5
                                                     if (m < 0) m = 55
                                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                    viewModel.updateDailyReminderTime(context, reminderHour, m)
+                                                    viewModel.updateDailyReminderTime(reminderHour, m)
                                                 }
                                                 .padding(6.dp)
                                         )
@@ -521,7 +512,7 @@ fun WidgetSettingsScreen(viewModel: AuraViewModel) {
                             checked = isLowPerf,
                             onCheckedChange = { isChecked ->
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                viewModel.setLowPerformanceMode(context, isChecked)
+                                viewModel.setLowPerformanceMode(isChecked)
                                 Toast.makeText(
                                     context,
                                     if (isChecked) "Low Performance Mode enabled" else "Standard performance mode active",
@@ -535,7 +526,171 @@ fun WidgetSettingsScreen(viewModel: AuraViewModel) {
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            // Section 5: Backup & Restore of User Custom & Saved Quotes
+            // Section 5: In-App Updates
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Updates",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.align(Alignment.Start)
+                )
+
+                val autoUpdateEnabled by viewModel.autoUpdateEnabled.collectAsState()
+                val updateStatus by viewModel.updateStatus.collectAsState()
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f), RoundedCornerShape(20.dp)),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
+                    ),
+                    shape = RoundedCornerShape(20.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                                Text(
+                                    text = "Automatic Updates",
+                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "Check for new versions once daily when the app is open.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                )
+                            }
+                            Switch(
+                                checked = autoUpdateEnabled,
+                                onCheckedChange = { isChecked ->
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    viewModel.setAutoUpdateEnabled(isChecked)
+                                }
+                            )
+                        }
+
+                        // Status row
+                        val statusText = when (val s = updateStatus) {
+                            is UpdateStatus.Idle -> "Tap 'Check' to look for updates."
+                            is UpdateStatus.Checking -> "Checking for updates…"
+                            is UpdateStatus.UpToDate -> "You're on the latest version."
+                            is UpdateStatus.UpdateAvailable -> "Update available: v${s.version}"
+                            is UpdateStatus.Downloading -> "Downloading… ${s.progress}%"
+                            is UpdateStatus.ReadyToInstall -> "v${s.version} ready to install."
+                            is UpdateStatus.Error -> s.message
+                        }
+                        val statusColor = when (updateStatus) {
+                            is UpdateStatus.UpdateAvailable, is UpdateStatus.ReadyToInstall ->
+                                MaterialTheme.colorScheme.primary
+                            is UpdateStatus.Error ->
+                                MaterialTheme.colorScheme.error
+                            else ->
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        }
+                        Text(
+                            text = statusText,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = statusColor
+                        )
+
+                        if (updateStatus is UpdateStatus.Downloading) {
+                            LinearProgressIndicator(
+                                progress = { (updateStatus as UpdateStatus.Downloading).progress / 100f },
+                                modifier = Modifier.fillMaxWidth(),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            val isDownloading = updateStatus is UpdateStatus.Downloading
+                            val isChecking = updateStatus is UpdateStatus.Checking
+
+                            OutlinedButton(
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    viewModel.checkForUpdates()
+                                },
+                                enabled = !isChecking && !isDownloading,
+                                modifier = Modifier.weight(1f).height(44.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.primary
+                                )
+                            ) {
+                                Text(
+                                    text = if (isChecking) "Checking…" else "Check",
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                                )
+                            }
+
+                            when (val s = updateStatus) {
+                                is UpdateStatus.UpdateAvailable -> {
+                                    Button(
+                                        onClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            viewModel.downloadUpdate(s.downloadUrl, s.version)
+                                        },
+                                        modifier = Modifier.weight(1f).height(44.dp),
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                    ) {
+                                        Text(
+                                            text = "Download",
+                                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                                        )
+                                    }
+                                }
+                                is UpdateStatus.ReadyToInstall -> {
+                                    Button(
+                                        onClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            viewModel.installUpdate(context, s.filePath)
+                                        },
+                                        modifier = Modifier.weight(1f).height(44.dp),
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.primary,
+                                            contentColor = MaterialTheme.colorScheme.onPrimary
+                                        )
+                                    ) {
+                                        Text(
+                                            text = "Install",
+                                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                                        )
+                                    }
+                                }
+                                else -> Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            // Section 6: Backup & Restore
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -554,7 +709,6 @@ fun WidgetSettingsScreen(viewModel: AuraViewModel) {
                     onResult = { uri ->
                         if (uri != null) {
                             viewModel.exportBackup(
-                                context = context,
                                 uri = uri,
                                 onSuccess = {
                                     Toast.makeText(context, "Backup exported successfully! ✦", Toast.LENGTH_LONG).show()
@@ -572,7 +726,6 @@ fun WidgetSettingsScreen(viewModel: AuraViewModel) {
                     onResult = { uri ->
                         if (uri != null) {
                             viewModel.importBackup(
-                                context = context,
                                 uri = uri,
                                 onSuccess = { customCount, favCount ->
                                     Toast.makeText(
@@ -673,6 +826,60 @@ fun WidgetSettingsScreen(viewModel: AuraViewModel) {
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            // Version number — tap 5× to unlock Developer Mode
+            val devUnlocked by viewModel.devModeUnlocked.collectAsState()
+            var versionTapCount by remember(devUnlocked) { mutableIntStateOf(0) }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (devUnlocked) 0.6f else 0.35f),
+                    modifier = Modifier.clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        if (!devUnlocked) {
+                            versionTapCount++
+                            if (versionTapCount >= 5) {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                viewModel.unlockDevMode()
+                                Toast.makeText(context, "Developer mode enabled", Toast.LENGTH_SHORT).show()
+                            } else {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            }
+                        }
+                    }
+                )
+
+                if (devUnlocked) {
+                    TextButton(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            viewModel.openDevScreen()
+                        },
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Text(
+                            text = "Developer Options",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }

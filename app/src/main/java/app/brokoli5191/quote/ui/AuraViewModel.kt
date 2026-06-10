@@ -1,43 +1,53 @@
 package app.brokoli5191.quote.ui
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import app.brokoli5191.quote.BuildConfig
 import app.brokoli5191.quote.data.QuoteEntity
 import app.brokoli5191.quote.data.QuoteRepository
+import app.brokoli5191.quote.utils.NotificationHelper
 import app.brokoli5191.quote.utils.NotificationScheduler
+import app.brokoli5191.quote.utils.CategoryQuoteVerifier
+import app.brokoli5191.quote.utils.CategoryVerificationResult
+import app.brokoli5191.quote.utils.UpdateChecker
+import app.brokoli5191.quote.utils.UpdateStatus
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
-class AuraViewModel(private val repository: QuoteRepository) : ViewModel() {
+class AuraViewModel(application: Application, private val repository: QuoteRepository) : AndroidViewModel(application) {
+
+    private val app get() = getApplication<Application>()
+    private val prefs get() = app.getSharedPreferences("aura_prefs", Context.MODE_PRIVATE)
 
     private val _dailyQuote = MutableStateFlow<QuoteEntity?>(null)
     val dailyQuote: StateFlow<QuoteEntity?> = _dailyQuote.asStateFlow()
 
-    private val _verificationResult = MutableStateFlow<app.brokoli5191.quote.utils.CategoryVerificationResult?>(null)
-    val verificationResult: StateFlow<app.brokoli5191.quote.utils.CategoryVerificationResult?> = _verificationResult.asStateFlow()
+    private val _verificationResult = MutableStateFlow<CategoryVerificationResult?>(null)
+    val verificationResult: StateFlow<CategoryVerificationResult?> = _verificationResult.asStateFlow()
 
-    private val _selectedTab = MutableStateFlow("Daily") // Daily, Library, Saved, Settings
+    private val _selectedTab = MutableStateFlow("Daily")
     val selectedTab: StateFlow<String> = _selectedTab.asStateFlow()
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    private val _selectedCategory = MutableStateFlow<String?>(null)
-    val selectedCategory: StateFlow<String?> = _selectedCategory.asStateFlow()
-
     private val _selectedCategories = MutableStateFlow<Set<String>>(emptySet())
     val selectedCategories: StateFlow<Set<String>> = _selectedCategories.asStateFlow()
 
-    private val _widgetStyle = MutableStateFlow("Quote") // Quote, Minimal, Compact
+    private val _widgetStyle = MutableStateFlow("Quote")
     val widgetStyle: StateFlow<String> = _widgetStyle.asStateFlow()
 
-    private val _themeMode = MutableStateFlow("AMOLED") // LIGHT, DARK, AMOLED, DYNAMIC
+    private val _themeMode = MutableStateFlow("AMOLED")
     val themeMode: StateFlow<String> = _themeMode.asStateFlow()
 
-    private val _themeAccent = MutableStateFlow("Violet") // Violet, Amber, Green, Blue, Rose
+    private val _themeAccent = MutableStateFlow("Violet")
     val themeAccent: StateFlow<String> = _themeAccent.asStateFlow()
 
     private val _dailyReminderEnabled = MutableStateFlow(false)
@@ -52,6 +62,20 @@ class AuraViewModel(private val repository: QuoteRepository) : ViewModel() {
     private val _lowPerformanceMode = MutableStateFlow(false)
     val lowPerformanceMode: StateFlow<Boolean> = _lowPerformanceMode.asStateFlow()
 
+    private val _devModeUnlocked = MutableStateFlow(false)
+    val devModeUnlocked: StateFlow<Boolean> = _devModeUnlocked.asStateFlow()
+
+    private val _showDevScreen = MutableStateFlow(false)
+    val showDevScreen: StateFlow<Boolean> = _showDevScreen.asStateFlow()
+
+    private val _autoUpdateEnabled = MutableStateFlow(false)
+    val autoUpdateEnabled: StateFlow<Boolean> = _autoUpdateEnabled.asStateFlow()
+
+    private val _updateStatus = MutableStateFlow<UpdateStatus>(UpdateStatus.Idle)
+    val updateStatus: StateFlow<UpdateStatus> = _updateStatus.asStateFlow()
+
+    private var lastLoadedDate = ""
+
     val allQuotes: StateFlow<List<QuoteEntity>> = repository.allQuotes
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -61,19 +85,22 @@ class AuraViewModel(private val repository: QuoteRepository) : ViewModel() {
     val userAdded: StateFlow<List<QuoteEntity>> = repository.userAdded
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val hasBackStack: StateFlow<Boolean> = combine(
+        _showDevScreen, _selectedTab, _selectedCategories, _searchQuery
+    ) { devScreen, tab, categories, query ->
+        devScreen || tab != "Daily" || categories.isNotEmpty() || query.isNotBlank()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
     val filteredQuotes: StateFlow<List<QuoteEntity>> = combine(
         allQuotes,
         searchQuery,
-        selectedCategory,
         selectedCategories
-    ) { quotes, query, category, categories ->
+    ) { quotes, query, categories ->
         var list = quotes
         if (categories.isNotEmpty()) {
             list = list.filter { q ->
                 categories.any { cat -> q.category.equals(cat, ignoreCase = true) }
             }
-        } else if (category != null) {
-            list = list.filter { it.category.equals(category, ignoreCase = true) }
         }
         if (query.isNotEmpty()) {
             list = list.filter {
@@ -88,34 +115,35 @@ class AuraViewModel(private val repository: QuoteRepository) : ViewModel() {
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
+        loadThemeSettings()
         loadDailyQuote()
-        runVerification()
     }
 
     fun runVerification() {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            val result = app.brokoli5191.quote.utils.CategoryQuoteVerifier.verify(repository)
+            val result = CategoryQuoteVerifier.verify(repository)
             _verificationResult.value = result
         }
     }
 
-    fun checkAndSeedDatabase(context: android.content.Context) {
+    fun checkAndSeedDatabase() {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            val prefs = context.getSharedPreferences("aura_prefs", android.content.Context.MODE_PRIVATE)
-            val isSeeded = prefs.getBoolean("database_json_seeded_v5_0", false)
+            val isSeeded = prefs.getBoolean("database_json_seeded_v5_2", false)
             val count = repository.getQuotesCount()
             if (!isSeeded || count < 30) {
                 repository.clearAllQuotes()
-                repository.preseedDatabase(context)
-                prefs.edit().putBoolean("database_json_seeded_v5_0", true).apply()
+                repository.preseedDatabase(app)
+                prefs.edit().putBoolean("database_json_seeded_v5_2", true).apply()
                 loadDailyQuote()
             }
             runVerification()
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                checkForUpdatesIfNeeded()
+            }
         }
     }
 
-    fun loadThemeSettings(context: android.content.Context) {
-        val prefs = context.getSharedPreferences("aura_prefs", android.content.Context.MODE_PRIVATE)
+    private fun loadThemeSettings() {
         _themeMode.value = prefs.getString("theme_mode", "AMOLED") ?: "AMOLED"
         _themeAccent.value = prefs.getString("theme_accent", "Violet") ?: "Violet"
         _widgetStyle.value = prefs.getString("widget_style", "Quote") ?: "Quote"
@@ -123,47 +151,138 @@ class AuraViewModel(private val repository: QuoteRepository) : ViewModel() {
         _dailyReminderHour.value = prefs.getInt("daily_reminder_hour", 8)
         _dailyReminderMinute.value = prefs.getInt("daily_reminder_minute", 0)
         _lowPerformanceMode.value = prefs.getBoolean("low_performance_mode", false)
+        _autoUpdateEnabled.value = prefs.getBoolean("auto_update_enabled", true)
     }
 
-    fun setLowPerformanceMode(context: android.content.Context, enabled: Boolean) {
+    fun setAutoUpdateEnabled(enabled: Boolean) {
+        _autoUpdateEnabled.value = enabled
+        prefs.edit().putBoolean("auto_update_enabled", enabled).apply()
+    }
+
+    fun checkForUpdatesIfNeeded() {
+        if (!_autoUpdateEnabled.value) return
+        val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        val lastCheck = prefs.getString("last_update_check_date", "") ?: ""
+        if (lastCheck == today) return
+        checkForUpdates()
+        prefs.edit().putString("last_update_check_date", today).apply()
+    }
+
+    fun checkForUpdates() {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            _updateStatus.value = UpdateStatus.Checking
+            val release = UpdateChecker.checkLatestRelease()
+            if (release == null) {
+                _updateStatus.value = UpdateStatus.Error("Could not reach update server")
+                return@launch
+            }
+            if (UpdateChecker.isNewerVersion(BuildConfig.VERSION_NAME, release.version)) {
+                _updateStatus.value = UpdateStatus.UpdateAvailable(release.version, release.downloadUrl, release.sizeBytes)
+            } else {
+                _updateStatus.value = UpdateStatus.UpToDate
+            }
+        }
+    }
+
+    fun downloadUpdate(downloadUrl: String, version: String) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            _updateStatus.value = UpdateStatus.Downloading(0)
+            val path = UpdateChecker.downloadApk(app, downloadUrl, version) { progress ->
+                _updateStatus.value = UpdateStatus.Downloading(progress)
+            }
+            if (path != null) {
+                _updateStatus.value = UpdateStatus.ReadyToInstall(path, version)
+            } else {
+                _updateStatus.value = UpdateStatus.Error("Download failed")
+            }
+        }
+    }
+
+    fun installUpdate(context: android.content.Context, filePath: String) {
+        UpdateChecker.installApk(context, filePath)
+    }
+
+    fun dismissUpdateError() {
+        _updateStatus.value = UpdateStatus.Idle
+    }
+
+    fun setLowPerformanceMode(enabled: Boolean) {
         _lowPerformanceMode.value = enabled
-        val prefs = context.getSharedPreferences("aura_prefs", android.content.Context.MODE_PRIVATE)
         prefs.edit().putBoolean("low_performance_mode", enabled).apply()
     }
 
-    fun setThemeMode(context: android.content.Context, mode: String) {
+    fun setThemeMode(mode: String) {
         _themeMode.value = mode
-        val prefs = context.getSharedPreferences("aura_prefs", android.content.Context.MODE_PRIVATE)
         prefs.edit().putString("theme_mode", mode).apply()
     }
 
-    fun setThemeAccent(context: android.content.Context, accent: String) {
+    fun setThemeAccent(accent: String) {
         _themeAccent.value = accent
-        val prefs = context.getSharedPreferences("aura_prefs", android.content.Context.MODE_PRIVATE)
         prefs.edit().putString("theme_accent", accent).apply()
     }
 
     fun loadDailyQuote() {
-        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        val todayStr = dateFormat.format(Date())
+        val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        lastLoadedDate = todayStr
         viewModelScope.launch {
             val quote = repository.getDailyQuote(todayStr)
             _dailyQuote.value = quote
         }
     }
 
-    fun cycleDailyQuote(context: android.content.Context) {
-        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        val todayStr = dateFormat.format(Date())
+    fun refreshDailyQuoteIfNeeded() {
+        val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        if (lastLoadedDate != todayStr) {
+            loadDailyQuote()
+        }
+    }
+
+    fun cycleDailyQuote() {
+        val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
         viewModelScope.launch {
             val quote = repository.cycleDailyQuote(todayStr)
             _dailyQuote.value = quote
-            
-            // Notify widget to update instantly
-            val updateIntent = android.content.Intent("app.brokoli5191.quote.UPDATE_WIDGET").apply {
-                component = android.content.ComponentName(context, "app.brokoli5191.quote.widget.AuraWidgetProvider")
+
+            val updateIntent = Intent("app.brokoli5191.quote.UPDATE_WIDGET").apply {
+                component = ComponentName(app, "app.brokoli5191.quote.widget.AuraWidgetProvider")
             }
-            context.sendBroadcast(updateIntent)
+            app.sendBroadcast(updateIntent)
+        }
+    }
+
+    fun triggerTestNotification() {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+                val quote = repository.getDailyQuote(todayStr)
+                NotificationHelper.showQuoteNotification(app, quote.text, quote.author, notificationId = 1002)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun unlockDevMode() {
+        _devModeUnlocked.value = true
+    }
+
+    fun openDevScreen() {
+        _showDevScreen.value = true
+        _devModeUnlocked.value = false
+    }
+
+    fun closeDevScreen() {
+        _showDevScreen.value = false
+    }
+
+    fun popBackStack() {
+        when {
+            _showDevScreen.value -> closeDevScreen()
+            _selectedTab.value == "Library" && (_selectedCategories.value.isNotEmpty() || _searchQuery.value.isNotBlank()) -> {
+                clearCategorySelection()
+                _searchQuery.value = ""
+            }
+            _selectedTab.value != "Daily" -> _selectedTab.value = "Daily"
         }
     }
 
@@ -172,32 +291,20 @@ class AuraViewModel(private val repository: QuoteRepository) : ViewModel() {
     }
 
     fun selectCategory(category: String?) {
-        _selectedCategory.value = category
-        if (category == null) {
-            _selectedCategories.value = emptySet()
-        } else {
-            _selectedCategories.value = setOf(category)
-        }
+        _selectedCategories.value = if (category == null) emptySet() else setOf(category)
     }
 
     fun toggleCategorySelected(category: String) {
-        val currentSet = _selectedCategories.value
-        val newSet = if (currentSet.contains(category)) {
-            currentSet - category
+        val newSet = if (_selectedCategories.value.contains(category)) {
+            _selectedCategories.value - category
         } else {
-            currentSet + category
+            _selectedCategories.value + category
         }
         _selectedCategories.value = newSet
-        if (newSet.isEmpty()) {
-            _selectedCategory.value = null
-        } else {
-            _selectedCategory.value = newSet.first()
-        }
     }
 
     fun clearCategorySelection() {
         _selectedCategories.value = emptySet()
-        _selectedCategory.value = null
     }
 
     fun setSearchQuery(query: String) {
@@ -206,12 +313,12 @@ class AuraViewModel(private val repository: QuoteRepository) : ViewModel() {
 
     fun setWidgetStyle(style: String) {
         _widgetStyle.value = style
+        prefs.edit().putString("widget_style", style).apply()
     }
 
     fun toggleFavorite(quote: QuoteEntity) {
         viewModelScope.launch {
             repository.toggleFavorite(quote.id, !quote.isFavorite)
-            // If the favorited quote is the daily quote, update daily quote UI state
             if (_dailyQuote.value?.id == quote.id) {
                 _dailyQuote.value = _dailyQuote.value?.copy(isFavorite = !quote.isFavorite)
             }
@@ -238,41 +345,38 @@ class AuraViewModel(private val repository: QuoteRepository) : ViewModel() {
         }
     }
 
-    fun setDailyReminderEnabled(context: android.content.Context, enabled: Boolean) {
+    fun setDailyReminderEnabled(enabled: Boolean) {
         _dailyReminderEnabled.value = enabled
-        val prefs = context.getSharedPreferences("aura_prefs", android.content.Context.MODE_PRIVATE)
         prefs.edit().putBoolean("daily_reminder_enabled", enabled).apply()
 
         if (enabled) {
-            NotificationScheduler.scheduleDailyNotification(context, _dailyReminderHour.value, _dailyReminderMinute.value)
+            NotificationScheduler.scheduleDailyNotification(app, _dailyReminderHour.value, _dailyReminderMinute.value)
         } else {
-            NotificationScheduler.cancelDailyNotification(context)
+            NotificationScheduler.cancelDailyNotification(app)
         }
     }
 
-    fun updateDailyReminderTime(context: android.content.Context, hour: Int, minute: Int) {
+    fun updateDailyReminderTime(hour: Int, minute: Int) {
         _dailyReminderHour.value = hour
         _dailyReminderMinute.value = minute
-        val prefs = context.getSharedPreferences("aura_prefs", android.content.Context.MODE_PRIVATE)
         prefs.edit()
             .putInt("daily_reminder_hour", hour)
             .putInt("daily_reminder_minute", minute)
             .apply()
 
         if (_dailyReminderEnabled.value) {
-            NotificationScheduler.scheduleDailyNotification(context, hour, minute)
+            NotificationScheduler.scheduleDailyNotification(app, hour, minute)
         }
     }
 
-    fun exportBackup(context: android.content.Context, uri: android.net.Uri, onSuccess: () -> Unit, onError: (String) -> Unit) {
+    fun exportBackup(uri: android.net.Uri, onSuccess: () -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
-                val allQuotesList = repository.getAllQuotesSync()
-                val backupItems = allQuotesList.filter { it.isUserAdded || it.isFavorite }
-                
+                val backupItems = repository.getAllQuotesSync().filter { it.isUserAdded || it.isFavorite }
+
                 val jsonArray = org.json.JSONArray()
                 for (quote in backupItems) {
-                    val obj = org.json.JSONObject().apply {
+                    jsonArray.put(org.json.JSONObject().apply {
                         put("text", quote.text)
                         put("author", quote.author)
                         put("category", quote.category)
@@ -282,14 +386,13 @@ class AuraViewModel(private val repository: QuoteRepository) : ViewModel() {
                         put("aboutAuthor", quote.aboutAuthor)
                         put("tags", quote.tags)
                         put("savedDate", quote.savedDate ?: "")
-                    }
-                    jsonArray.put(obj)
+                    })
                 }
-                
-                context.contentResolver.openOutputStream(uri)?.use { os ->
+
+                app.contentResolver.openOutputStream(uri)?.use { os ->
                     os.write(jsonArray.toString(4).toByteArray())
                 }
-                
+
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                     onSuccess()
                 }
@@ -302,46 +405,39 @@ class AuraViewModel(private val repository: QuoteRepository) : ViewModel() {
         }
     }
 
-    fun importBackup(context: android.content.Context, uri: android.net.Uri, onSuccess: (insertedCustom: Int, updatedFavs: Int) -> Unit, onError: (String) -> Unit) {
+    fun importBackup(uri: android.net.Uri, onSuccess: (insertedCustom: Int, updatedFavs: Int) -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
-                val content = context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                    inputStream.bufferedReader().use { it.readText() }
-                } ?: throw Exception("Could not open file")
-                
+                val content = app.contentResolver.openInputStream(uri)?.use { it.bufferedReader().readText() }
+                    ?: throw Exception("Could not open file")
+
                 val jsonArray = org.json.JSONArray(content)
                 val dbQuotes = repository.getAllQuotesSync()
-                
+
                 var insertedCustom = 0
                 var updatedFavs = 0
-                
+
                 for (i in 0 until jsonArray.length()) {
                     val obj = jsonArray.getJSONObject(i)
                     val text = obj.getString("text")
                     val author = obj.getString("author")
-                    val category = obj.optString("category", "Stoicism")
                     val isFavorite = obj.optBoolean("isFavorite", false)
                     val isUserAdded = obj.optBoolean("isUserAdded", false)
-                    val timestamp = obj.optLong("timestamp", System.currentTimeMillis())
-                    val aboutAuthor = obj.optString("aboutAuthor", "")
-                    val tags = obj.optString("tags", "")
-                    val savedDate = obj.optString("savedDate", null).let { if (it.isNullOrEmpty()) null else it }
-                    
+
                     if (isUserAdded) {
                         val alreadyExists = dbQuotes.any { it.text.trim() == text.trim() && it.author.trim() == author.trim() }
                         if (!alreadyExists) {
-                            val newQuote = QuoteEntity(
+                            repository.insertQuote(QuoteEntity(
                                 text = text,
                                 author = author,
-                                category = category,
+                                category = obj.optString("category", "Stoicism"),
                                 isFavorite = isFavorite,
                                 isUserAdded = true,
-                                timestamp = timestamp,
-                                aboutAuthor = aboutAuthor,
-                                tags = tags,
-                                savedDate = savedDate
-                            )
-                            repository.insertQuote(newQuote)
+                                timestamp = obj.optLong("timestamp", System.currentTimeMillis()),
+                                aboutAuthor = obj.optString("aboutAuthor", ""),
+                                tags = obj.optString("tags", ""),
+                                savedDate = obj.optString("savedDate", null).let { if (it.isNullOrEmpty()) null else it }
+                            ))
                             insertedCustom++
                         }
                     } else if (isFavorite) {
@@ -352,7 +448,7 @@ class AuraViewModel(private val repository: QuoteRepository) : ViewModel() {
                         }
                     }
                 }
-                
+
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                     onSuccess(insertedCustom, updatedFavs)
                 }
@@ -366,11 +462,14 @@ class AuraViewModel(private val repository: QuoteRepository) : ViewModel() {
     }
 }
 
-class AuraViewModelFactory(private val repository: QuoteRepository) : ViewModelProvider.Factory {
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+class AuraViewModelFactory(
+    private val application: Application,
+    private val repository: QuoteRepository
+) : ViewModelProvider.AndroidViewModelFactory(application) {
+    override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(AuraViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return AuraViewModel(repository) as T
+            return AuraViewModel(application, repository) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

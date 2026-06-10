@@ -39,11 +39,10 @@ object NotificationScheduler {
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                var isExactPossible = false
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    isExactPossible = alarmManager.canScheduleExactAlarms()
+                val isExactPossible = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    alarmManager.canScheduleExactAlarms()
                 } else {
-                    isExactPossible = true
+                    true
                 }
 
                 if (isExactPossible) {
