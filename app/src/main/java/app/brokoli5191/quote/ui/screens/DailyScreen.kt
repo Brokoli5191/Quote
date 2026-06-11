@@ -10,6 +10,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
@@ -108,10 +109,8 @@ fun DailyScreen(viewModel: AuraViewModel) {
             AnimatedContent(
                 targetState = quoteState,
                 transitionSpec = {
-                    (fadeIn(animationSpec = spring(dampingRatio = 0.8f)) +
-                     slideInVertically(initialOffsetY = { 32 }))
-                        .togetherWith(fadeOut(animationSpec = spring(dampingRatio = 0.8f)) +
-                         slideOutVertically(targetOffsetY = { -32 }))
+                    fadeIn(animationSpec = tween(300))
+                        .togetherWith(fadeOut(animationSpec = tween(300)))
                 },
                 label = "DailyQuoteTransition",
                 modifier = Modifier.fillMaxWidth()
