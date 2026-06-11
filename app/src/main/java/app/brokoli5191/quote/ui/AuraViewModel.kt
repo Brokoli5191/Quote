@@ -136,7 +136,6 @@ class AuraViewModel(application: Application, private val repository: QuoteRepos
                 prefs.edit().putBoolean("database_json_seeded_v5_2", true).apply()
                 loadDailyQuote()
             }
-            runVerification()
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                 checkForUpdatesIfNeeded()
             }
