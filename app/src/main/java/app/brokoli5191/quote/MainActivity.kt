@@ -25,14 +25,14 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.FavoriteBorder
-import androidx.compose.material.icons.outlined.GridView
-import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -386,8 +386,8 @@ fun BottomNavigationBar(activeTab: String, lowPerformanceMode: Boolean, onTabSel
             horizontalArrangement = Arrangement.SpaceAround
         ) {
             val items = listOf(
-                Triple("Daily", Pair(Icons.Outlined.Home, Icons.Filled.Home), "Daily"),
-                Triple("Library", Pair(Icons.Outlined.GridView, Icons.Filled.GridView), "Library"),
+                Triple("Daily", Pair(Icons.Outlined.WbSunny, Icons.Filled.WbSunny), "Daily"),
+                Triple("Library", Pair(Icons.Outlined.Explore, Icons.Filled.Explore), "Library"),
                 Triple("Saved", Pair(Icons.Outlined.FavoriteBorder, Icons.Filled.Favorite), "Saved"),
                 Triple("Settings", Pair(Icons.Outlined.Settings, Icons.Filled.Settings), "Settings")
             )
