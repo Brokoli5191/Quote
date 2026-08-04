@@ -236,27 +236,10 @@ fun LibraryScreen(viewModel: AuraViewModel) {
                                 .padding(horizontal = 20.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            val bentoCategories = remember {
-                                listOf(
-                                    CategoryTileData(name = "Inspirational", icon = Icons.Default.EmojiObjects, tintColor = Color(0xFFFFF7EB), isFullWidth = true),
-                                    CategoryTileData(name = "Life", icon = Icons.Default.Spa, tintColor = Color(0xFFA0D2AD)),
-                                    CategoryTileData(name = "Humor", icon = Icons.Default.TheaterComedy, tintColor = Color(0xFFFFDB9C)),
-                                    CategoryTileData(name = "Love", icon = Icons.Default.Favorite, tintColor = Color(0xFFFFB2C5)),
-                                    CategoryTileData(name = "Books", icon = Icons.Default.LibraryBooks, tintColor = Color(0xFFFFDB9C)),
-                                    CategoryTileData(name = "Truth", icon = Icons.Default.Balance, tintColor = Color(0xFFADC6FF)),
-                                    CategoryTileData(name = "Reading", icon = Icons.Default.AutoStories, tintColor = Color(0xFFFFDB9C)),
-                                    CategoryTileData(name = "Wisdom", icon = Icons.Default.SelfImprovement, tintColor = Color(0xFFFFDB9C)),
-                                    CategoryTileData(name = "Happiness", icon = Icons.Default.SentimentVerySatisfied, tintColor = Color(0xFFFFDB9C)),
-                                    CategoryTileData(name = "Writing", icon = Icons.Default.DriveFileRenameOutline, tintColor = Color(0xFFADC6FF)),
-                                    CategoryTileData(name = "Inspiration", icon = Icons.Default.AutoAwesome, tintColor = Color(0xFFFFF7EB)),
-                                    CategoryTileData(name = "Philosophy", icon = Icons.Default.HistoryEdu, tintColor = Color(0xFFADC6FF)),
-                                    CategoryTileData(name = "Death", icon = Icons.Default.HourglassEmpty, tintColor = Color(0xFFADC6FF)),
-                                    CategoryTileData(name = "Poetry", icon = Icons.Default.Create, tintColor = Color(0xFFFFB2C5)),
-                                    CategoryTileData(name = "Optimism", icon = Icons.Default.WbSunny, tintColor = Color(0xFFFFDB9C))
-                                )
-                            }
+                            // Single source of truth: see CategoryCatalog.kt
+                            val bentoCategories = categoryCatalog
 
-                            // Render Inspirational (First large card)
+                            // Render Inspirational (first large card)
                             val inspirational = bentoCategories[0]
                             CategoryBentoCard(
                                 name = inspirational.name,
@@ -266,8 +249,8 @@ fun LibraryScreen(viewModel: AuraViewModel) {
                                 onClick = { selectCategoryWithHaptic(inspirational.name) }
                             )
 
-                            // Render rows of 2 for middle categories (1 to 14)
-                            val midCategories = bentoCategories.subList(1, 15)
+                            // Render the remaining categories in rows of 2
+                            val midCategories = bentoCategories.drop(1)
                             midCategories.chunked(2).forEach { pair ->
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
@@ -361,23 +344,7 @@ fun LibraryScreen(viewModel: AuraViewModel) {
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    val categoriesList = listOf(
-                        "Inspirational",
-                        "Life",
-                        "Humor",
-                        "Love",
-                        "Books",
-                        "Truth",
-                        "Reading",
-                        "Wisdom",
-                        "Happiness",
-                        "Writing",
-                        "Inspiration",
-                        "Philosophy",
-                        "Death",
-                        "Poetry",
-                        "Optimism"
-                    )
+                    val categoriesList = filterCategoryNames
 
                     categoriesList.chunked(2).forEach { rowCategoryList ->
                         Row(
@@ -823,13 +790,6 @@ fun QuoteBrowseItemCard(
     }
 }
 
-
-data class CategoryTileData(
-    val name: String,
-    val icon: androidx.compose.ui.graphics.vector.ImageVector,
-    val tintColor: Color,
-    val isFullWidth: Boolean = false
-)
 
 @Composable
 fun CategoryBentoCard(
