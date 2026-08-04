@@ -16,44 +16,6 @@ class QuoteRepository(private val quoteDao: QuoteDao) {
         quoteDao.deleteAllQuotes()
     }
 
-    private fun mapTagsToCategory(quoteText: String, author: String, tags: List<String>): String {
-        val allLowerTags = tags.map { it.lowercase().trim() }
-        val textLower = quoteText.lowercase()
-        
-        // Define our 15 specific categories requested by the user
-        val userCategories = listOf(
-            "Inspirational", "Life", "Humor", "Love", "Books", "Truth", "Reading", "Wisdom",
-            "Happiness", "Writing", "Inspiration", "Philosophy", "Death", "Poetry", "Optimism"
-        )
-        
-        // 1. Try to find an exact match in the tags first (after formatting)
-        for (category in userCategories) {
-            val categoryLower = category.lowercase()
-            if (allLowerTags.contains(categoryLower)) {
-                return category
-            }
-        }
-        
-        // 2. Try to match tags that contain the category word
-        for (category in userCategories) {
-            val categoryLower = category.lowercase()
-            if (allLowerTags.any { it.contains(categoryLower) }) {
-                return category
-            }
-        }
-        
-        // 3. Try to check the quote text for the category word
-        for (category in userCategories) {
-            val categoryLower = category.lowercase()
-            if (textLower.contains(categoryLower)) {
-                return category
-            }
-        }
-        
-        // 4. Default fallback: "Inspirational"
-        return "Inspirational"
-    }
-
     suspend fun preseedDatabase(context: Context) {
         try {
             val inputStream = context.resources.openRawResource(app.brokoli5191.quote.R.raw.quotes_seed)
@@ -72,7 +34,7 @@ class QuoteRepository(private val quoteDao: QuoteDao) {
                     tagsList.add(tagsArray.getString(j))
                 }
                 
-                val category = mapTagsToCategory(quoteText, author, tagsList)
+                val category = CategoryMapper.map(tagsList, quoteText)
                 val cleanText = quoteText.replace("\"", "").replace("“", "").replace("”", "").trim()
                 val cleanAuthor = author.replace("\"", "").replace("“", "").replace("”", "").trim()
                 val tagsStr = tagsList.joinToString(", ")
