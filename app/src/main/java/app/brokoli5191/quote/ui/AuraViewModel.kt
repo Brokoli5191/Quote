@@ -131,12 +131,13 @@ class AuraViewModel(application: Application, private val repository: QuoteRepos
 
     fun checkAndSeedDatabase() {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            val isSeeded = prefs.getBoolean("database_json_seeded_v5_2", false)
+            val isSeeded = prefs.getBoolean("database_json_seeded_v6", false)
             val count = repository.getQuotesCount()
             if (!isSeeded || count < 30) {
-                repository.clearAllQuotes()
-                repository.preseedDatabase(app)
-                prefs.edit().putBoolean("database_json_seeded_v5_2", true).apply()
+                // Favorite-preserving re-seed: keeps user-added quotes and restores
+                // favorites by (text, author) so the bigger DB costs no user data.
+                repository.reseedPreservingFavorites(app)
+                prefs.edit().putBoolean("database_json_seeded_v6", true).apply()
                 loadDailyQuote()
             }
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
