@@ -53,6 +53,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 @Composable
 fun DailyScreen(viewModel: AuraViewModel) {
     val quoteState by viewModel.dailyQuote.collectAsState()
+    val lowPerformanceMode by viewModel.lowPerformanceMode.collectAsState()
     val context = LocalContext.current
     val scrollState = rememberScrollState()
     val haptic = LocalHapticFeedback.current
@@ -78,6 +79,7 @@ fun DailyScreen(viewModel: AuraViewModel) {
                 viewModel.cycleDailyQuote()
             },
             scrollState = scrollState,
+            lowPerformanceMode = lowPerformanceMode,
             modifier = Modifier.fillMaxSize()
         ) { offsetY ->
             Column(
@@ -109,11 +111,19 @@ fun DailyScreen(viewModel: AuraViewModel) {
             AnimatedContent(
                 targetState = quoteState,
                 transitionSpec = {
-                    ContentTransform(
-                        targetContentEnter = fadeIn(animationSpec = tween(300)),
-                        initialContentExit = fadeOut(animationSpec = tween(300)),
-                        sizeTransform = null
-                    )
+                    if (lowPerformanceMode) {
+                        ContentTransform(
+                            targetContentEnter = EnterTransition.None,
+                            initialContentExit = ExitTransition.None,
+                            sizeTransform = null
+                        )
+                    } else {
+                        ContentTransform(
+                            targetContentEnter = fadeIn(animationSpec = tween(300)),
+                            initialContentExit = fadeOut(animationSpec = tween(300)),
+                            sizeTransform = null
+                        )
+                    }
                 },
                 label = "DailyQuoteTransition",
                 modifier = Modifier.fillMaxWidth()
@@ -416,6 +426,7 @@ fun ElasticPullDownContainer(
     onTriggerRefresh: () -> Unit,
     scrollState: ScrollState,
     modifier: Modifier = Modifier,
+    lowPerformanceMode: Boolean = false,
     content: @Composable (offsetY: Float) -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
@@ -472,9 +483,12 @@ fun ElasticPullDownContainer(
                             val maxOffset = 1200f
                             val resistanceFactor = 1200f
                             val elasticOffset = maxOffset * (1f - kotlin.math.exp(-rawDragY / resistanceFactor))
-                            
-                            scope.launch {
-                                dragOffset.snapTo(elasticOffset)
+
+                            // Low-performance mode: keep the refresh trigger but no rubber-band visual.
+                            if (!lowPerformanceMode) {
+                                scope.launch {
+                                    dragOffset.snapTo(elasticOffset)
+                                }
                             }
 
                             // Trigger tactile feedback ticks

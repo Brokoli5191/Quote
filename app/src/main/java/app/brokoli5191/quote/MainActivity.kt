@@ -175,7 +175,7 @@ class MainActivity : ComponentActivity() {
                                 .padding(bottom = innerPadding.calculateBottomPadding())
                         ) {
                             // Previous page peeks in from the left during back gesture
-                            if (backPreviewTab != null) {
+                            if (backPreviewTab != null && !lowPerformanceMode) {
                                 Box(
                                     Modifier
                                         .fillMaxSize()
@@ -196,7 +196,7 @@ class MainActivity : ComponentActivity() {
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .graphicsLayer {
-                                        if (!showDevScreen && backProgress > 0f && !isFilterClearBack) {
+                                        if (!showDevScreen && backProgress > 0f && !isFilterClearBack && !lowPerformanceMode) {
                                             translationX = size.width * backProgress
                                         }
                                     }
@@ -212,18 +212,11 @@ class MainActivity : ComponentActivity() {
                                         } else {
                                             val isForward = tabIndex(targetState) > tabIndex(initialState)
                                             if (lowPerformanceMode) {
-                                                val slideSpec = tween<androidx.compose.ui.unit.IntOffset>(
-                                                    durationMillis = 220,
-                                                    easing = androidx.compose.animation.core.FastOutSlowInEasing
+                                                // Low-performance mode: no motion at all.
+                                                ContentTransform(
+                                                    targetContentEnter = EnterTransition.None,
+                                                    initialContentExit = ExitTransition.None
                                                 )
-                                                val fadeSpec = tween<Float>(durationMillis = 180)
-                                                if (isForward) {
-                                                    (slideInHorizontally(slideSpec) { it } + fadeIn(fadeSpec))
-                                                        .togetherWith(slideOutHorizontally(slideSpec) { -it } + fadeOut(fadeSpec))
-                                                } else {
-                                                    (slideInHorizontally(slideSpec) { -it } + fadeIn(fadeSpec))
-                                                        .togetherWith(slideOutHorizontally(slideSpec) { it } + fadeOut(fadeSpec))
-                                                }
                                             } else {
                                                 val floatSpring = spring<Float>(dampingRatio = 0.76f, stiffness = 180f)
                                                 val offsetSpring = spring<androidx.compose.ui.unit.IntOffset>(dampingRatio = 0.76f, stiffness = 180f)
