@@ -32,6 +32,9 @@ interface QuoteDao {
     @Query("DELETE FROM quotes")
     suspend fun deleteAllQuotes()
 
+    @Query("DELETE FROM quotes WHERE isUserAdded = 0")
+    suspend fun deleteNonUserQuotes()
+
     @Query("DELETE FROM quotes WHERE id = :id")
     suspend fun deleteQuoteById(id: Int)
 

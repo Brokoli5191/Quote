@@ -61,6 +61,28 @@ class QuoteRepository(private val quoteDao: QuoteDao) {
         }
     }
 
+    /**
+     * Re-seeds the bundled quotes without destroying user data: user-added rows
+     * are left untouched, and favorites on seed rows are restored by matching
+     * (text, author) after re-insert (row ids change on re-seed).
+     */
+    suspend fun reseedPreservingFavorites(context: Context) {
+        val oldFavKeys = quoteDao.getAllQuotesSync()
+            .filter { it.isFavorite && !it.isUserAdded }
+            .map { it.text.trim() to it.author.trim() }
+            .toSet()
+        quoteDao.deleteNonUserQuotes()
+        preseedDatabase(context)
+        if (oldFavKeys.isNotEmpty()) {
+            val now = System.currentTimeMillis().toString()
+            quoteDao.getAllQuotesSync().forEach { q ->
+                if (!q.isUserAdded && (q.text.trim() to q.author.trim()) in oldFavKeys) {
+                    quoteDao.updateFavorite(q.id, true, now)
+                }
+            }
+        }
+    }
+
     fun getQuotesByCategory(category: String): Flow<List<QuoteEntity>> {
         return quoteDao.getQuotesByCategory(category)
     }
