@@ -169,7 +169,10 @@ fun LibraryScreen(viewModel: AuraViewModel) {
                 targetState = (selectedCategories.isNotEmpty() || searchQuery.isNotBlank()),
                 transitionSpec = {
                     if (lowPerformanceMode) {
-                        fadeIn(animationSpec = tween(150)) togetherWith fadeOut(animationSpec = tween(150))
+                        ContentTransform(
+                            targetContentEnter = EnterTransition.None,
+                            initialContentExit = ExitTransition.None
+                        )
                     } else {
                         val exprSpring = spring<Float>(dampingRatio = 0.52f, stiffness = 220f)
                         val exprOffsetSpring = spring<androidx.compose.ui.unit.IntOffset>(dampingRatio = 0.52f, stiffness = 220f)
@@ -660,6 +663,7 @@ fun CategoryBrowseViewInPlace(
                 items(quotes, key = { it.id }) { quote ->
                     QuoteBrowseItemCard(
                         quote = quote,
+                        lowPerformanceMode = lowPerformanceMode,
                         onToggleFavorite = { onToggleFavorite(quote) },
                         onShare = {
                             val intent = Intent(Intent.ACTION_SEND).apply {
@@ -680,21 +684,22 @@ fun CategoryBrowseViewInPlace(
 fun QuoteBrowseItemCard(
     quote: QuoteEntity,
     onToggleFavorite: () -> Unit,
-    onShare: () -> Unit
+    onShare: () -> Unit,
+    lowPerformanceMode: Boolean = false
 ) {
     val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
-    val offsetX = remember { Animatable(80f) }
-    val alphaAnim = remember { Animatable(0f) }
+    val offsetX = remember { Animatable(if (lowPerformanceMode) 0f else 80f) }
+    val alphaAnim = remember { Animatable(if (lowPerformanceMode) 1f else 0f) }
 
     LaunchedEffect(Unit) {
-        offsetX.animateTo(
+        if (!lowPerformanceMode) offsetX.animateTo(
             targetValue = 0f,
             animationSpec = spring(stiffness = 300f, dampingRatio = 0.8f)
         )
     }
     LaunchedEffect(Unit) {
-        alphaAnim.animateTo(
+        if (!lowPerformanceMode) alphaAnim.animateTo(
             targetValue = 1f,
             animationSpec = tween(durationMillis = 250)
         )
