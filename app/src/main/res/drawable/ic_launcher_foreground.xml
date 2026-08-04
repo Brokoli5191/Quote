@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Open-book silhouette. Two pages splay from a bottom binding with a V-gap
+  opening upward. Detail is carried by SHAPE, not colour, and there are no
+  hairline strokes — so it reads correctly both in full colour and when
+  Android flattens the <monochrome> layer to a single tint (themed icons).
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
@@ -7,27 +13,10 @@
 
     <!-- Left page -->
     <path
-        android:fillColor="#E9DDFF"
-        android:pathData="M54,47 C45,43 34,42 26,43 L26,65 C35,62 46,63 54,68 Z" />
-    <!-- Right page -->
+        android:fillColor="#F2ECFF"
+        android:pathData="M50,40 C40,38 32,40 26,45 L27,60 C36,63 46,65 54,66 C53,56 52,48 50,40 Z" />
+    <!-- Right page (mirror; transparent V-gap forms the spine) -->
     <path
-        android:fillColor="#E9DDFF"
-        android:pathData="M54,47 C63,43 74,42 82,43 L82,65 C73,62 62,63 54,68 Z" />
-
-    <!-- Spine crease -->
-    <path
-        android:strokeColor="#37265E"
-        android:strokeWidth="1.6"
-        android:strokeLineCap="round"
-        android:pathData="M54,47 L54,68" />
-
-    <!-- Text lines (left page) -->
-    <path android:strokeColor="#37265E" android:strokeWidth="1.5" android:strokeLineCap="round" android:pathData="M33,51 L49,50" />
-    <path android:strokeColor="#37265E" android:strokeWidth="1.5" android:strokeLineCap="round" android:pathData="M33,56 L49,55" />
-    <path android:strokeColor="#37265E" android:strokeWidth="1.5" android:strokeLineCap="round" android:pathData="M33,61 L48,60" />
-
-    <!-- Text lines (right page) -->
-    <path android:strokeColor="#37265E" android:strokeWidth="1.5" android:strokeLineCap="round" android:pathData="M59,50 L75,51" />
-    <path android:strokeColor="#37265E" android:strokeWidth="1.5" android:strokeLineCap="round" android:pathData="M59,55 L75,56" />
-    <path android:strokeColor="#37265E" android:strokeWidth="1.5" android:strokeLineCap="round" android:pathData="M60,60 L75,61" />
+        android:fillColor="#F2ECFF"
+        android:pathData="M58,40 C68,38 76,40 82,45 L81,60 C72,63 62,65 54,66 C55,56 56,48 58,40 Z" />
 </vector>
