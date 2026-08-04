@@ -4,8 +4,9 @@
 # ~2508 tagged quotes) and emits app/src/main/res/raw/quotes_seed.json in the
 # shape the seeder expects: [{"quote": "...", "author": "...", "tags": [...]}].
 #
-# Cleans smart quotes, drops empty rows, dedups on (text, author), and strips
-# noise tags (misattributed-*, attributed-no-source, author-name tokens).
+# Cleans smart quotes, drops empty rows and quotes longer than 90 chars, dedups
+# on (text, author), and strips noise tags (misattributed-*, attributed-no-source,
+# author-name tokens).
 #
 # Usage: bash tools/build_quotes_seed.sh
 # Requires: curl, node.
@@ -41,6 +42,7 @@ for (const line of lines) {
   const text = clean(o.quote);
   const author = clean(o.author);
   if (!text || !author) continue;
+  if (text.length > 90) continue; // keep quotes short enough to look good on the Daily screen
   const key = (text + '|' + author).toLowerCase();
   if (seen.has(key)) continue;
   seen.add(key);
