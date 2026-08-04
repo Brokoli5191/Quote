@@ -8,8 +8,16 @@ import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.animation.*
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -297,6 +305,68 @@ private fun tabIndex(tab: String) = when (tab) {
     else -> 0
 }
 
+/**
+ * Nav-bar icon: shows the outline glyph when inactive; when it becomes active the
+ * filled glyph is revealed with a diagonal wipe from top-left to bottom-right over
+ * the identically-sized, perfectly-overlaid outline. The pill fades in with it.
+ */
+@Composable
+private fun NavBarIcon(
+    outline: ImageVector,
+    filled: ImageVector,
+    selected: Boolean,
+    label: String,
+    lowPerformanceMode: Boolean
+) {
+    val progress by animateFloatAsState(
+        targetValue = if (selected) 1f else 0f,
+        animationSpec = if (lowPerformanceMode) snap() else tween(durationMillis = 420, easing = FastOutSlowInEasing),
+        label = "navFill"
+    )
+    val activeTint = MaterialTheme.colorScheme.onPrimaryContainer
+    val inactiveTint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
+
+    Box(
+        modifier = Modifier
+            .size(width = 64.dp, height = 32.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = progress)),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(Modifier.size(24.dp)) {
+            // Base outline, always the same size and position as the filled layer.
+            Icon(
+                imageVector = outline,
+                contentDescription = label,
+                tint = lerp(inactiveTint, activeTint, progress),
+                modifier = Modifier.size(24.dp)
+            )
+            // Filled layer, revealed by a diagonal wipe (x + y <= progress * (w + h)).
+            Icon(
+                imageVector = filled,
+                contentDescription = null,
+                tint = activeTint,
+                modifier = Modifier
+                    .size(24.dp)
+                    .drawWithContent {
+                        if (progress <= 0f) return@drawWithContent
+                        val extent = (size.width + size.height) * progress
+                        clipPath(
+                            Path().apply {
+                                moveTo(0f, 0f)
+                                lineTo(extent, 0f)
+                                lineTo(0f, extent)
+                                close()
+                            }
+                        ) {
+                            this@drawWithContent.drawContent()
+                        }
+                    }
+            )
+        }
+    }
+}
+
 @Composable
 fun BottomNavigationBar(activeTab: String, lowPerformanceMode: Boolean, onTabSelected: (String) -> Unit) {
     val haptic = LocalHapticFeedback.current
@@ -340,25 +410,13 @@ fun BottomNavigationBar(activeTab: String, lowPerformanceMode: Boolean, onTabSel
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(width = 64.dp, height = 32.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(
-                                color = if (isSelected) MaterialTheme.colorScheme.primaryContainer
-                                        else Color.Transparent
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        val targetIcon = if (isSelected && !lowPerformanceMode) iconPair.second else iconPair.first
-                        Icon(
-                            imageVector = targetIcon,
-                            contentDescription = label,
-                            tint = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
-                                   else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
+                    NavBarIcon(
+                        outline = iconPair.first,
+                        filled = iconPair.second,
+                        selected = isSelected,
+                        label = label,
+                        lowPerformanceMode = lowPerformanceMode
+                    )
 
                     Spacer(modifier = Modifier.height(6.dp))
 
