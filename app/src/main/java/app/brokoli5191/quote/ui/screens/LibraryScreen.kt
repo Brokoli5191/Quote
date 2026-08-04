@@ -238,97 +238,21 @@ fun LibraryScreen(viewModel: AuraViewModel) {
                         ) {
                             val bentoCategories = remember {
                                 listOf(
-                                    CategoryTileData(
-                                        name = "Inspirational",
-                                        description = "Ignite your inner fire, passion, and thrive",
-                                        icon = Icons.Default.EmojiObjects,
-                                        tintColor = Color(0xFFFFF7EB),
-                                        isFullWidth = true
-                                    ),
-                                    CategoryTileData(
-                                        name = "Life",
-                                        description = "Existential reflections & daily journeys",
-                                        icon = Icons.Default.Spa,
-                                        tintColor = Color(0xFFA0D2AD)
-                                    ),
-                                    CategoryTileData(
-                                        name = "Humor",
-                                        description = "Laughter, wit, and cheeky observations",
-                                        icon = Icons.Default.TheaterComedy,
-                                        tintColor = Color(0xFFFFDB9C)
-                                    ),
-                                    CategoryTileData(
-                                        name = "Love",
-                                        description = "Compassion, human bonds, and high affection",
-                                        icon = Icons.Default.Favorite,
-                                        tintColor = Color(0xFFFFB2C5)
-                                    ),
-                                    CategoryTileData(
-                                        name = "Books",
-                                        description = "A portable magic of printed pages",
-                                        icon = Icons.Default.LibraryBooks,
-                                        tintColor = Color(0xFFFFDB9C)
-                                    ),
-                                    CategoryTileData(
-                                        name = "Truth",
-                                        description = "Honesty and direct paths without compromise",
-                                        icon = Icons.Default.Balance,
-                                        tintColor = Color(0xFFADC6FF)
-                                    ),
-                                    CategoryTileData(
-                                        name = "Reading",
-                                        description = "The quiet art of continuous literature",
-                                        icon = Icons.Default.AutoStories,
-                                        tintColor = Color(0xFFFFDB9C)
-                                    ),
-                                    CategoryTileData(
-                                        name = "Wisdom",
-                                        description = "Centuries of knowledge and deep philosophy",
-                                        icon = Icons.Default.SelfImprovement,
-                                        tintColor = Color(0xFFFFDB9C)
-                                    ),
-                                    CategoryTileData(
-                                        name = "Happiness",
-                                        description = "Peace of mind and pure contentments",
-                                        icon = Icons.Default.SentimentVerySatisfied,
-                                        tintColor = Color(0xFFFFDB9C)
-                                    ),
-                                    CategoryTileData(
-                                        name = "Writing",
-                                        description = "Sit down at typewriters and bleed",
-                                        icon = Icons.Default.DriveFileRenameOutline,
-                                        tintColor = Color(0xFFADC6FF)
-                                    ),
-                                    CategoryTileData(
-                                        name = "Inspiration",
-                                        description = "Sudden bright bursts of creative idea",
-                                        icon = Icons.Default.AutoAwesome,
-                                        tintColor = Color(0xFFFFF7EB)
-                                    ),
-                                    CategoryTileData(
-                                        name = "Philosophy",
-                                        description = "Socrates, Stoics, and search of meaning",
-                                        icon = Icons.Default.HistoryEdu,
-                                        tintColor = Color(0xFFADC6FF)
-                                    ),
-                                    CategoryTileData(
-                                        name = "Death",
-                                        description = "The next great adventure and transition",
-                                        icon = Icons.Default.HourglassEmpty,
-                                        tintColor = Color(0xFFADC6FF)
-                                    ),
-                                    CategoryTileData(
-                                        name = "Poetry",
-                                        description = "Rhythms, lines, and feelings of the heart",
-                                        icon = Icons.Default.Create,
-                                        tintColor = Color(0xFFFFB2C5)
-                                    ),
-                                    CategoryTileData(
-                                        name = "Optimism",
-                                        description = "Gutter-born gazing toward bright stars",
-                                        icon = Icons.Default.WbSunny,
-                                        tintColor = Color(0xFFFFDB9C)
-                                    )
+                                    CategoryTileData(name = "Inspirational", icon = Icons.Default.EmojiObjects, tintColor = Color(0xFFFFF7EB), isFullWidth = true),
+                                    CategoryTileData(name = "Life", icon = Icons.Default.Spa, tintColor = Color(0xFFA0D2AD)),
+                                    CategoryTileData(name = "Humor", icon = Icons.Default.TheaterComedy, tintColor = Color(0xFFFFDB9C)),
+                                    CategoryTileData(name = "Love", icon = Icons.Default.Favorite, tintColor = Color(0xFFFFB2C5)),
+                                    CategoryTileData(name = "Books", icon = Icons.Default.LibraryBooks, tintColor = Color(0xFFFFDB9C)),
+                                    CategoryTileData(name = "Truth", icon = Icons.Default.Balance, tintColor = Color(0xFFADC6FF)),
+                                    CategoryTileData(name = "Reading", icon = Icons.Default.AutoStories, tintColor = Color(0xFFFFDB9C)),
+                                    CategoryTileData(name = "Wisdom", icon = Icons.Default.SelfImprovement, tintColor = Color(0xFFFFDB9C)),
+                                    CategoryTileData(name = "Happiness", icon = Icons.Default.SentimentVerySatisfied, tintColor = Color(0xFFFFDB9C)),
+                                    CategoryTileData(name = "Writing", icon = Icons.Default.DriveFileRenameOutline, tintColor = Color(0xFFADC6FF)),
+                                    CategoryTileData(name = "Inspiration", icon = Icons.Default.AutoAwesome, tintColor = Color(0xFFFFF7EB)),
+                                    CategoryTileData(name = "Philosophy", icon = Icons.Default.HistoryEdu, tintColor = Color(0xFFADC6FF)),
+                                    CategoryTileData(name = "Death", icon = Icons.Default.HourglassEmpty, tintColor = Color(0xFFADC6FF)),
+                                    CategoryTileData(name = "Poetry", icon = Icons.Default.Create, tintColor = Color(0xFFFFB2C5)),
+                                    CategoryTileData(name = "Optimism", icon = Icons.Default.WbSunny, tintColor = Color(0xFFFFDB9C))
                                 )
                             }
 
@@ -336,10 +260,9 @@ fun LibraryScreen(viewModel: AuraViewModel) {
                             val inspirational = bentoCategories[0]
                             CategoryBentoCard(
                                 name = inspirational.name,
-                                description = inspirational.description,
                                 icon = inspirational.icon,
                                 tintColor = inspirational.tintColor,
-                                height = 150.dp,
+                                height = 120.dp,
                                 onClick = { selectCategoryWithHaptic(inspirational.name) }
                             )
 
@@ -354,10 +277,9 @@ fun LibraryScreen(viewModel: AuraViewModel) {
                                         Box(modifier = Modifier.weight(1f)) {
                                             CategoryBentoCard(
                                                 name = cat.name,
-                                                description = cat.description,
                                                 icon = cat.icon,
                                                 tintColor = cat.tintColor,
-                                                height = 140.dp,
+                                                height = 110.dp,
                                                 onClick = { selectCategoryWithHaptic(cat.name) }
                                             )
                                         }
@@ -904,7 +826,6 @@ fun QuoteBrowseItemCard(
 
 data class CategoryTileData(
     val name: String,
-    val description: String,
     val icon: androidx.compose.ui.graphics.vector.ImageVector,
     val tintColor: Color,
     val isFullWidth: Boolean = false
@@ -913,7 +834,6 @@ data class CategoryTileData(
 @Composable
 fun CategoryBentoCard(
     name: String,
-    description: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     tintColor: Color,
     height: androidx.compose.ui.unit.Dp,
@@ -989,14 +909,6 @@ fun CategoryBentoCard(
                     text = name,
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = Color.White
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.5f),
-                    maxLines = 2,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
             }
         }
