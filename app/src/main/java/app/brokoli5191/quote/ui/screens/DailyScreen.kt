@@ -109,8 +109,11 @@ fun DailyScreen(viewModel: AuraViewModel) {
             AnimatedContent(
                 targetState = quoteState,
                 transitionSpec = {
-                    fadeIn(animationSpec = tween(300))
-                        .togetherWith(fadeOut(animationSpec = tween(300)))
+                    ContentTransform(
+                        targetContentEnter = fadeIn(animationSpec = tween(300)),
+                        initialContentExit = fadeOut(animationSpec = tween(300)),
+                        sizeTransform = null
+                    )
                 },
                 label = "DailyQuoteTransition",
                 modifier = Modifier.fillMaxWidth()
@@ -203,41 +206,24 @@ fun DailyScreen(viewModel: AuraViewModel) {
                                 }
 
                                 Column(
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.Center
                                 ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        Text(
-                                            text = "✦",
-                                            color = MaterialTheme.colorScheme.tertiary,
-                                            fontSize = 14.sp
-                                        )
-                                        Text(
-                                            text = "DAILY INSIGHT",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.tertiary,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-
-                                    Spacer(modifier = Modifier.height(4.dp))
-
                                     Text(
-                                        text = "About the Sage",
-                                        style = MaterialTheme.typography.headlineMedium,
-                                        color = MaterialTheme.colorScheme.onSurface
+                                        text = "AUTHOR",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.tertiary,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 1.5.sp
                                     )
 
                                     Spacer(modifier = Modifier.height(6.dp))
 
                                     Text(
-                                        text = if (quote.aboutAuthor.isBlank())
-                                            "A wisdom practitioner with deep teachings of truth and insight."
-                                            else quote.aboutAuthor,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        text = quote.author,
+                                        style = MaterialTheme.typography.headlineSmall,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        fontWeight = FontWeight.Bold
                                     )
                                 }
                             }
