@@ -135,11 +135,6 @@ fun WidgetSettingsScreen(viewModel: AuraViewModel) {
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        Text(
-                            text = "True-black background in any dark theme (incl. System)",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                        )
                     }
                     Switch(
                         checked = amoledBlack,
@@ -221,13 +216,6 @@ fun WidgetSettingsScreen(viewModel: AuraViewModel) {
                     }
                 }
 
-                if (isDynamic) {
-                    Text(
-                        text = "Accent colors are automatically determined by your device's live system/wallpaper palette.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                    )
-                }
             }
 
             Spacer(modifier = Modifier.height(28.dp))
@@ -306,11 +294,6 @@ fun WidgetSettingsScreen(viewModel: AuraViewModel) {
                                         text = "Inspirational Mornings",
                                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                                         color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = "Start your day with a focused quote of the day notification.",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                                     )
                                 }
                             }
@@ -524,11 +507,6 @@ fun WidgetSettingsScreen(viewModel: AuraViewModel) {
                                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                                 color = MaterialTheme.colorScheme.onSurface
                             )
-                            Text(
-                                text = "Simplify screen transitions and empty matches animations to enhance responsiveness.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                            )
                         }
 
                         Switch(
@@ -591,11 +569,6 @@ fun WidgetSettingsScreen(viewModel: AuraViewModel) {
                                     text = "Automatic Updates",
                                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                                     color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = "Check for new versions once daily when the app is open.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                                 )
                             }
                             Switch(
@@ -782,11 +755,6 @@ fun WidgetSettingsScreen(viewModel: AuraViewModel) {
                             .padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Text(
-                            text = "Backup custom quotes and saved reflections to a JSON file.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                        )
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
