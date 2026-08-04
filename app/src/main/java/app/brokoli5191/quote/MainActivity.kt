@@ -69,10 +69,11 @@ class MainActivity : ComponentActivity() {
 
             val themeMode by viewModel.themeMode.collectAsState()
             val themeAccent by viewModel.themeAccent.collectAsState()
+            val amoledBlack by viewModel.amoledBlack.collectAsState()
             val lowPerformanceMode by viewModel.lowPerformanceMode.collectAsState()
             val showDevScreen by viewModel.showDevScreen.collectAsState()
 
-            MyApplicationTheme(themeMode = themeMode, themeAccent = themeAccent) {
+            MyApplicationTheme(themeMode = themeMode, themeAccent = themeAccent, amoledBlack = amoledBlack) {
                 val activeTab by viewModel.selectedTab.collectAsState()
 
                 val hasBackStack by viewModel.hasBackStack.collectAsState()

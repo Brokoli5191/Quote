@@ -82,8 +82,9 @@ private data class QuadrupleColors(
 
 @Composable
 fun MyApplicationTheme(
-    themeMode: String = "AMOLED", // LIGHT, DARK, AMOLED, DYNAMIC
+    themeMode: String = "DARK", // LIGHT, DARK, DYNAMIC
     themeAccent: String = "Violet", // Violet, Amber, Green, Blue, Rose
+    amoledBlack: Boolean = false, // true-black surfaces in any dark scheme (incl. DYNAMIC)
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
@@ -95,10 +96,18 @@ fun MyApplicationTheme(
 
     val colorScheme = when {
         themeMode == "DYNAMIC" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            if (isSystemInDarkTheme()) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            val dark = isSystemInDarkTheme()
+            val base = if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            if (amoledBlack && dark) {
+                base.copy(
+                    background = androidx.compose.ui.graphics.Color(0xFF000000),
+                    surface = androidx.compose.ui.graphics.Color(0xFF0B0B0C),
+                    surfaceVariant = androidx.compose.ui.graphics.Color(0xFF1C1C1E)
+                )
+            } else base
         }
         useDark -> {
-            val isAmoled = themeMode == "AMOLED"
+            val isAmoled = amoledBlack
             val bg = if (isAmoled) androidx.compose.ui.graphics.Color(0xFF000000) else androidx.compose.ui.graphics.Color(0xFF141317)
             val surf = if (isAmoled) androidx.compose.ui.graphics.Color(0xFF0B0B0C) else androidx.compose.ui.graphics.Color(0xFF1C1B1F)
             val surfContainer = if (isAmoled) androidx.compose.ui.graphics.Color(0xFF111112) else androidx.compose.ui.graphics.Color(0xFF201F23)

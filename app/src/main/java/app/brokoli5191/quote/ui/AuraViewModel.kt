@@ -44,11 +44,14 @@ class AuraViewModel(application: Application, private val repository: QuoteRepos
     private val _widgetStyle = MutableStateFlow("Quote")
     val widgetStyle: StateFlow<String> = _widgetStyle.asStateFlow()
 
-    private val _themeMode = MutableStateFlow("AMOLED")
+    private val _themeMode = MutableStateFlow("DARK")
     val themeMode: StateFlow<String> = _themeMode.asStateFlow()
 
     private val _themeAccent = MutableStateFlow("Violet")
     val themeAccent: StateFlow<String> = _themeAccent.asStateFlow()
+
+    private val _amoledBlack = MutableStateFlow(false)
+    val amoledBlack: StateFlow<Boolean> = _amoledBlack.asStateFlow()
 
     private val _dailyReminderEnabled = MutableStateFlow(false)
     val dailyReminderEnabled: StateFlow<Boolean> = _dailyReminderEnabled.asStateFlow()
@@ -143,7 +146,17 @@ class AuraViewModel(application: Application, private val repository: QuoteRepos
     }
 
     private fun loadThemeSettings() {
-        _themeMode.value = prefs.getString("theme_mode", "AMOLED") ?: "AMOLED"
+        // Migration: the old single "AMOLED" mode becomes DARK + amoledBlack toggle,
+        // so AMOLED can now combine with Material You (DYNAMIC).
+        val storedMode = prefs.getString("theme_mode", "DARK") ?: "DARK"
+        if (storedMode == "AMOLED") {
+            _themeMode.value = "DARK"
+            _amoledBlack.value = true
+            prefs.edit().putString("theme_mode", "DARK").putBoolean("amoled_black", true).apply()
+        } else {
+            _themeMode.value = storedMode
+            _amoledBlack.value = prefs.getBoolean("amoled_black", false)
+        }
         _themeAccent.value = prefs.getString("theme_accent", "Violet") ?: "Violet"
         _widgetStyle.value = prefs.getString("widget_style", "Quote") ?: "Quote"
         _dailyReminderEnabled.value = prefs.getBoolean("daily_reminder_enabled", false)
@@ -213,6 +226,11 @@ class AuraViewModel(application: Application, private val repository: QuoteRepos
     fun setThemeMode(mode: String) {
         _themeMode.value = mode
         prefs.edit().putString("theme_mode", mode).apply()
+    }
+
+    fun setAmoledBlack(enabled: Boolean) {
+        _amoledBlack.value = enabled
+        prefs.edit().putBoolean("amoled_black", enabled).apply()
     }
 
     fun setThemeAccent(accent: String) {
