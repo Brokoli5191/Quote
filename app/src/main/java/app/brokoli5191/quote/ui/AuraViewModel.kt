@@ -115,7 +115,10 @@ class AuraViewModel(application: Application, private val repository: QuoteRepos
             }
         }
         list
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    }
+        // Filter ~2500 rows off the main thread so search keystrokes don't jank.
+        .flowOn(kotlinx.coroutines.Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
         loadThemeSettings()

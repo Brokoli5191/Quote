@@ -187,8 +187,18 @@ class MainActivity : ComponentActivity() {
                                             scaleY = 0.93f + backProgress * 0.07f
                                         }
                                 ) {
-                                    when (backPreviewTab) {
-                                        "Daily" -> DailyScreen(viewModel)
+                                    // Lightweight static peek — avoids composing the full
+                                    // DailyScreen on every predictive-back gesture frame.
+                                    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                                        Text(
+                                            text = "Daily Quote",
+                                            style = MaterialTheme.typography.headlineLarge,
+                                            color = MaterialTheme.colorScheme.onBackground,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier
+                                                .statusBarsPadding()
+                                                .padding(start = 20.dp, top = 16.dp)
+                                        )
                                     }
                                 }
                             }
@@ -222,22 +232,20 @@ class MainActivity : ComponentActivity() {
                                             } else {
                                                 val floatSpring = spring<Float>(dampingRatio = 0.76f, stiffness = 180f)
                                                 val offsetSpring = spring<androidx.compose.ui.unit.IntOffset>(dampingRatio = 0.76f, stiffness = 180f)
+                                                // Scale dropped: slide + fade only — scaling a
+                                                // full-screen subtree was the costliest property.
                                                 if (isForward) {
                                                     (slideInHorizontally(offsetSpring) { (it * 0.15f).toInt() } +
-                                                     fadeIn(floatSpring) +
-                                                     scaleIn(initialScale = 0.92f, animationSpec = floatSpring))
+                                                     fadeIn(floatSpring))
                                                     .togetherWith(
                                                      slideOutHorizontally(offsetSpring) { -(it * 0.15f).toInt() } +
-                                                     fadeOut(floatSpring) +
-                                                     scaleOut(targetScale = 0.92f, animationSpec = floatSpring))
+                                                     fadeOut(floatSpring))
                                                 } else {
                                                     (slideInHorizontally(offsetSpring) { -(it * 0.15f).toInt() } +
-                                                     fadeIn(floatSpring) +
-                                                     scaleIn(initialScale = 0.92f, animationSpec = floatSpring))
+                                                     fadeIn(floatSpring))
                                                     .togetherWith(
                                                      slideOutHorizontally(offsetSpring) { (it * 0.15f).toInt() } +
-                                                     fadeOut(floatSpring) +
-                                                     scaleOut(targetScale = 0.92f, animationSpec = floatSpring))
+                                                     fadeOut(floatSpring))
                                                 }
                                             }
                                         }
