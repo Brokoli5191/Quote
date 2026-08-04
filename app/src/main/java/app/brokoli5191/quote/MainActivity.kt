@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.animation.*
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
@@ -52,6 +53,7 @@ import app.brokoli5191.quote.ui.theme.MyApplicationTheme
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
@@ -69,10 +71,11 @@ class MainActivity : ComponentActivity() {
 
             val themeMode by viewModel.themeMode.collectAsState()
             val themeAccent by viewModel.themeAccent.collectAsState()
+            val amoledBlack by viewModel.amoledBlack.collectAsState()
             val lowPerformanceMode by viewModel.lowPerformanceMode.collectAsState()
             val showDevScreen by viewModel.showDevScreen.collectAsState()
 
-            MyApplicationTheme(themeMode = themeMode, themeAccent = themeAccent) {
+            MyApplicationTheme(themeMode = themeMode, themeAccent = themeAccent, amoledBlack = amoledBlack) {
                 val activeTab by viewModel.selectedTab.collectAsState()
 
                 val hasBackStack by viewModel.hasBackStack.collectAsState()
@@ -174,7 +177,7 @@ class MainActivity : ComponentActivity() {
                                 .padding(bottom = innerPadding.calculateBottomPadding())
                         ) {
                             // Previous page peeks in from the left during back gesture
-                            if (backPreviewTab != null) {
+                            if (backPreviewTab != null && !lowPerformanceMode) {
                                 Box(
                                     Modifier
                                         .fillMaxSize()
@@ -184,8 +187,18 @@ class MainActivity : ComponentActivity() {
                                             scaleY = 0.93f + backProgress * 0.07f
                                         }
                                 ) {
-                                    when (backPreviewTab) {
-                                        "Daily" -> DailyScreen(viewModel)
+                                    // Lightweight static peek — avoids composing the full
+                                    // DailyScreen on every predictive-back gesture frame.
+                                    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                                        Text(
+                                            text = "Daily Quote",
+                                            style = MaterialTheme.typography.headlineLarge,
+                                            color = MaterialTheme.colorScheme.onBackground,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier
+                                                .statusBarsPadding()
+                                                .padding(start = 20.dp, top = 16.dp)
+                                        )
                                     }
                                 }
                             }
@@ -195,7 +208,7 @@ class MainActivity : ComponentActivity() {
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .graphicsLayer {
-                                        if (!showDevScreen && backProgress > 0f && !isFilterClearBack) {
+                                        if (!showDevScreen && backProgress > 0f && !isFilterClearBack && !lowPerformanceMode) {
                                             translationX = size.width * backProgress
                                         }
                                     }
@@ -211,37 +224,28 @@ class MainActivity : ComponentActivity() {
                                         } else {
                                             val isForward = tabIndex(targetState) > tabIndex(initialState)
                                             if (lowPerformanceMode) {
-                                                val slideSpec = tween<androidx.compose.ui.unit.IntOffset>(
-                                                    durationMillis = 220,
-                                                    easing = androidx.compose.animation.core.FastOutSlowInEasing
+                                                // Low-performance mode: no motion at all.
+                                                ContentTransform(
+                                                    targetContentEnter = EnterTransition.None,
+                                                    initialContentExit = ExitTransition.None
                                                 )
-                                                val fadeSpec = tween<Float>(durationMillis = 180)
-                                                if (isForward) {
-                                                    (slideInHorizontally(slideSpec) { it } + fadeIn(fadeSpec))
-                                                        .togetherWith(slideOutHorizontally(slideSpec) { -it } + fadeOut(fadeSpec))
-                                                } else {
-                                                    (slideInHorizontally(slideSpec) { -it } + fadeIn(fadeSpec))
-                                                        .togetherWith(slideOutHorizontally(slideSpec) { it } + fadeOut(fadeSpec))
-                                                }
                                             } else {
                                                 val floatSpring = spring<Float>(dampingRatio = 0.76f, stiffness = 180f)
                                                 val offsetSpring = spring<androidx.compose.ui.unit.IntOffset>(dampingRatio = 0.76f, stiffness = 180f)
+                                                // Scale dropped: slide + fade only — scaling a
+                                                // full-screen subtree was the costliest property.
                                                 if (isForward) {
                                                     (slideInHorizontally(offsetSpring) { (it * 0.15f).toInt() } +
-                                                     fadeIn(floatSpring) +
-                                                     scaleIn(initialScale = 0.92f, animationSpec = floatSpring))
+                                                     fadeIn(floatSpring))
                                                     .togetherWith(
                                                      slideOutHorizontally(offsetSpring) { -(it * 0.15f).toInt() } +
-                                                     fadeOut(floatSpring) +
-                                                     scaleOut(targetScale = 0.92f, animationSpec = floatSpring))
+                                                     fadeOut(floatSpring))
                                                 } else {
                                                     (slideInHorizontally(offsetSpring) { -(it * 0.15f).toInt() } +
-                                                     fadeIn(floatSpring) +
-                                                     scaleIn(initialScale = 0.92f, animationSpec = floatSpring))
+                                                     fadeIn(floatSpring))
                                                     .togetherWith(
                                                      slideOutHorizontally(offsetSpring) { (it * 0.15f).toInt() } +
-                                                     fadeOut(floatSpring) +
-                                                     scaleOut(targetScale = 0.92f, animationSpec = floatSpring))
+                                                     fadeOut(floatSpring))
                                                 }
                                             }
                                         }

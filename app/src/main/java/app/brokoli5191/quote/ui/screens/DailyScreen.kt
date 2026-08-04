@@ -53,6 +53,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 @Composable
 fun DailyScreen(viewModel: AuraViewModel) {
     val quoteState by viewModel.dailyQuote.collectAsState()
+    val lowPerformanceMode by viewModel.lowPerformanceMode.collectAsState()
     val context = LocalContext.current
     val scrollState = rememberScrollState()
     val haptic = LocalHapticFeedback.current
@@ -78,6 +79,7 @@ fun DailyScreen(viewModel: AuraViewModel) {
                 viewModel.cycleDailyQuote()
             },
             scrollState = scrollState,
+            lowPerformanceMode = lowPerformanceMode,
             modifier = Modifier.fillMaxSize()
         ) { offsetY ->
             Column(
@@ -109,8 +111,19 @@ fun DailyScreen(viewModel: AuraViewModel) {
             AnimatedContent(
                 targetState = quoteState,
                 transitionSpec = {
-                    fadeIn(animationSpec = tween(300))
-                        .togetherWith(fadeOut(animationSpec = tween(300)))
+                    if (lowPerformanceMode) {
+                        ContentTransform(
+                            targetContentEnter = EnterTransition.None,
+                            initialContentExit = ExitTransition.None,
+                            sizeTransform = null
+                        )
+                    } else {
+                        ContentTransform(
+                            targetContentEnter = fadeIn(animationSpec = tween(300)),
+                            initialContentExit = fadeOut(animationSpec = tween(300)),
+                            sizeTransform = null
+                        )
+                    }
                 },
                 label = "DailyQuoteTransition",
                 modifier = Modifier.fillMaxWidth()
@@ -203,41 +216,24 @@ fun DailyScreen(viewModel: AuraViewModel) {
                                 }
 
                                 Column(
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.Center
                                 ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        Text(
-                                            text = "✦",
-                                            color = MaterialTheme.colorScheme.tertiary,
-                                            fontSize = 14.sp
-                                        )
-                                        Text(
-                                            text = "DAILY INSIGHT",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.tertiary,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-
-                                    Spacer(modifier = Modifier.height(4.dp))
-
                                     Text(
-                                        text = "About the Sage",
-                                        style = MaterialTheme.typography.headlineMedium,
-                                        color = MaterialTheme.colorScheme.onSurface
+                                        text = "AUTHOR",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.tertiary,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 1.5.sp
                                     )
 
                                     Spacer(modifier = Modifier.height(6.dp))
 
                                     Text(
-                                        text = if (quote.aboutAuthor.isBlank())
-                                            "A wisdom practitioner with deep teachings of truth and insight."
-                                            else quote.aboutAuthor,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        text = quote.author,
+                                        style = MaterialTheme.typography.headlineSmall,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        fontWeight = FontWeight.Bold
                                     )
                                 }
                             }
@@ -430,6 +426,7 @@ fun ElasticPullDownContainer(
     onTriggerRefresh: () -> Unit,
     scrollState: ScrollState,
     modifier: Modifier = Modifier,
+    lowPerformanceMode: Boolean = false,
     content: @Composable (offsetY: Float) -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
@@ -486,9 +483,12 @@ fun ElasticPullDownContainer(
                             val maxOffset = 1200f
                             val resistanceFactor = 1200f
                             val elasticOffset = maxOffset * (1f - kotlin.math.exp(-rawDragY / resistanceFactor))
-                            
-                            scope.launch {
-                                dragOffset.snapTo(elasticOffset)
+
+                            // Low-performance mode: keep the refresh trigger but no rubber-band visual.
+                            if (!lowPerformanceMode) {
+                                scope.launch {
+                                    dragOffset.snapTo(elasticOffset)
+                                }
                             }
 
                             // Trigger tactile feedback ticks

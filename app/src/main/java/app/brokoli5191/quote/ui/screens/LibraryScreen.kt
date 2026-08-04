@@ -169,7 +169,10 @@ fun LibraryScreen(viewModel: AuraViewModel) {
                 targetState = (selectedCategories.isNotEmpty() || searchQuery.isNotBlank()),
                 transitionSpec = {
                     if (lowPerformanceMode) {
-                        fadeIn(animationSpec = tween(150)) togetherWith fadeOut(animationSpec = tween(150))
+                        ContentTransform(
+                            targetContentEnter = EnterTransition.None,
+                            initialContentExit = ExitTransition.None
+                        )
                     } else {
                         val exprSpring = spring<Float>(dampingRatio = 0.52f, stiffness = 220f)
                         val exprOffsetSpring = spring<androidx.compose.ui.unit.IntOffset>(dampingRatio = 0.52f, stiffness = 220f)
@@ -236,115 +239,21 @@ fun LibraryScreen(viewModel: AuraViewModel) {
                                 .padding(horizontal = 20.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            val bentoCategories = remember {
-                                listOf(
-                                    CategoryTileData(
-                                        name = "Inspirational",
-                                        description = "Ignite your inner fire, passion, and thrive",
-                                        icon = Icons.Default.EmojiObjects,
-                                        tintColor = Color(0xFFFFF7EB),
-                                        isFullWidth = true
-                                    ),
-                                    CategoryTileData(
-                                        name = "Life",
-                                        description = "Existential reflections & daily journeys",
-                                        icon = Icons.Default.Spa,
-                                        tintColor = Color(0xFFA0D2AD)
-                                    ),
-                                    CategoryTileData(
-                                        name = "Humor",
-                                        description = "Laughter, wit, and cheeky observations",
-                                        icon = Icons.Default.TheaterComedy,
-                                        tintColor = Color(0xFFFFDB9C)
-                                    ),
-                                    CategoryTileData(
-                                        name = "Love",
-                                        description = "Compassion, human bonds, and high affection",
-                                        icon = Icons.Default.Favorite,
-                                        tintColor = Color(0xFFFFB2C5)
-                                    ),
-                                    CategoryTileData(
-                                        name = "Books",
-                                        description = "A portable magic of printed pages",
-                                        icon = Icons.Default.LibraryBooks,
-                                        tintColor = Color(0xFFFFDB9C)
-                                    ),
-                                    CategoryTileData(
-                                        name = "Truth",
-                                        description = "Honesty and direct paths without compromise",
-                                        icon = Icons.Default.Balance,
-                                        tintColor = Color(0xFFADC6FF)
-                                    ),
-                                    CategoryTileData(
-                                        name = "Reading",
-                                        description = "The quiet art of continuous literature",
-                                        icon = Icons.Default.AutoStories,
-                                        tintColor = Color(0xFFFFDB9C)
-                                    ),
-                                    CategoryTileData(
-                                        name = "Wisdom",
-                                        description = "Centuries of knowledge and deep philosophy",
-                                        icon = Icons.Default.SelfImprovement,
-                                        tintColor = Color(0xFFFFDB9C)
-                                    ),
-                                    CategoryTileData(
-                                        name = "Happiness",
-                                        description = "Peace of mind and pure contentments",
-                                        icon = Icons.Default.SentimentVerySatisfied,
-                                        tintColor = Color(0xFFFFDB9C)
-                                    ),
-                                    CategoryTileData(
-                                        name = "Writing",
-                                        description = "Sit down at typewriters and bleed",
-                                        icon = Icons.Default.DriveFileRenameOutline,
-                                        tintColor = Color(0xFFADC6FF)
-                                    ),
-                                    CategoryTileData(
-                                        name = "Inspiration",
-                                        description = "Sudden bright bursts of creative idea",
-                                        icon = Icons.Default.AutoAwesome,
-                                        tintColor = Color(0xFFFFF7EB)
-                                    ),
-                                    CategoryTileData(
-                                        name = "Philosophy",
-                                        description = "Socrates, Stoics, and search of meaning",
-                                        icon = Icons.Default.HistoryEdu,
-                                        tintColor = Color(0xFFADC6FF)
-                                    ),
-                                    CategoryTileData(
-                                        name = "Death",
-                                        description = "The next great adventure and transition",
-                                        icon = Icons.Default.HourglassEmpty,
-                                        tintColor = Color(0xFFADC6FF)
-                                    ),
-                                    CategoryTileData(
-                                        name = "Poetry",
-                                        description = "Rhythms, lines, and feelings of the heart",
-                                        icon = Icons.Default.Create,
-                                        tintColor = Color(0xFFFFB2C5)
-                                    ),
-                                    CategoryTileData(
-                                        name = "Optimism",
-                                        description = "Gutter-born gazing toward bright stars",
-                                        icon = Icons.Default.WbSunny,
-                                        tintColor = Color(0xFFFFDB9C)
-                                    )
-                                )
-                            }
+                            // Single source of truth: see CategoryCatalog.kt
+                            val bentoCategories = categoryCatalog
 
-                            // Render Inspirational (First large card)
+                            // Render Inspirational (first large card)
                             val inspirational = bentoCategories[0]
                             CategoryBentoCard(
                                 name = inspirational.name,
-                                description = inspirational.description,
                                 icon = inspirational.icon,
                                 tintColor = inspirational.tintColor,
-                                height = 150.dp,
+                                height = 120.dp,
                                 onClick = { selectCategoryWithHaptic(inspirational.name) }
                             )
 
-                            // Render rows of 2 for middle categories (1 to 14)
-                            val midCategories = bentoCategories.subList(1, 15)
+                            // Render the remaining categories in rows of 2
+                            val midCategories = bentoCategories.drop(1)
                             midCategories.chunked(2).forEach { pair ->
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
@@ -354,10 +263,9 @@ fun LibraryScreen(viewModel: AuraViewModel) {
                                         Box(modifier = Modifier.weight(1f)) {
                                             CategoryBentoCard(
                                                 name = cat.name,
-                                                description = cat.description,
                                                 icon = cat.icon,
                                                 tintColor = cat.tintColor,
-                                                height = 140.dp,
+                                                height = 110.dp,
                                                 onClick = { selectCategoryWithHaptic(cat.name) }
                                             )
                                         }
@@ -439,23 +347,7 @@ fun LibraryScreen(viewModel: AuraViewModel) {
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    val categoriesList = listOf(
-                        "Inspirational",
-                        "Life",
-                        "Humor",
-                        "Love",
-                        "Books",
-                        "Truth",
-                        "Reading",
-                        "Wisdom",
-                        "Happiness",
-                        "Writing",
-                        "Inspiration",
-                        "Philosophy",
-                        "Death",
-                        "Poetry",
-                        "Optimism"
-                    )
+                    val categoriesList = filterCategoryNames
 
                     categoriesList.chunked(2).forEach { rowCategoryList ->
                         Row(
@@ -771,6 +663,7 @@ fun CategoryBrowseViewInPlace(
                 items(quotes, key = { it.id }) { quote ->
                     QuoteBrowseItemCard(
                         quote = quote,
+                        lowPerformanceMode = lowPerformanceMode,
                         onToggleFavorite = { onToggleFavorite(quote) },
                         onShare = {
                             val intent = Intent(Intent.ACTION_SEND).apply {
@@ -791,21 +684,22 @@ fun CategoryBrowseViewInPlace(
 fun QuoteBrowseItemCard(
     quote: QuoteEntity,
     onToggleFavorite: () -> Unit,
-    onShare: () -> Unit
+    onShare: () -> Unit,
+    lowPerformanceMode: Boolean = false
 ) {
     val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
-    val offsetX = remember { Animatable(80f) }
-    val alphaAnim = remember { Animatable(0f) }
+    val offsetX = remember { Animatable(if (lowPerformanceMode) 0f else 80f) }
+    val alphaAnim = remember { Animatable(if (lowPerformanceMode) 1f else 0f) }
 
     LaunchedEffect(Unit) {
-        offsetX.animateTo(
+        if (!lowPerformanceMode) offsetX.animateTo(
             targetValue = 0f,
             animationSpec = spring(stiffness = 300f, dampingRatio = 0.8f)
         )
     }
     LaunchedEffect(Unit) {
-        alphaAnim.animateTo(
+        if (!lowPerformanceMode) alphaAnim.animateTo(
             targetValue = 1f,
             animationSpec = tween(durationMillis = 250)
         )
@@ -902,18 +796,9 @@ fun QuoteBrowseItemCard(
 }
 
 
-data class CategoryTileData(
-    val name: String,
-    val description: String,
-    val icon: androidx.compose.ui.graphics.vector.ImageVector,
-    val tintColor: Color,
-    val isFullWidth: Boolean = false
-)
-
 @Composable
 fun CategoryBentoCard(
     name: String,
-    description: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     tintColor: Color,
     height: androidx.compose.ui.unit.Dp,
@@ -989,14 +874,6 @@ fun CategoryBentoCard(
                     text = name,
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = Color.White
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.5f),
-                    maxLines = 2,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
             }
         }
