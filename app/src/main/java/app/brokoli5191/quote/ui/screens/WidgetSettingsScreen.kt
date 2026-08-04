@@ -88,11 +88,10 @@ fun WidgetSettingsScreen(viewModel: AuraViewModel) {
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     val activeThemeMode by viewModel.themeMode.collectAsState()
-                    val modes = listOf("AMOLED", "DARK", "LIGHT", "DYNAMIC")
+                    val modes = listOf("LIGHT", "DARK", "DYNAMIC")
                     modes.forEach { mode ->
                         val isSelected = activeThemeMode == mode
                         val label = when (mode) {
-                            "AMOLED" -> "Amoled"
                             "DYNAMIC" -> "System"
                             else -> mode.lowercase().replaceFirstChar { it.uppercase() }
                         }
@@ -122,6 +121,30 @@ fun WidgetSettingsScreen(viewModel: AuraViewModel) {
                             )
                         }
                     }
+                }
+
+                val amoledBlack by viewModel.amoledBlack.collectAsState()
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = "AMOLED pure black",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "True-black background in any dark theme (incl. System)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
+                    Switch(
+                        checked = amoledBlack,
+                        onCheckedChange = { viewModel.setAmoledBlack(it) }
+                    )
                 }
             }
 
