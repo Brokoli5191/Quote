@@ -160,14 +160,6 @@ fun SavedScreen(viewModel: AuraViewModel) {
                                 style = MaterialTheme.typography.headlineMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            Text(
-                                text = if (subTab == "Favorites")
-                                    "Explore the daily insights or categories library and heart your favorite affirmations to build your archive here."
-                                    else "Click the plus button below to register your own wisdom cards in quote.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                            )
                         }
                     }
                 } else {
