@@ -7,7 +7,7 @@ Branch: `worktree-quote-improvements`
 
 Seven user-requested improvements to the Quote Android app (Kotlin/Compose, Room, single-Activity Compose UI). Grouped into independent workstreams so each can be built, reviewed, and — if needed — reverted on its own.
 
-Build note: Gradle cannot run in this sandbox (loopback error). Verification is by code review + a compile-sanity pass in Android Studio on the real machine. Any code must be self-consistent and compile-safe by inspection.
+Build note: Gradle builds run via `./gradlew` (Gradle 9.4.1, Kotlin 2.3.0, JDK 21). Each workstream is verified with `./gradlew assembleDebug` (and unit tests where added) before commit — no longer review-only.
 
 ---
 
@@ -84,15 +84,25 @@ Also re-apply the trivial in-flight tweak (`ContentTransform(sizeTransform = nul
 
 ---
 
-## Workstream E — Theme options polish: AMOLED + Material You (item 5a)
+## Workstream E — Decouple AMOLED from Material You so they combine (item 5a)
 
-Mostly already built: Settings exposes AMOLED / DARK / LIGHT / DYNAMIC (System = Material You) + accent colors, and Theme.kt implements all of them including a true-black AMOLED path and `dynamic*ColorScheme`.
+**Problem (user correction):** today the theme is a single mutually-exclusive mode — `AMOLED / DARK / LIGHT / DYNAMIC`. AMOLED and DYNAMIC (Material You) can't both be active, so "Material You dynamic colors **with** true-black AMOLED background" is impossible. That combination is the actual request.
 
-Scope here is **polish/verification**, not new architecture:
-- Confirm DYNAMIC (Material You) correctly follows system light/dark and that accents are properly disabled in dynamic mode (the Settings screen already greys them out — verify).
-- Confirm AMOLED true-black (`0xFF000000`) is applied to all surfaces including nav bar background.
-- Make the two options clearly labeled/discoverable in Settings (user may not have noticed they exist).
-- No breaking changes to persisted `theme_mode` values.
+**Fix — split into two independent axes:**
+- **Color source + brightness** (the mode row): `LIGHT` / `DARK` / `SYSTEM` (SYSTEM = Material You dynamic colors, following the OS light/dark on Android 12+). Drop `AMOLED` as a *mode*.
+- **AMOLED pure-black** (new independent `Switch`): when ON and a dark scheme is active (DARK, or SYSTEM resolving to dark), force `background`/`surface`/`surfaceVariant` to true black `0xFF000000` while keeping the color source — so preset-accent dark **or** Material You dark can both be pure black. Ignored in light.
+
+**Data / migration:**
+- New pref `amoled_black: Boolean` + `_amoledBlack` StateFlow + `setAmoledBlack(...)` in ViewModel.
+- Migrate existing installs: on load, `theme_mode == "AMOLED"` → set mode `DARK` + `amoledBlack = true` (and rewrite the pref) so nobody loses their black theme.
+- `MyApplicationTheme` gains an `amoledBlack: Boolean` param; the dark/dynamic-dark branches apply true black when it's set. Light branch unaffected.
+
+**Settings UI:**
+- Mode row becomes 3 buttons (Light / Dark / System).
+- Add an "AMOLED pure black" toggle row below it, enabled whenever the active scheme can be dark (DARK always; SYSTEM shown but only visually effective in dark).
+- Accent palette stays disabled under SYSTEM (dynamic supplies accents) — unchanged.
+
+Verify true-black reaches the nav bar background (`BottomNavigationBar` uses `colorScheme.background`, so it follows automatically).
 
 ---
 
@@ -118,7 +128,7 @@ In `LibraryScreen`, each `CategoryBentoCard` renders a `description` line ("Igni
 
 ## Build / integration order
 
-1. F (subtitles) + E (theme polish) + D (Daily cleanup) — small, isolated UI edits.
+1. F (subtitles) + D (Daily cleanup) + E (AMOLED/Material-You decouple + migration) — isolated UI/theme edits.
 2. A (data + categories) — the biggest change; single source of truth for categories, favorite-preserving re-seed.
 3. B (true low-perf mode) — threads a flag through the screens touched above.
 4. C (jank + startup + Baseline Profile) — cross-cutting, done after UI is stable so profiles capture the real hot paths.
@@ -138,4 +148,6 @@ Each workstream is a separate commit on `worktree-quote-improvements`. Ship as o
 - Data pipeline: run the build-time script, assert count, no empty fields, dedup worked, every quote maps to a real category, "Uncategorized" count is small.
 - Categories: unit-test `mapTagsToCategory` against representative tag sets.
 - Re-seed: verify favorites/user quotes survive a version bump (favorite restore by text+author).
-- UI: manual pass in Android Studio (build blocked in sandbox) — low-perf shows zero motion; theme modes render; Library has no subtitles; Daily has no filler; icon renders adaptive.
+- Build gate: `./gradlew assembleDebug` passes per workstream.
+- Theme: DARK+AMOLED and SYSTEM+AMOLED both render true black; existing `AMOLED` pref migrates to DARK+black toggle; SYSTEM follows OS light/dark.
+- UI: manual pass on device/emulator — low-perf shows zero motion; Library has no subtitles; Daily has no filler; icon renders adaptive.
