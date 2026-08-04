@@ -154,7 +154,7 @@ fun DailyScreen(viewModel: AuraViewModel) {
                     }
 
                     Text(
-                        text = quote.text,
+                        text = "“${quote.text}”",
                         style = MaterialTheme.typography.displayMedium,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier
