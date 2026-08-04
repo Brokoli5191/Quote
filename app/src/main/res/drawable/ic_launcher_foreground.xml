@@ -1,22 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Open-book silhouette. Two pages splay from a bottom binding with a V-gap
-  opening upward. Detail is carried by SHAPE, not colour, and there are no
-  hairline strokes — so it reads correctly both in full colour and when
-  Android flattens the <monochrome> layer to a single tint (themed icons).
+  App icon glyph: "book" (filled) from Tabler Icons — https://tabler.io/icons
+  Licensed under the MIT License, Copyright (c) 2020-2024 Paweł Kuna.
+  Solid single-colour silhouette, so it reads correctly in full colour and when
+  Android flattens the <monochrome> layer to one tint (themed icons).
+  Source glyph is 24x24; scaled 2.333x and centred (translate 26) into the
+  108x108 adaptive foreground safe zone.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-
-    <!-- Left page -->
-    <path
-        android:fillColor="#F2ECFF"
-        android:pathData="M50,40 C40,38 32,40 26,45 L27,60 C36,63 46,65 54,66 C53,56 52,48 50,40 Z" />
-    <!-- Right page (mirror; transparent V-gap forms the spine) -->
-    <path
-        android:fillColor="#F2ECFF"
-        android:pathData="M58,40 C68,38 76,40 82,45 L81,60 C72,63 62,65 54,66 C55,56 56,48 58,40 Z" />
+    <group
+        android:translateX="26"
+        android:translateY="26"
+        android:scaleX="2.3333"
+        android:scaleY="2.3333">
+        <path
+            android:fillColor="#F2ECFF"
+            android:pathData="M21.5 5.134a1 1 0 0 1 .493 .748l.007 .118v13a1 1 0 0 1 -1.5 .866a8 8 0 0 0 -7.5 -.266v-15.174a10 10 0 0 1 8.5 .708m-10.5 -.707l.001 15.174a8 8 0 0 0 -7.234 .117l-.327 .18l-.103 .044l-.049 .016l-.11 .026l-.061 .01l-.117 .006h-.042l-.11 -.012l-.077 -.014l-.108 -.032l-.126 -.056l-.095 -.056l-.089 -.067l-.06 -.056l-.073 -.082l-.064 -.089l-.022 -.036l-.032 -.06l-.044 -.103l-.016 -.049l-.026 -.11l-.01 -.061l-.004 -.049l-.002 -13.068a1 1 0 0 1 .5 -.866a10 10 0 0 1 8.5 -.707" />
+    </group>
 </vector>
