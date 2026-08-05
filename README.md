@@ -30,9 +30,7 @@ Get the APK from the GitHub releases page.
 ### From Source
 1. Add your Android SDK path to `local.properties`:
    `sdk.dir=C:/Users/<Username>/AppData/Local/Android/Sdk`
-2. Decode the debug keystore:
-   `certutil -decode debug.keystore.base64 debug.keystore`
-3. Run `.\gradlew.bat assembleDebug` (Windows) or `./gradlew assembleDebug` (Mac/Linux).
+2. Run `.\gradlew.bat assembleDebug` (Windows) or `./gradlew assembleDebug` (Mac/Linux).
 
 The APK is built at `app/build/outputs/apk/debug/app-debug.apk`.
 
