@@ -163,7 +163,10 @@ async function moderate(request: Request, env: Env, id: string, reviewer: string
     "SELECT id, status FROM submissions WHERE id = ? LIMIT 1"
   ).bind(id).first<{ id: string; status: string }>();
   if (!existing) return adminJson({ error: "Submission not found." }, 404);
-  if (existing.status !== "pending") return adminJson({ error: "Submission has already been reviewed." }, 409);
+  const canApproveRejected = existing.status === "rejected" && validation.value.action === "approve";
+  if (existing.status !== "pending" && !canApproveRejected) {
+    return adminJson({ error: "Submission cannot be changed from its current state." }, 409);
+  }
 
   const value = validation.value;
   const note = value.note ? `${value.note} [reviewed by ${reviewer}]` : `Reviewed by ${reviewer}`;
@@ -190,10 +193,22 @@ async function moderate(request: Request, env: Env, id: string, reviewer: string
       JSON.stringify(value.tags)
     ),
     env.DB.prepare(
-      "UPDATE submissions SET status = 'approved', reviewed_at = unixepoch(), reviewer_note = ? WHERE id = ? AND status = 'pending'"
+      "UPDATE submissions SET status = 'approved', reviewed_at = unixepoch(), reviewer_note = ? WHERE id = ? AND status IN ('pending', 'rejected')"
     ).bind(note, id)
   ]);
   return adminJson({ id, status: "approved", communityQuoteId });
+}
+
+async function deleteRejectedSubmission(env: Env, id: string): Promise<Response> {
+  const existing = await env.DB.prepare(
+    "SELECT status FROM submissions WHERE id = ? LIMIT 1"
+  ).bind(id).first<{ status: string }>();
+  if (!existing) return adminJson({ error: "Submission not found." }, 404);
+  if (existing.status !== "rejected") {
+    return adminJson({ error: "Only rejected submissions can be deleted." }, 409);
+  }
+  await env.DB.prepare("DELETE FROM submissions WHERE id = ? AND status = 'rejected'").bind(id).run();
+  return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
 }
 
 export async function handleAdmin(request: Request, env: Env): Promise<Response> {
@@ -213,6 +228,9 @@ export async function handleAdmin(request: Request, env: Env): Promise<Response>
   const match = url.pathname.match(/^\/admin\/api\/submissions\/([0-9a-f-]+)$/i);
   if (match && request.method === "PATCH") {
     return moderate(request, env, match[1], reviewer);
+  }
+  if (match && request.method === "DELETE") {
+    return deleteRejectedSubmission(env, match[1]);
   }
   const communityMatch = url.pathname.match(/^\/admin\/api\/community\/([0-9a-f-]+)$/i);
   if (communityMatch && request.method === "PATCH") {

@@ -22,6 +22,7 @@ export function dashboardPage(): Response {
     #notice { min-height: 1.5rem; color: #cbbbd8; }
     #list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr)); gap: 1rem; }
     article { display: flex; flex-direction: column; min-height: 19rem; padding: 1.25rem; border: 1px solid #352d3f; border-radius: 1.3rem; background: linear-gradient(145deg, #1c1723, #121016); box-shadow: 0 1.2rem 3rem #0005; }
+    article.unpublished { opacity: .52; filter: grayscale(.9); border-color: #4a4850; background: #151419; }
     blockquote { margin: .8rem 0; font-family: Georgia, serif; font-size: 1.45rem; line-height: 1.35; }
     .author { color: #d1b9ef; font-weight: 750; }
     .meta { margin-top: auto; color: #a99db5; font-size: .78rem; line-height: 1.6; }
@@ -111,12 +112,15 @@ export function dashboardPage(): Response {
         const tags = JSON.parse(item.tagsJson || '[]');
         let actions = '';
         if (item.status === 'pending') actions = '<div class="actions"><button class="approve" data-approve="' + item.id + '">Review & approve</button><button class="reject" data-reject="' + item.id + '">Reject</button></div>';
+        if (item.status === 'rejected') actions = '<div class="actions"><button class="approve" data-approve="' + item.id + '">Review & approve</button><button class="reject" data-delete="' + item.id + '">Delete permanently</button></div>';
         if (item.status === 'approved' && item.communityQuoteId) actions = '<div class="actions"><button class="approve" data-edit-community="' + item.communityQuoteId + '">Edit</button><button class="reject" data-toggle-community="' + item.communityQuoteId + '" data-active="' + item.communityActive + '">' + (item.communityActive ? 'Unpublish' : 'Republish') + '</button></div>';
         const publication = item.status === 'approved' ? '<br>' + (item.communityActive ? 'Published' : 'Unpublished') + ' · revision ' + item.communityRevision : '';
-        return '<article><div class="eyebrow">' + escapeHtml(item.category) + '</div><blockquote>“' + escapeHtml(item.quoteText) + '”</blockquote><div class="author">— ' + escapeHtml(item.author || 'Unknown') + '</div><div class="tags">' + tags.map(tag => '<span class="tag">#' + escapeHtml(tag) + '</span>').join('') + '</div><div class="meta">Submitted ' + new Date(item.submittedAt * 1000).toLocaleString() + (item.appVersion ? '<br>App ' + escapeHtml(item.appVersion) : '') + publication + '</div>' + actions + '</article>';
+        const articleClass = item.status === 'approved' && item.communityActive === 0 ? ' class="unpublished"' : '';
+        return '<article' + articleClass + '><div class="eyebrow">' + escapeHtml(item.category) + '</div><blockquote>“' + escapeHtml(item.quoteText) + '”</blockquote><div class="author">— ' + escapeHtml(item.author || 'Unknown') + '</div><div class="tags">' + tags.map(tag => '<span class="tag">#' + escapeHtml(tag) + '</span>').join('') + '</div><div class="meta">Submitted ' + new Date(item.submittedAt * 1000).toLocaleString() + (item.appVersion ? '<br>App ' + escapeHtml(item.appVersion) : '') + publication + '</div>' + actions + '</article>';
       }).join('');
       list.querySelectorAll('[data-approve]').forEach(button => button.onclick = () => openEditor(button.dataset.approve));
       list.querySelectorAll('[data-reject]').forEach(button => button.onclick = () => reject(button.dataset.reject));
+      list.querySelectorAll('[data-delete]').forEach(button => button.onclick = () => deleteRejected(button.dataset.delete));
       list.querySelectorAll('[data-edit-community]').forEach(button => button.onclick = () => openCommunityEditor(button.dataset.editCommunity));
       list.querySelectorAll('[data-toggle-community]').forEach(button => button.onclick = () => toggleCommunity(button.dataset.toggleCommunity, button.dataset.active === '1'));
     }
@@ -161,6 +165,18 @@ export function dashboardPage(): Response {
       if (!confirm('Reject this submission?')) return;
       try {
         await moderate(id, 'reject', {quoteText:item.quoteText, author:item.author, category:item.category, tags:JSON.parse(item.tagsJson || '[]'), note:''});
+      } catch (error) { notice.textContent = error.message; }
+    }
+
+    async function deleteRejected(id) {
+      if (!confirm('Permanently delete this rejected submission? This cannot be undone.')) return;
+      try {
+        const response = await fetch('/admin/api/submissions/' + id, {method: 'DELETE'});
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || 'Delete failed.');
+        }
+        await load(active);
       } catch (error) { notice.textContent = error.message; }
     }
 
