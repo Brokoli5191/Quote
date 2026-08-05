@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp" width="96" alt="Quote app icon">
+  <img src=".github/icon.svg" width="96" alt="Quote app icon">
   <h1>Quote</h1>
   <p><strong>An offline-first Android home for curated wisdom and moderated community quotes.</strong></p>
 
