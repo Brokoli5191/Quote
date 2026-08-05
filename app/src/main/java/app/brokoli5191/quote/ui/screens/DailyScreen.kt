@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -54,9 +55,7 @@ import app.brokoli5191.quote.ui.theme.SerifFontFamily
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-
-@OptIn(ExperimentalAnimationApi::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun DailyScreen(viewModel: QuoteViewModel) {
     val quoteState by viewModel.dailyQuote.collectAsState()
@@ -194,26 +193,12 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                             }
 
                             Spacer(Modifier.height(12.dp))
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                quote.tags.split(",")
+                            QuoteTags(
+                                tags = quote.tags.split(",")
                                     .map { it.trim() }
                                     .filter { it.isNotEmpty() }
                                     .take(4)
-                                    .chunked(2)
-                                    .forEach { tags ->
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            tags.forEach { tag ->
-                                                SuggestionChip(
-                                                    onClick = {},
-                                                    label = { Text(tag, maxLines = 1) }
-                                                )
-                                            }
-                                        }
-                                }
-                            }
+                            )
 
                             Spacer(Modifier.height(8.dp))
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -251,6 +236,47 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                 }
             }
         }
+}
+
+@Composable
+private fun QuoteTags(tags: List<String>) {
+    Layout(
+        modifier = Modifier.fillMaxWidth(),
+        content = {
+            tags.forEach { tag ->
+                SuggestionChip(
+                    onClick = {},
+                    label = { Text(tag, maxLines = 1) }
+                )
+            }
+        }
+    ) { measurables, constraints ->
+        val spacing = 8.dp.roundToPx()
+        val placeables = measurables.map { it.measure(constraints.copy(minWidth = 0, minHeight = 0)) }
+        val positions = ArrayList<Pair<Int, Int>>(placeables.size)
+        var x = 0
+        var y = 0
+        var rowHeight = 0
+
+        placeables.forEach { placeable ->
+            if (x > 0 && x + placeable.width > constraints.maxWidth) {
+                x = 0
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            positions += x to y
+            x += placeable.width + spacing
+            rowHeight = maxOf(rowHeight, placeable.height)
+        }
+
+        val height = (y + rowHeight).coerceIn(constraints.minHeight, constraints.maxHeight)
+        layout(constraints.maxWidth, height) {
+            placeables.forEachIndexed { index, placeable ->
+                val (placeX, placeY) = positions[index]
+                placeable.placeRelative(placeX, placeY)
+            }
+        }
+    }
 }
 
 @Composable
