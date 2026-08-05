@@ -1,0 +1,26 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "quote-submission-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-05",
+  "workers_dev": true,
+  "preview_urls": false,
+  "vars": {
+    "ACCESS_TEAM_DOMAIN": "brokoli5191.cloudflareaccess.com",
+    "ACCESS_AUD": "037d592a09bd6cb8936ecccfc59398c77450f4281505d878af5d1bbdb2f5b81c"
+  },
+  "routes": [
+    {
+      "pattern": "quote.cowsay.win",
+      "custom_domain": true
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "quote-submissions",
+      "database_id": "81fe0125-e62b-4021-a407-f7c3956276b5",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

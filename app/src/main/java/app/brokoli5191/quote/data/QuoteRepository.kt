@@ -113,27 +113,47 @@ class QuoteRepository(
         quoteDao.deleteQuoteById(id)
     }
 
+    suspend fun markSubmissionPending(id: Int, submissionId: String) {
+        quoteDao.updateSubmission(
+            id = id,
+            status = QuoteSubmissionStatus.PENDING,
+            submissionId = submissionId,
+            submittedAt = System.currentTimeMillis()
+        )
+    }
+
+    suspend fun updateSubmissionStatus(id: Int, status: String) {
+        quoteDao.updateSubmissionStatus(id, status)
+    }
+
+    suspend fun applyCommunityUpdates(quotes: List<QuoteEntity>, deletedIds: List<String>) {
+        quotes.forEach { incoming ->
+            val existing = incoming.serverId?.let { quoteDao.getQuoteByServerId(it) }
+            quoteDao.insertQuote(
+                if (existing == null) incoming else incoming.copy(
+                    id = existing.id,
+                    isFavorite = existing.isFavorite,
+                    savedDate = existing.savedDate,
+                    timestamp = existing.timestamp
+                )
+            )
+        }
+        if (deletedIds.isNotEmpty()) quoteDao.deleteCommunityQuotes(deletedIds)
+    }
+
     // Daily quote selector
-    suspend fun getDailyQuote(date: String): QuoteEntity {
+    suspend fun getDailyQuote(date: String, sourceMode: String = QuoteSourceMode.ALL): QuoteEntity? {
         // Check if there is already a selection for today
         val selection = quoteDao.getDailySelection(date)
         if (selection != null) {
             val q = quoteDao.getQuoteById(selection.quoteId)
-            if (q != null) return q
+            if (q != null && q.matchesSourceMode(sourceMode)) return q
         }
 
         // Otherwise select a random quote
-        val all = quoteDao.getAllQuotesSync()
+        val all = quoteDao.getAllQuotesSync().filter { it.matchesSourceMode(sourceMode) }
         if (all.isEmpty()) {
-            // Seeding might be running, or we fall back to a hardcoded standard quote temporarily
-            return QuoteEntity(
-                id = 9999,
-                text = "Be yourself; everyone else is already taken.",
-                author = "Oscar Wilde",
-                category = "Love",
-                aboutAuthor = "Irish poet and playwright.",
-                tags = "Identity"
-            )
+            return null
         }
 
         // Exclude previously used daily quotes to avoid repeats
@@ -149,17 +169,10 @@ class QuoteRepository(
         return selectedQuote
     }
 
-    suspend fun cycleDailyQuote(date: String): QuoteEntity {
-        val all = quoteDao.getAllQuotesSync()
+    suspend fun cycleDailyQuote(date: String, sourceMode: String = QuoteSourceMode.ALL): QuoteEntity? {
+        val all = quoteDao.getAllQuotesSync().filter { it.matchesSourceMode(sourceMode) }
         if (all.isEmpty()) {
-            return QuoteEntity(
-                id = 9999,
-                text = "Be yourself; everyone else is already taken.",
-                author = "Oscar Wilde",
-                category = "Love",
-                aboutAuthor = "Irish poet and playwright.",
-                tags = "Identity"
-            )
+            return null
         }
 
         val selection = quoteDao.getDailySelection(date)

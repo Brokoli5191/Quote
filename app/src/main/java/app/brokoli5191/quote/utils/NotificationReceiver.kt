@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import app.brokoli5191.quote.data.AppDatabase
 import app.brokoli5191.quote.data.QuoteRepository
+import app.brokoli5191.quote.data.QuoteSourceMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -29,8 +30,9 @@ class NotificationReceiver : BroadcastReceiver() {
                 val db = AppDatabase.getInstance(context)
                 val repository = QuoteRepository(db.quoteDao(), app.brokoli5191.quote.data.InstallationSeed.get(context))
                 val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-                val quote = repository.getDailyQuote(todayStr)
-                NotificationHelper.showQuoteNotification(context, quote.text, quote.author)
+                val sourceMode = prefs.getString("quote_source_mode", QuoteSourceMode.ALL) ?: QuoteSourceMode.ALL
+                val quote = repository.getDailyQuote(todayStr, sourceMode)
+                if (quote != null) NotificationHelper.showQuoteNotification(context, quote.text, quote.author)
             } catch (e: Exception) {
                 e.printStackTrace()
                 NotificationHelper.showQuoteNotification(

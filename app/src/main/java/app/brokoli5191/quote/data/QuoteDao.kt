@@ -17,6 +17,9 @@ interface QuoteDao {
     @Query("SELECT * FROM quotes WHERE id = :id LIMIT 1")
     suspend fun getQuoteById(id: Int): QuoteEntity?
 
+    @Query("SELECT * FROM quotes WHERE serverId = :serverId LIMIT 1")
+    suspend fun getQuoteByServerId(serverId: String): QuoteEntity?
+
     @Query("SELECT * FROM quotes WHERE category = :category ORDER BY timestamp DESC")
     fun getQuotesByCategory(category: String): Flow<List<QuoteEntity>>
 
@@ -32,11 +35,20 @@ interface QuoteDao {
     @Query("DELETE FROM quotes")
     suspend fun deleteAllQuotes()
 
-    @Query("DELETE FROM quotes WHERE isUserAdded = 0")
+    @Query("DELETE FROM quotes WHERE isUserAdded = 0 AND origin != 'community'")
     suspend fun deleteNonUserQuotes()
 
     @Query("DELETE FROM quotes WHERE id = :id")
     suspend fun deleteQuoteById(id: Int)
+
+    @Query("UPDATE quotes SET submissionStatus = :status, submissionId = :submissionId, submittedAt = :submittedAt WHERE id = :id AND isUserAdded = 1")
+    suspend fun updateSubmission(id: Int, status: String, submissionId: String?, submittedAt: Long?)
+
+    @Query("UPDATE quotes SET submissionStatus = :status WHERE id = :id AND isUserAdded = 1")
+    suspend fun updateSubmissionStatus(id: Int, status: String)
+
+    @Query("DELETE FROM quotes WHERE origin = 'community' AND serverId IN (:serverIds)")
+    suspend fun deleteCommunityQuotes(serverIds: List<String>)
 
     // Daily selections
     @Query("SELECT * FROM daily_selections WHERE date = :date LIMIT 1")

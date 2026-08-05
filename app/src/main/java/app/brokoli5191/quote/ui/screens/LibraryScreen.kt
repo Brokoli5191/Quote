@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import app.brokoli5191.quote.data.QuoteEntity
+import app.brokoli5191.quote.data.QuoteSourceMode
 import app.brokoli5191.quote.ui.QuoteViewModel
 import app.brokoli5191.quote.ui.components.ExpressiveButton
 import app.brokoli5191.quote.ui.components.ExpressiveIconButton
@@ -50,13 +51,15 @@ import androidx.compose.ui.zIndex
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryScreen(viewModel: QuoteViewModel) {
     val searchQuery by viewModel.searchQuery.collectAsState()
     val filteredQuotes by viewModel.filteredQuotes.collectAsState()
-    val allQuotes by viewModel.allQuotes.collectAsState()
+    val sourceMode by viewModel.quoteSourceMode.collectAsState()
+    val communitySyncFinished by viewModel.communitySyncFinished.collectAsState()
 
     val selectedCategories by viewModel.selectedCategories.collectAsState()
     val lowPerformanceMode by viewModel.lowPerformanceMode.collectAsState()
@@ -143,6 +146,9 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                             viewModel.setSearchQuery("")
                         },
                         onToggleFavorite = { viewModel.toggleFavorite(it) },
+                        communityOnly = sourceMode == QuoteSourceMode.COMMUNITY,
+                        communitySyncFinished = communitySyncFinished,
+                        onRetrySync = { viewModel.syncCommunityQuotes() },
                         lowPerformanceMode = lowPerformanceMode,
                         topContentPadding = libraryChromeHeight
                     )
@@ -491,6 +497,9 @@ fun CategoryBrowseViewInPlace(
     quotes: List<QuoteEntity>,
     onBack: () -> Unit,
     onToggleFavorite: (QuoteEntity) -> Unit,
+    communityOnly: Boolean = false,
+    communitySyncFinished: Boolean = true,
+    onRetrySync: () -> Unit = {},
     lowPerformanceMode: Boolean = false,
     topContentPadding: androidx.compose.ui.unit.Dp = 0.dp
 ) {
@@ -504,6 +513,10 @@ fun CategoryBrowseViewInPlace(
     // Don't flash empty-state on first frame before filteredQuotes arrives
     var hasReceivedQuotes by remember { mutableStateOf(quotes.isNotEmpty()) }
     LaunchedEffect(quotes) { if (quotes.isNotEmpty()) hasReceivedQuotes = true }
+    LaunchedEffect(Unit) {
+        delay(600)
+        hasReceivedQuotes = true
+    }
 
     Box(
         modifier = Modifier
@@ -637,7 +650,7 @@ fun CategoryBrowseViewInPlace(
                 Spacer(modifier = Modifier.height(24.dp))
                 
                 Text(
-                    text = "No Wisdom Matches",
+                    text = if (communityOnly) "No Community Quotes Yet" else "No Wisdom Matches",
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontWeight = FontWeight.Bold,
                         fontFamily = SerifFontFamily
@@ -649,7 +662,10 @@ fun CategoryBrowseViewInPlace(
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 Text(
-                    text = "We couldn't find any quotes matching your interest. Reset the filters to explore other profound areas of wisdom.",
+                    text = if (communityOnly) {
+                        if (communitySyncFinished) "Approved community quotes will appear here after the next sync."
+                        else "Checking for newly approved community quotes..."
+                    } else "We couldn't find any quotes matching your interest. Reset the filters to explore other profound areas of wisdom.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     textAlign = TextAlign.Center,
@@ -660,7 +676,7 @@ fun CategoryBrowseViewInPlace(
 
                 // Beautiful interactive button to clear filters
                 ExpressiveButton(
-                    onClick = onBackWithHaptic,
+                    onClick = if (communityOnly) onRetrySync else onBackWithHaptic,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary
                     ),
@@ -675,7 +691,7 @@ fun CategoryBrowseViewInPlace(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Reset All Filters",
+                        text = if (communityOnly) "Sync again" else "Reset All Filters",
                         style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
                     )
                 }
