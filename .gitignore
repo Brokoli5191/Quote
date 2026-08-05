@@ -1,18 +1,43 @@
-*.iml
-.gradle
-.kotlin
+# Local tooling and documentation
+/.claude/
+/docs/
+/metadata.json
+
+# Gradle and Kotlin generated files
+/.gradle/
+/.kotlin/
+/build/
+**/build/
+
+# Android and IDE local files
 /local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
-local.properties
+/.idea/
+/.vscode/
+*.iml
+/captures/
+.externalNativeBuild/
+.cxx/
+
+# Signing credentials
+*.jks
+*.keystore
+*.keystore.base64
+keystore.properties
+
+# Environment and local configuration
 .env
-debug.keystore
+.env.*
+!.env.example
+
+# Generated packages, reports, and logs
+*.apk
+*.aab
+*.apks
+*.hprof
+*.log
+app/debug_output.txt
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+Desktop.ini

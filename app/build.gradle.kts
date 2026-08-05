@@ -13,8 +13,8 @@ android {
     applicationId = "app.brokoli5191.quote"
     minSdk = 24
     targetSdk = 36
-    versionCode = 6
-    versionName = "1.2.1"
+    versionCode = 7
+    versionName = "1.3.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -33,18 +33,7 @@ android {
         storePassword = System.getenv("STORE_PASSWORD") ?: "android"
         keyAlias = "upload"
         keyPassword = System.getenv("KEY_PASSWORD") ?: "android"
-      } else {
-        storeFile = file("${rootDir}/debug.keystore")
-        storePassword = "android"
-        keyAlias = "androiddebugkey"
-        keyPassword = "android"
       }
-    }
-    create("debugConfig") {
-      storeFile = file("${rootDir}/debug.keystore")
-      storePassword = "android"
-      keyAlias = "androiddebugkey"
-      keyPassword = "android"
     }
   }
 
@@ -53,10 +42,12 @@ android {
       isCrunchPngs = false
       isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      signingConfig = signingConfigs.getByName("release")
-    }
-    debug {
-      signingConfig = signingConfigs.getByName("debugConfig")
+      val releaseSigning = signingConfigs.getByName("release")
+      signingConfig = if (releaseSigning.storeFile?.exists() == true) {
+        releaseSigning
+      } else {
+        signingConfigs.getByName("debug")
+      }
     }
   }
   compileOptions {
