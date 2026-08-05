@@ -29,23 +29,51 @@ const fs = require('fs');
 const [,, inPath, outPath] = process.argv;
 const lines = fs.readFileSync(inPath, 'utf8').split('\n').filter(l => l.trim());
 
-const clean = s => (s || '')
-  .replace(/[“”„″"]/g, '')  // smart + straight double quotes
+const windows1252 = new Map([
+  ['€', 0x80], ['‚', 0x82], ['ƒ', 0x83], ['„', 0x84], ['…', 0x85],
+  ['†', 0x86], ['‡', 0x87], ['ˆ', 0x88], ['‰', 0x89], ['Š', 0x8a],
+  ['‹', 0x8b], ['Œ', 0x8c], ['Ž', 0x8e], ['‘', 0x91], ['’', 0x92],
+  ['“', 0x93], ['”', 0x94], ['•', 0x95], ['–', 0x96], ['—', 0x97],
+  ['˜', 0x98], ['™', 0x99], ['š', 0x9a], ['›', 0x9b], ['œ', 0x9c],
+  ['ž', 0x9e], ['Ÿ', 0x9f],
+]);
+
+const repairMojibake = value => {
+  if (value.includes('Ø£Ø¬') && value.includes('Ø­Ø¨')) {
+    return 'أجمل حب هو الذي نعثر عليه أثناء بحثنا عن شيء آخر';
+  }
+  let normalized = value
+    .replace(/â€™/g, '’').replace(/â€˜/g, '‘')
+    .replace(/â€œ/g, '“').replace(/â€�/g, '”')
+    .replace(/â€“/g, '–').replace(/â€”/g, '—')
+    .replace(/â€¦/g, '…').replace(/â€²/g, '′')
+    .replace(/â€/g, '—');
+  if (!/[ÃÂâØÙ]/.test(normalized)) return normalized;
+  const bytes = [];
+  for (const char of normalized) {
+    const code = char.codePointAt(0);
+    const byte = windows1252.get(char) ?? (code <= 0xff ? code : null);
+    if (byte === null) return normalized;
+    bytes.push(byte);
+  }
+  const repaired = Buffer.from(bytes).toString('utf8');
+  return repaired.includes('\uFFFD') ? normalized : repaired;
+};
+
+const cleanText = s => repairMojibake(String(s || ''))
   .replace(/\s+/g, ' ')
+  .replace(/([.!?,”])(?=“)/g, '$1 ')
+  .trim()
+  .replace(/^[“”„"]|[“”„"]$/g, '')
   .trim();
 
 const cleanAuthor = value => {
-  let author = clean(value);
+  let author = cleanText(value);
   const knownMojibake = new Map([
     ['Ø£Ø­ÙØ§Ù… Ù…Ø³ØªØºØ§Ù†Ù…ÙŠ', 'Ahlam Mosteghanemi'],
     ['Ø£Ø­Ù…Ø¯ Ø®Ø§ÙØ¯ ØªÙˆÙ�ÙŠÙ‚', 'Ahmed Khaled Towfik'],
   ]);
   if (knownMojibake.has(author)) return knownMojibake.get(author);
-  // The source occasionally contains UTF-8 decoded as Latin-1 (for example MiÃ©ville).
-  if (/[ÃÂØÙ]/.test(author)) {
-    const repaired = Buffer.from(author, 'latin1').toString('utf8');
-    if (!repaired.includes('\uFFFD')) author = repaired;
-  }
   return author.replace(/,+$/, '').trim();
 };
 
@@ -54,7 +82,7 @@ const out = [];
 for (const line of lines) {
   let o;
   try { o = JSON.parse(line); } catch { continue; }
-  const text = clean(o.quote);
+  const text = cleanText(o.quote);
   const author = cleanAuthor(o.author);
   if (!text || !author) continue;
   if (text.length > 90) continue; // keep quotes short enough to look good on the Daily screen

@@ -31,6 +31,9 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import app.brokoli5191.quote.BuildConfig
 import app.brokoli5191.quote.ui.QuoteViewModel
+import app.brokoli5191.quote.ui.components.ExpressiveButton
+import app.brokoli5191.quote.ui.components.ExpressiveOutlinedButton
+import app.brokoli5191.quote.ui.components.ExpressiveTextButton
 import app.brokoli5191.quote.utils.UpdateStatus
 
 @Composable
@@ -48,7 +51,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
-                .padding(bottom = 32.dp),
+                .padding(bottom = 112.dp),
             horizontalAlignment = Alignment.Start
         ) {
             // Elegant Settings Page Title (matches Library / Saved headers)
@@ -83,11 +86,11 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                     modifier = Modifier.align(Alignment.Start)
                 )
 
+                val activeThemeMode by viewModel.themeMode.collectAsState()
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    val activeThemeMode by viewModel.themeMode.collectAsState()
                     val modes = listOf("LIGHT", "DARK", "DYNAMIC")
                     modes.forEach { mode ->
                         val isSelected = activeThemeMode == mode
@@ -95,7 +98,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                             "DYNAMIC" -> "System"
                             else -> mode.lowercase().replaceFirstChar { it.uppercase() }
                         }
-                        Button(
+                        ExpressiveButton(
                             onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 viewModel.setThemeMode(mode)
@@ -103,7 +106,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                             modifier = Modifier
                                 .weight(1f)
                                 .height(44.dp),
-                            shape = RoundedCornerShape(12.dp),
+                            restingCorner = 12.dp,
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = if (isSelected)
                                     MaterialTheme.colorScheme.primaryContainer
@@ -123,23 +126,25 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                     }
                 }
 
-                val amoledBlack by viewModel.amoledBlack.collectAsState()
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            text = "AMOLED pure black",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface
+                if (activeThemeMode != "LIGHT") {
+                    val amoledBlack by viewModel.amoledBlack.collectAsState()
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                text = "AMOLED Pure Black",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        Switch(
+                            checked = amoledBlack,
+                            onCheckedChange = { viewModel.setAmoledBlack(it) }
                         )
                     }
-                    Switch(
-                        checked = amoledBlack,
-                        onCheckedChange = { viewModel.setAmoledBlack(it) }
-                    )
                 }
             }
 
@@ -502,14 +507,9 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                     ) {
                         Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                             Text(
-                                text = "Blur navigation surfaces",
+                                text = "Blur Navigation Surfaces",
                                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                                 color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = if (isLowPerf) "Disabled while Low Performance Mode is active" else "Use a translucent glass treatment for fixed bars",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         Switch(
@@ -653,14 +653,14 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                             val isDownloading = updateStatus is UpdateStatus.Downloading
                             val isChecking = updateStatus is UpdateStatus.Checking
 
-                            OutlinedButton(
+                            ExpressiveOutlinedButton(
                                 onClick = {
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     viewModel.checkForUpdates()
                                 },
                                 enabled = !isChecking && !isDownloading,
                                 modifier = Modifier.weight(1f).height(44.dp),
-                                shape = RoundedCornerShape(12.dp),
+                                restingCorner = 12.dp,
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
                                 colors = ButtonDefaults.outlinedButtonColors(
                                     contentColor = MaterialTheme.colorScheme.primary
@@ -674,13 +674,13 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
 
                             when (val s = updateStatus) {
                                 is UpdateStatus.UpdateAvailable -> {
-                                    Button(
+                                    ExpressiveButton(
                                         onClick = {
                                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                             viewModel.downloadUpdate(s.downloadUrl, s.version)
                                         },
                                         modifier = Modifier.weight(1f).height(44.dp),
-                                        shape = RoundedCornerShape(12.dp),
+                                        restingCorner = 12.dp,
                                         colors = ButtonDefaults.buttonColors(
                                             containerColor = MaterialTheme.colorScheme.primaryContainer,
                                             contentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -693,13 +693,13 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                     }
                                 }
                                 is UpdateStatus.ReadyToInstall -> {
-                                    Button(
+                                    ExpressiveButton(
                                         onClick = {
                                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                             viewModel.installUpdate(context, s.filePath)
                                         },
                                         modifier = Modifier.weight(1f).height(44.dp),
-                                        shape = RoundedCornerShape(12.dp),
+                                        restingCorner = 12.dp,
                                         colors = ButtonDefaults.buttonColors(
                                             containerColor = MaterialTheme.colorScheme.primary,
                                             contentColor = MaterialTheme.colorScheme.onPrimary
@@ -795,7 +795,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             // Export Button
-                            Button(
+                            ExpressiveButton(
                                 onClick = {
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     exportLauncher.launch("quote_backup.json")
@@ -803,7 +803,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(48.dp),
-                                shape = RoundedCornerShape(12.dp),
+                                restingCorner = 12.dp,
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -822,7 +822,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                             }
 
                             // Import Button
-                            OutlinedButton(
+                            ExpressiveOutlinedButton(
                                 onClick = {
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     importLauncher.launch(arrayOf("application/json"))
@@ -830,7 +830,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(48.dp),
-                                shape = RoundedCornerShape(12.dp),
+                                restingCorner = 12.dp,
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
                                 colors = ButtonDefaults.outlinedButtonColors(
                                     contentColor = MaterialTheme.colorScheme.primary
@@ -887,7 +887,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                 )
 
                 if (devUnlocked) {
-                    TextButton(
+                    ExpressiveTextButton(
                         onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             viewModel.openDevScreen()

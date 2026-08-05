@@ -3,8 +3,12 @@ package app.brokoli5191.quote.data
 import android.content.Context
 import kotlinx.coroutines.flow.Flow
 import java.nio.charset.StandardCharsets
+import java.nio.charset.Charset
 
-class QuoteRepository(private val quoteDao: QuoteDao) {
+class QuoteRepository(
+    private val quoteDao: QuoteDao,
+    private val installationSeed: Long = java.security.SecureRandom().nextLong()
+) {
     val allQuotes: Flow<List<QuoteEntity>> = quoteDao.getAllQuotes()
     val favorites: Flow<List<QuoteEntity>> = quoteDao.getFavoriteQuotes()
     val userAdded: Flow<List<QuoteEntity>> = quoteDao.getUserAddedQuotes()
@@ -36,7 +40,7 @@ class QuoteRepository(private val quoteDao: QuoteDao) {
                 }
                 
                 val category = CategoryMapper.map(tagsList, quoteText)
-                val cleanText = quoteText.replace("\"", "").replace("“", "").replace("”", "").trim()
+                val cleanText = normalizeQuoteText(quoteText)
                 val cleanAuthor = normalizeAuthorName(author)
                 val tagsStr = tagsList.joinToString(", ")
 
@@ -70,14 +74,14 @@ class QuoteRepository(private val quoteDao: QuoteDao) {
     suspend fun reseedPreservingFavorites(context: Context) {
         val oldFavKeys = quoteDao.getAllQuotesSync()
             .filter { it.isFavorite && !it.isUserAdded }
-            .map { it.text.trim() to it.author.trim() }
+            .map { normalizeQuoteText(it.text) to normalizeAuthorName(it.author) }
             .toSet()
         quoteDao.deleteNonUserQuotes()
         preseedDatabase(context)
         if (oldFavKeys.isNotEmpty()) {
             val now = System.currentTimeMillis().toString()
             quoteDao.getAllQuotesSync().forEach { q ->
-                if (!q.isUserAdded && (q.text.trim() to q.author.trim()) in oldFavKeys) {
+                if (!q.isUserAdded && (normalizeQuoteText(q.text) to normalizeAuthorName(q.author)) in oldFavKeys) {
                     quoteDao.updateFavorite(q.id, true, now)
                 }
             }
@@ -137,8 +141,7 @@ class QuoteRepository(private val quoteDao: QuoteDao) {
         val available = all.filter { it.id !in usedIds }
         val pool = if (available.isEmpty()) all else available
 
-        val seed = kotlin.math.abs(date.hashCode())
-        val selectedIdx = seed % pool.size
+        val selectedIdx = dailyQuoteIndex(installationSeed, date, pool.size)
         val selectedQuote = pool[selectedIdx]
 
         // Save selection for today
@@ -175,6 +178,11 @@ class QuoteRepository(private val quoteDao: QuoteDao) {
 
 }
 
+internal fun dailyQuoteIndex(installationSeed: Long, date: String, poolSize: Int): Int {
+    require(poolSize > 0)
+    return kotlin.random.Random(installationSeed xor date.hashCode().toLong()).nextInt(poolSize)
+}
+
 internal fun normalizeAuthorName(value: String): String {
     var author = value.replace("\"", "").replace("“", "").replace("”", "").trim()
     author = when (author) {
@@ -182,9 +190,28 @@ internal fun normalizeAuthorName(value: String): String {
         "Ø£Ø­Ù…Ø¯ Ø®Ø§ÙØ¯ ØªÙˆÙ�ÙŠÙ‚" -> "Ahmed Khaled Towfik"
         else -> author
     }
-    if (author.any { it == 'Ã' || it == 'Â' || it == 'Ø' || it == 'Ù' }) {
-        val repaired = String(author.toByteArray(StandardCharsets.ISO_8859_1), StandardCharsets.UTF_8)
-        if ('\uFFFD' !in repaired) author = repaired
-    }
+    author = repairMojibake(author)
     return author.trim().trimEnd(',').trim()
+}
+
+internal fun normalizeQuoteText(value: String): String = repairMojibake(value)
+    .replace(Regex("\\s+"), " ")
+    .replace(Regex("([.!?,”])(?=“)"), "$1 ")
+    .trim()
+    .trim('"', '“', '”', '„')
+    .trim()
+
+private fun repairMojibake(value: String): String {
+    if ("Ø£Ø¬" in value && "Ø­Ø¨" in value) {
+        return "أجمل حب هو الذي نعثر عليه أثناء بحثنا عن شيء آخر"
+    }
+    val normalized = value
+        .replace("â€™", "’").replace("â€˜", "‘")
+        .replace("â€œ", "“").replace("â€�", "”")
+        .replace("â€“", "–").replace("â€”", "—")
+        .replace("â€¦", "…").replace("â€²", "′")
+        .replace("â€", "—")
+    if (normalized.none { it == 'Ã' || it == 'Â' || it == 'â' || it == 'Ø' || it == 'Ù' }) return normalized
+    val repaired = String(normalized.toByteArray(Charset.forName("windows-1252")), StandardCharsets.UTF_8)
+    return if ('\uFFFD' in repaired) normalized else repaired
 }

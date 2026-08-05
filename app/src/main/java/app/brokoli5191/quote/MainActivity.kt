@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModelProvider
 import app.brokoli5191.quote.data.AppDatabase
 import app.brokoli5191.quote.data.QuoteRepository
+import app.brokoli5191.quote.data.InstallationSeed
 import app.brokoli5191.quote.ui.QuoteViewModel
 import app.brokoli5191.quote.ui.QuoteViewModelFactory
 import app.brokoli5191.quote.ui.screens.DailyScreen
@@ -57,6 +58,10 @@ import app.brokoli5191.quote.ui.screens.LibraryScreen
 import app.brokoli5191.quote.ui.screens.SavedScreen
 import app.brokoli5191.quote.ui.screens.WidgetSettingsScreen
 import app.brokoli5191.quote.ui.theme.MyApplicationTheme
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeEffect
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 
 class MainActivity : ComponentActivity() {
 
@@ -66,7 +71,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         val database = AppDatabase.getInstance(applicationContext)
-        val repository = QuoteRepository(database.quoteDao())
+        val repository = QuoteRepository(database.quoteDao(), InstallationSeed.get(applicationContext))
         val factory = QuoteViewModelFactory(application, repository)
 
         // Create ViewModel before setContent so theme loads synchronously — prevents flash
@@ -86,6 +91,8 @@ class MainActivity : ComponentActivity() {
 
             MyApplicationTheme(themeMode = themeMode, themeAccent = themeAccent, amoledBlack = amoledBlack) {
                 val activeTab by viewModel.selectedTab.collectAsState()
+                val blurActive = blurNavigationSurfaces && !lowPerformanceMode
+                val navigationHazeState = rememberHazeState(blurEnabled = blurActive)
 
                 val hasBackStack by viewModel.hasBackStack.collectAsState()
                 val selectedCategories by viewModel.selectedCategories.collectAsState()
@@ -175,16 +182,17 @@ class MainActivity : ComponentActivity() {
                             BottomNavigationBar(
                                 activeTab = activeTab,
                                 lowPerformanceMode = lowPerformanceMode,
-                                glassEffectEnabled = blurNavigationSurfaces && !lowPerformanceMode,
+                                blurEnabled = blurActive,
+                                hazeState = navigationHazeState,
                                 onTabSelected = { viewModel.selectTab(it) }
                             )
                         },
                         contentWindowInsets = WindowInsets(0, 0, 0, 0)
-                    ) { innerPadding ->
+                    ) {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(bottom = innerPadding.calculateBottomPadding())
+                                .hazeSource(navigationHazeState, zIndex = 0f)
                         ) {
                             // Previous page peeks in from the left during back gesture
                             if (backPreviewTab != null && !lowPerformanceMode) {
@@ -373,15 +381,17 @@ private fun NavBarIcon(
 fun BottomNavigationBar(
     activeTab: String,
     lowPerformanceMode: Boolean,
-    glassEffectEnabled: Boolean,
+    blurEnabled: Boolean,
+    hazeState: HazeState,
     onTabSelected: (String) -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .hazeEffect(hazeState)
             .background(
-                MaterialTheme.colorScheme.background.copy(alpha = if (glassEffectEnabled) 0.82f else 1f)
+                MaterialTheme.colorScheme.background.copy(alpha = if (blurEnabled) 0.72f else 1f)
             )
     ) {
         Box(

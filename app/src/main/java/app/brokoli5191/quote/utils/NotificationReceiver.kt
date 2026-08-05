@@ -27,7 +27,7 @@ class NotificationReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val db = AppDatabase.getInstance(context)
-                val repository = QuoteRepository(db.quoteDao())
+                val repository = QuoteRepository(db.quoteDao(), app.brokoli5191.quote.data.InstallationSeed.get(context))
                 val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
                 val quote = repository.getDailyQuote(todayStr)
                 NotificationHelper.showQuoteNotification(context, quote.text, quote.author)

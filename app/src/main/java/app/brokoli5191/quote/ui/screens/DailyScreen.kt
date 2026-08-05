@@ -10,6 +10,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -38,11 +40,16 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import app.brokoli5191.quote.data.QuoteEntity
 import app.brokoli5191.quote.ui.QuoteViewModel
+import app.brokoli5191.quote.ui.components.ExpressiveButton
+import app.brokoli5191.quote.ui.components.ExpressiveTonalButton
 import app.brokoli5191.quote.ui.theme.SerifFontFamily
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -56,8 +63,15 @@ fun DailyScreen(viewModel: QuoteViewModel) {
     val lowPerformanceMode by viewModel.lowPerformanceMode.collectAsState()
     val context = LocalContext.current
     val scrollState = rememberScrollState()
-    val haptic = LocalHapticFeedback.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    var pageVisible by remember { mutableStateOf(false) }
+    val pageAlpha by animateFloatAsState(
+        targetValue = if (pageVisible) 1f else 0f,
+        animationSpec = if (lowPerformanceMode) snap() else tween(600),
+        label = "DailyPageFadeIn"
+    )
+
+    LaunchedEffect(Unit) { pageVisible = true }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -69,59 +83,49 @@ fun DailyScreen(viewModel: QuoteViewModel) {
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        ElasticPullDownContainer(
-            onTriggerRefresh = viewModel::cycleDailyQuote,
-            scrollState = scrollState,
-            lowPerformanceMode = lowPerformanceMode,
-            modifier = Modifier.fillMaxSize()
-        ) { offsetY ->
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .graphicsLayer { alpha = pageAlpha }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                .padding(bottom = 112.dp)
+        ) {
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(scrollState)
-                    .graphicsLayer { translationY = offsetY }
-                    .padding(bottom = 24.dp)
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 18.dp)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .statusBarsPadding()
-                        .padding(start = 20.dp, end = 12.dp, top = 16.dp, bottom = 18.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column {
-                        Text(
-                            text = "Today",
-                            style = MaterialTheme.typography.headlineLarge,
-                            color = MaterialTheme.colorScheme.onBackground,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Text(
-                            text = "A thought worth keeping",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    IconButton(onClick = viewModel::cycleDailyQuote) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Show another quote", tint = MaterialTheme.colorScheme.primary)
-                    }
-                }
+                Text(
+                    text = "Today",
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = "A thought worth keeping",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
 
                 AnimatedContent(
-                    targetState = quoteState,
+                    targetState = quoteState?.id,
                     transitionSpec = {
                         if (lowPerformanceMode) EnterTransition.None togetherWith ExitTransition.None
                         else fadeIn(tween(250)) togetherWith fadeOut(tween(250))
                     },
                     label = "DailyQuoteTransition",
                     modifier = Modifier.fillMaxWidth()
-                ) { quote ->
-                    quote?.let {
+                ) { quoteId ->
+                    quoteState?.takeIf { it.id == quoteId }?.let { quote ->
                         Column(
-                            modifier = Modifier.padding(horizontal = 20.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                            modifier = Modifier.padding(horizontal = 20.dp)
                         ) {
                             Card(
                                 modifier = Modifier.fillMaxWidth().border(
@@ -130,23 +134,37 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                                     RoundedCornerShape(30.dp)
                                 ),
                                 shape = RoundedCornerShape(30.dp),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.32f)
+                                )
                             ) {
-                                Column(Modifier.padding(horizontal = 24.dp, vertical = 28.dp)) {
-                                    Text(
-                                        text = "“",
-                                        fontFamily = SerifFontFamily,
-                                        fontSize = 68.sp,
-                                        lineHeight = 48.sp,
-                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
-                                    )
-                                    Text(
-                                        text = quote.text,
-                                        style = MaterialTheme.typography.headlineMedium,
-                                        fontFamily = SerifFontFamily,
-                                        lineHeight = 35.sp,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
+                                Column(Modifier.padding(horizontal = 24.dp, vertical = 24.dp)) {
+                                    Box(Modifier.fillMaxWidth()) {
+                                        Text(
+                                            text = "“",
+                                            fontFamily = SerifFontFamily,
+                                            fontSize = 104.sp,
+                                            lineHeight = 104.sp,
+                                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                            modifier = Modifier.align(Alignment.TopStart)
+                                        )
+                                        Text(
+                                            text = "”",
+                                            fontFamily = SerifFontFamily,
+                                            fontSize = 104.sp,
+                                            lineHeight = 104.sp,
+                                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                            modifier = Modifier.align(Alignment.BottomEnd)
+                                        )
+                                        Text(
+                                            text = quote.text,
+                                            style = MaterialTheme.typography.headlineMedium,
+                                            fontFamily = SerifFontFamily,
+                                            lineHeight = 36.sp,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 30.dp)
+                                        )
+                                    }
                                     Spacer(Modifier.height(24.dp))
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Box(
@@ -170,25 +188,34 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                                                 fontWeight = FontWeight.SemiBold,
                                                 color = MaterialTheme.colorScheme.onSurface
                                             )
-                                            Text(
-                                                quote.category,
-                                                style = MaterialTheme.typography.labelMedium,
-                                                color = MaterialTheme.colorScheme.primary
-                                            )
                                         }
                                     }
                                 }
                             }
 
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                quote.tags.split(",").map { it.trim() }.filter { it.isNotEmpty() }.take(4).forEach { tag ->
-                                    SuggestionChip(onClick = {}, label = { Text(tag) })
+                            Spacer(Modifier.height(12.dp))
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                quote.tags.split(",")
+                                    .map { it.trim() }
+                                    .filter { it.isNotEmpty() }
+                                    .take(4)
+                                    .chunked(2)
+                                    .forEach { tags ->
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            tags.forEach { tag ->
+                                                SuggestionChip(
+                                                    onClick = {},
+                                                    label = { Text(tag, maxLines = 1) }
+                                                )
+                                            }
+                                        }
                                 }
                             }
 
+                            Spacer(Modifier.height(8.dp))
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 DailyActionButton(
                                     icon = if (quote.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
@@ -206,13 +233,14 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                                     }, null))
                                 }
                             }
-                            Button(
+                            Spacer(Modifier.height(10.dp))
+                            ExpressiveButton(
                                 onClick = {
                                     val url = "https://en.wikipedia.org/wiki/${quote.author.replace(" ", "_")}"
                                     context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
                                 },
                                 modifier = Modifier.fillMaxWidth().height(52.dp),
-                                shape = RoundedCornerShape(18.dp)
+                                restingCorner = 18.dp
                             ) {
                                 Icon(Icons.Default.Language, contentDescription = null)
                                 Spacer(Modifier.width(8.dp))
@@ -223,7 +251,6 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                 }
             }
         }
-    }
 }
 
 @Composable
@@ -232,149 +259,18 @@ private fun RowScope.DailyActionButton(
     label: String,
     onClick: () -> Unit
 ) {
-    FilledTonalButton(
+    ExpressiveTonalButton(
         onClick = onClick,
         modifier = Modifier.weight(1f).height(52.dp),
-        shape = RoundedCornerShape(18.dp),
+        restingCorner = 18.dp,
+        colors = ButtonDefaults.filledTonalButtonColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+        ),
         contentPadding = PaddingValues(horizontal = 8.dp)
     ) {
         Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(6.dp))
         Text(label, maxLines = 1)
-    }
-}
-
-@Composable
-fun ElasticPullDownContainer(
-    onTriggerRefresh: () -> Unit,
-    scrollState: ScrollState,
-    modifier: Modifier = Modifier,
-    lowPerformanceMode: Boolean = false,
-    content: @Composable (offsetY: Float) -> Unit
-) {
-    val haptic = LocalHapticFeedback.current
-    val dragOffset = remember { Animatable(0f) }
-    var rawDragY by remember { mutableStateOf(0f) }
-    val scope = rememberCoroutineScope()
-    var hasTriggeredLimitHaptic by remember { mutableStateOf(false) }
-
-    Box(
-        modifier = modifier
-            .pointerInput(scrollState.value) {
-                detectVerticalDragGestures(
-                    onDragStart = {
-                        rawDragY = 0f
-                        hasTriggeredLimitHaptic = false
-                    },
-                    onDragEnd = {
-                        scope.launch {
-                            if (rawDragY > 600f) {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                onTriggerRefresh()
-                            }
-                            dragOffset.animateTo(
-                                targetValue = 0f,
-                                animationSpec = spring(
-                                    dampingRatio = 0.65f, // Custom elastic rubber-band damping
-                                    stiffness = 300f     // Satisfying snap-back speed
-                                )
-                            )
-                        }
-                        rawDragY = 0f
-                        hasTriggeredLimitHaptic = false
-                    },
-                    onDragCancel = {
-                        scope.launch {
-                            dragOffset.animateTo(
-                                targetValue = 0f,
-                                animationSpec = spring(
-                                    dampingRatio = 0.65f,
-                                    stiffness = 300f
-                                )
-                            )
-                        }
-                        rawDragY = 0f
-                        hasTriggeredLimitHaptic = false
-                    },
-                    onVerticalDrag = { change, dragAmount ->
-                        // Only intercept drag gestures if at the top of the scroll list
-                        if (scrollState.value == 0 && (dragAmount > 0 || rawDragY > 0f)) {
-                            change.consume()
-                            rawDragY = (rawDragY + dragAmount).coerceAtLeast(0f)
-                            
-                            // Exponential rubber-banding math: offset = maxOffset * (1 - e^-x)
-                            val maxOffset = 1200f
-                            val resistanceFactor = 1200f
-                            val elasticOffset = maxOffset * (1f - kotlin.math.exp(-rawDragY / resistanceFactor))
-
-                            // Low-performance mode: keep the refresh trigger but no rubber-band visual.
-                            if (!lowPerformanceMode) {
-                                scope.launch {
-                                    dragOffset.snapTo(elasticOffset)
-                                }
-                            }
-
-                            // Trigger tactile feedback ticks
-                            if (rawDragY > 600f && !hasTriggeredLimitHaptic) {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                hasTriggeredLimitHaptic = true
-                            } else if (rawDragY <= 600f && hasTriggeredLimitHaptic) {
-                                hasTriggeredLimitHaptic = false
-                            }
-                        }
-                    }
-                )
-            }
-    ) {
-        // Visual Pull-To-Refresh instruction pill at the top
-        if (dragOffset.value > 5f) {
-            val progress = (rawDragY / 600f).coerceIn(0f, 1f)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 16.dp)
-                    .graphicsLayer {
-                        alpha = progress
-                        scaleX = 0.7f + progress * 0.3f
-                        scaleY = 0.7f + progress * 0.3f
-                        translationY = dragOffset.value * 0.38f
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier
-                        .background(
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.88f),
-                            shape = RoundedCornerShape(20.dp)
-                        )
-                        .border(
-                            0.5.dp,
-                            MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
-                            shape = RoundedCornerShape(20.dp)
-                        )
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = "Pull To Refresh Indicator",
-                        tint = if (rawDragY > 600f) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier
-                            .size(16.dp)
-                            .graphicsLayer {
-                                rotationZ = rawDragY * 0.8f
-                            }
-                    )
-                    Text(
-                        text = if (rawDragY > 600f) "Release for wisdom ✦" else "Pull for wisdom",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = if (rawDragY > 600f) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                }
-            }
-        }
-
-        content(dragOffset.value)
     }
 }

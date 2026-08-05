@@ -10,6 +10,7 @@ import kotlinx.coroutines.delay
 import androidx.compose.animation.*
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -28,10 +29,15 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.brokoli5191.quote.data.QuoteEntity
 import app.brokoli5191.quote.ui.QuoteViewModel
+import app.brokoli5191.quote.ui.components.ExpressiveButton
+import app.brokoli5191.quote.ui.components.ExpressiveIconButton
+import app.brokoli5191.quote.ui.components.ExpressiveTextButton
+import app.brokoli5191.quote.ui.components.rememberExpressiveShape
 import app.brokoli5191.quote.ui.theme.SerifFontFamily
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -51,6 +57,7 @@ fun SavedScreen(viewModel: QuoteViewModel) {
 
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
+    val fabInteractionSource = remember { MutableInteractionSource() }
 
     Box(
         modifier = Modifier
@@ -165,7 +172,7 @@ fun SavedScreen(viewModel: QuoteViewModel) {
                 } else {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(16.dp),
+                        contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 112.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         items(activeList, key = { it.id }) { quote ->
@@ -195,11 +202,12 @@ fun SavedScreen(viewModel: QuoteViewModel) {
             },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = 16.dp, end = 16.dp)
+                .padding(bottom = 104.dp, end = 16.dp)
                 .size(56.dp),
-            shape = RoundedCornerShape(16.dp),
+            shape = rememberExpressiveShape(fabInteractionSource, 16.dp, 8.dp),
             containerColor = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            interactionSource = fabInteractionSource
         ) {
             Icon(
                 imageVector = Icons.Default.Add,
@@ -230,14 +238,19 @@ fun TabSelectorButton(
     onClick: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
+    val interactionSource = remember { MutableInteractionSource() }
+    val shape = rememberExpressiveShape(interactionSource, 12.dp, 5.dp)
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
+            .clip(shape)
             .background(
                 if (isSelected) MaterialTheme.colorScheme.primaryContainer
                 else Color.Transparent
             )
-            .clickable {
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null
+            ) {
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 onClick()
             }
@@ -388,6 +401,9 @@ fun PremiumCollectionQuoteCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
@@ -420,15 +436,19 @@ fun PremiumCollectionQuoteCard(
                         Text(
                             text = quote.author,
                             style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
 
                     Row(
+                        modifier = Modifier.wrapContentWidth(),
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        IconButton(onClick = {
+                        ExpressiveIconButton(onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                             clipboard.setPrimaryClip(ClipData.newPlainText("quote", "\"${quote.text}\" — ${quote.author}"))
@@ -440,7 +460,7 @@ fun PremiumCollectionQuoteCard(
                             )
                         }
 
-                        IconButton(onClick = {
+                        ExpressiveIconButton(onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             onShare()
                         }) {
@@ -452,7 +472,7 @@ fun PremiumCollectionQuoteCard(
                         }
 
                         if (quote.isUserAdded) {
-                            IconButton(onClick = {
+                            ExpressiveIconButton(onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 onDelete()
                             }) {
@@ -463,7 +483,7 @@ fun PremiumCollectionQuoteCard(
                                 )
                             }
                         } else {
-                            IconButton(onClick = {
+                            ExpressiveIconButton(onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 onToggleFavorite()
                             }) {
@@ -555,7 +575,7 @@ fun AddCustomQuoteDialog(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = MaterialTheme.colorScheme.background,
         tonalElevation = 8.dp,
         dragHandle = { BottomSheetDefaults.DragHandle(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)) }
     ) {
@@ -578,7 +598,7 @@ fun AddCustomQuoteDialog(
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.primary
                 )
-                IconButton(onClick = onDismiss) {
+                ExpressiveIconButton(onClick = onDismiss) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Close",
@@ -639,6 +659,7 @@ fun AddCustomQuoteDialog(
                     ) {
                         rowCategoryList.forEach { categoryName ->
                             val isSelected = (category == categoryName)
+                            val interactionSource = remember(categoryName) { MutableInteractionSource() }
                             FilterChip(
                                 selected = isSelected,
                                 onClick = {
@@ -654,6 +675,8 @@ fun AddCustomQuoteDialog(
                                     )
                                 },
                                 modifier = Modifier.weight(1f).height(46.dp),
+                                shape = rememberExpressiveShape(interactionSource, 23.dp, 10.dp),
+                                interactionSource = interactionSource,
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
                                     selectedLabelColor = MaterialTheme.colorScheme.primary,
@@ -682,7 +705,7 @@ fun AddCustomQuoteDialog(
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TextButton(
+                ExpressiveTextButton(
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         onDismiss()
@@ -693,7 +716,7 @@ fun AddCustomQuoteDialog(
                     Text("Cancel")
                 }
 
-                Button(
+                ExpressiveButton(
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         if (text.isNotBlank()) {
@@ -705,7 +728,7 @@ fun AddCustomQuoteDialog(
                         containerColor = MaterialTheme.colorScheme.primaryContainer,
                         contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                     ),
-                    shape = RoundedCornerShape(12.dp)
+                    restingCorner = 12.dp
                 ) {
                     Text("Add Quote")
                 }

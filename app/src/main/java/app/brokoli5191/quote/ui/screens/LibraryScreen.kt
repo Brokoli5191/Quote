@@ -7,6 +7,7 @@ import android.content.Intent
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -28,11 +29,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import app.brokoli5191.quote.data.QuoteEntity
 import app.brokoli5191.quote.ui.QuoteViewModel
+import app.brokoli5191.quote.ui.components.ExpressiveButton
+import app.brokoli5191.quote.ui.components.ExpressiveIconButton
+import app.brokoli5191.quote.ui.components.ExpressiveTextButton
+import app.brokoli5191.quote.ui.components.rememberExpressiveShape
 import app.brokoli5191.quote.ui.theme.SerifFontFamily
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -40,6 +46,10 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.zIndex
+import dev.chrisbanes.haze.hazeEffect
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,8 +61,17 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
     val selectedCategories by viewModel.selectedCategories.collectAsState()
     val lowPerformanceMode by viewModel.lowPerformanceMode.collectAsState()
     val blurNavigationSurfaces by viewModel.blurNavigationSurfaces.collectAsState()
+    val isBrowsing = selectedCategories.isNotEmpty() || searchQuery.isNotBlank()
+    val categoryLabel = when {
+        selectedCategories.size > 1 -> "${selectedCategories.size} categories"
+        selectedCategories.size == 1 -> selectedCategories.first()
+        else -> null
+    }
     
     val scrollState = rememberScrollState()
+    val libraryBlurEnabled = blurNavigationSurfaces && !lowPerformanceMode
+    val libraryHazeState = rememberHazeState(blurEnabled = libraryBlurEnabled)
+    val libraryChromeHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 128.dp
     var showCategoryFilterDialog by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
@@ -74,102 +93,13 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
         ) {
-            // 1. Sleek unifed Header (matches "Your Collection" in Saved tab)
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-                    .graphicsLayer { alpha = headerAlpha.value }
-                    .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 0.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "Library",
-                        style = MaterialTheme.typography.headlineLarge,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    // Category Filter list icon on the top right
-                    IconButton(
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            showCategoryFilterDialog = true
-                        },
-                        modifier = Modifier
-                            .size(40.dp)
-                            .background(
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                shape = CircleShape
-                            )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.FilterList,
-                            contentDescription = "Filter Categories",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // 2. Persistent Search bar in composition to prevent keyboard loss
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { viewModel.setSearchQuery(it) },
-                placeholder = { Text("Search wisdom...", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp)
-                    .clip(RoundedCornerShape(32.dp)),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = MaterialTheme.colorScheme.surface.copy(
-                        alpha = if (blurNavigationSurfaces && !lowPerformanceMode) 0.78f else 1f
-                    ),
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(
-                        alpha = if (blurNavigationSurfaces && !lowPerformanceMode) 0.62f else 0.4f
-                    ),
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
-                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                ),
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = "Search",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(start = 8.dp)
-                    )
-                },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { viewModel.setSearchQuery("") }) {
-                            Icon(
-                                imageVector = Icons.Default.Clear,
-                                contentDescription = "Clear Search",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                },
-                shape = RoundedCornerShape(32.dp),
-                singleLine = true
-            )
-
             // 3. Main sliding bento content vs list view in same composition
             AnimatedContent(
-                targetState = (selectedCategories.isNotEmpty() || searchQuery.isNotBlank()),
+                targetState = isBrowsing,
                 transitionSpec = {
                     if (lowPerformanceMode) {
                         ContentTransform(
@@ -199,16 +129,13 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                     }
                 },
                 label = "LibraryInPlaceTransition",
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(0f)
+                    .hazeSource(libraryHazeState, zIndex = 0f)
             ) { isBrowsing ->
                 if (isBrowsing) {
-                    val categoryLabel = when {
-                        selectedCategories.size > 1 -> "${selectedCategories.size} categories"
-                        selectedCategories.size == 1 -> selectedCategories.first()
-                        else -> null
-                    }
                     CategoryBrowseViewInPlace(
-                        category = categoryLabel,
                         searchQuery = searchQuery,
                         quotes = filteredQuotes,
                         onBack = {
@@ -216,22 +143,17 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                             viewModel.setSearchQuery("")
                         },
                         onToggleFavorite = { viewModel.toggleFavorite(it) },
-                        lowPerformanceMode = lowPerformanceMode
+                        lowPerformanceMode = lowPerformanceMode,
+                        topContentPadding = libraryChromeHeight
                     )
                 } else {
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
                             .verticalScroll(scrollState)
-                            .padding(bottom = 16.dp)
+                            .padding(bottom = 112.dp)
                     ) {
-                        // Category Section Header to spacing bento grid correctly down
-                        Text(
-                            text = "Browse Categories",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f),
-                            modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 12.dp)
-                        )
+                        Spacer(modifier = Modifier.height(libraryChromeHeight + 12.dp))
 
                         // Beautiful Adaptive Bento Grid with Stunning Stocks loaded via Coil
                         Column(
@@ -280,6 +202,146 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                     }
                 }
             }
+
+            // Compose the source first, then sample it from this single blur layer.
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(libraryChromeHeight + if (isBrowsing) 64.dp else 0.dp)
+                    .zIndex(1f)
+                    .hazeEffect(libraryHazeState) {
+                        blurRadius = 32.dp
+                        tints = emptyList()
+                        noiseFactor = 0f
+                        mask = Brush.verticalGradient(
+                            0f to Color.Black,
+                            0.72f to Color.Black,
+                            1f to Color.Transparent
+                        )
+                    }
+            )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(libraryChromeHeight + if (isBrowsing) 64.dp else 0.dp)
+                    .zIndex(1.5f)
+                    .background(
+                        if (isBrowsing) {
+                            Brush.verticalGradient(
+                                0f to MaterialTheme.colorScheme.background.copy(alpha = 0.94f),
+                                0.58f to MaterialTheme.colorScheme.background.copy(alpha = 0.78f),
+                                0.84f to MaterialTheme.colorScheme.background.copy(alpha = 0.34f),
+                                1f to Color.Transparent
+                            )
+                        } else {
+                            Brush.verticalGradient(
+                                0f to MaterialTheme.colorScheme.background.copy(alpha = 0.92f),
+                                0.55f to MaterialTheme.colorScheme.background.copy(alpha = 0.68f),
+                                0.82f to MaterialTheme.colorScheme.background.copy(alpha = 0.22f),
+                                1f to Color.Transparent
+                            )
+                        }
+                    )
+            )
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .zIndex(2f)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .graphicsLayer { alpha = headerAlpha.value }
+                        .padding(start = 20.dp, end = 20.dp, top = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Library",
+                            style = MaterialTheme.typography.headlineLarge,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            fontWeight = FontWeight.Bold
+                        )
+                        ExpressiveIconButton(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                showCategoryFilterDialog = true
+                            },
+                            modifier = Modifier
+                                .size(40.dp)
+                                .background(
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                    CircleShape
+                                )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FilterList,
+                                contentDescription = "Filter Categories",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = viewModel::setSearchQuery,
+                    placeholder = {
+                        Text(
+                            "Search wisdom...",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp)
+                        .clip(RoundedCornerShape(32.dp))
+                        .background(MaterialTheme.colorScheme.background, RoundedCornerShape(32.dp)),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = MaterialTheme.colorScheme.background,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.background,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                    ),
+                    leadingIcon = {
+                        Icon(Icons.Default.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.primary)
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            ExpressiveIconButton(onClick = { viewModel.setSearchQuery("") }) {
+                                Icon(Icons.Default.Clear, contentDescription = "Clear Search")
+                            }
+                        }
+                    },
+                    shape = RoundedCornerShape(32.dp),
+                    singleLine = true
+                )
+            }
+
+            if (isBrowsing) {
+                LibraryFilterRow(
+                    category = categoryLabel,
+                    onBack = {
+                        selectCategoryWithHaptic(null)
+                        viewModel.setSearchQuery("")
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .offset(y = libraryChromeHeight)
+                        .zIndex(3f)
+                        .padding(horizontal = 20.dp)
+                )
+            }
         }
     }
 
@@ -288,7 +350,7 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
         ModalBottomSheet(
             onDismissRequest = { showCategoryFilterDialog = false },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = MaterialTheme.colorScheme.surface,
+            containerColor = MaterialTheme.colorScheme.background,
             tonalElevation = 8.dp,
             dragHandle = { BottomSheetDefaults.DragHandle(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)) }
         ) {
@@ -309,7 +371,7 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.primary
                     )
-                    IconButton(onClick = { showCategoryFilterDialog = false }) {
+                    ExpressiveIconButton(onClick = { showCategoryFilterDialog = false }) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Close",
@@ -357,6 +419,7 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                         ) {
                             rowCategoryList.forEach { categoryName ->
                                 val isSelected = selectedCategories.contains(categoryName)
+                                val interactionSource = remember(categoryName) { MutableInteractionSource() }
                                 FilterChip(
                                     selected = isSelected,
                                     onClick = {
@@ -372,6 +435,8 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                                         )
                                     },
                                     modifier = Modifier.weight(1f).height(46.dp),
+                                    shape = rememberExpressiveShape(interactionSource, 23.dp, 10.dp),
+                                    interactionSource = interactionSource,
                                     colors = FilterChipDefaults.filterChipColors(
                                         selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
                                         selectedLabelColor = MaterialTheme.colorScheme.primary,
@@ -400,7 +465,7 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    TextButton(
+                    ExpressiveTextButton(
                         onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             viewModel.clearCategorySelection()
@@ -414,13 +479,13 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                         Text("Clear All")
                     }
 
-                    Button(
+                    ExpressiveButton(
                         onClick = { showCategoryFilterDialog = false },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary,
                             contentColor = MaterialTheme.colorScheme.onPrimary
                         ),
-                        shape = RoundedCornerShape(12.dp)
+                        restingCorner = 12.dp
                     ) {
                         Text("Apply Filter")
                     }
@@ -432,12 +497,12 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
 
 @Composable
 fun CategoryBrowseViewInPlace(
-    category: String?,
     searchQuery: String,
     quotes: List<QuoteEntity>,
     onBack: () -> Unit,
     onToggleFavorite: (QuoteEntity) -> Unit,
-    lowPerformanceMode: Boolean = false
+    lowPerformanceMode: Boolean = false,
+    topContentPadding: androidx.compose.ui.unit.Dp = 0.dp
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
@@ -450,41 +515,11 @@ fun CategoryBrowseViewInPlace(
     var hasReceivedQuotes by remember { mutableStateOf(quotes.isNotEmpty()) }
     LaunchedEffect(quotes) { if (quotes.isNotEmpty()) hasReceivedQuotes = true }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 20.dp)
     ) {
-        // Beautiful elegant breadcrumb row to manage selection
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(32.dp))
-                    .background(MaterialTheme.colorScheme.primary)
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-            ) {
-                Text(
-                    text = if (category != null) category else "Search results",
-                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onPrimary
-                )
-            }
-
-            TextButton(onClick = onBackWithHaptic) {
-                Text(
-                    text = "Clear Filter",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.secondary
-                )
-            }
-        }
-
         if (hasReceivedQuotes && quotes.isEmpty()) {
             val infiniteTransition = rememberInfiniteTransition(label = "EmptyStateAnimation")
             
@@ -534,7 +569,7 @@ fun CategoryBrowseViewInPlace(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(vertical = 32.dp),
+                    .padding(top = topContentPadding + 56.dp, bottom = 32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
@@ -634,14 +669,14 @@ fun CategoryBrowseViewInPlace(
                 )
 
                 // Beautiful interactive button to clear filters
-                Button(
+                ExpressiveButton(
                     onClick = onBackWithHaptic,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary
                     ),
                     elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
                     contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
-                    shape = RoundedCornerShape(24.dp)
+                    restingCorner = 24.dp
                 ) {
                     Icon(
                         imageVector = Icons.Default.Refresh,
@@ -658,7 +693,7 @@ fun CategoryBrowseViewInPlace(
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 24.dp),
+                contentPadding = PaddingValues(top = topContentPadding + 56.dp, bottom = 112.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(quotes, key = { it.id }) { quote ->
@@ -676,6 +711,53 @@ fun CategoryBrowseViewInPlace(
                     )
                 }
             }
+        }
+
+    }
+}
+
+@Composable
+private fun LibraryFilterRow(
+    category: String?,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Box(
+            modifier = Modifier
+                .clip(FilterPillShape)
+                .background(MaterialTheme.colorScheme.primary)
+                .height(40.dp)
+                .padding(horizontal = 16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = category ?: "Search results",
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onPrimary
+            )
+        }
+
+        ExpressiveTextButton(
+            onClick = onBack,
+            modifier = Modifier.height(40.dp),
+            restingCorner = 32.dp,
+            colors = ButtonDefaults.textButtonColors(
+                containerColor = Color.White,
+                contentColor = Color(0xFF1C1B1F)
+            ),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp)
+        ) {
+            Text(
+                text = "Clear Filter",
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
+            )
         }
     }
 }
@@ -742,14 +824,20 @@ fun QuoteBrowseItemCard(
                     text = "— ${quote.author}",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 8.dp),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
 
                 Row(
+                    modifier = Modifier.wrapContentWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = {
+                    ExpressiveIconButton(onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                         clipboard.setPrimaryClip(ClipData.newPlainText("quote", "\"${quote.text}\" — ${quote.author}"))
@@ -761,7 +849,7 @@ fun QuoteBrowseItemCard(
                         )
                     }
 
-                    IconButton(onClick = {
+                    ExpressiveIconButton(onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         onShare()
                     }) {
@@ -779,7 +867,7 @@ fun QuoteBrowseItemCard(
                         finishedListener = { isLikedAnim = false }
                     )
 
-                    IconButton(onClick = {
+                    ExpressiveIconButton(onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         isLikedAnim = true
                         onToggleFavorite()
@@ -796,6 +884,8 @@ fun QuoteBrowseItemCard(
     }
 }
 
+private val FilterPillShape = RoundedCornerShape(32.dp)
+
 
 @Composable
 fun CategoryBentoCard(
@@ -805,6 +895,8 @@ fun CategoryBentoCard(
     height: androidx.compose.ui.unit.Dp,
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val expressiveShape = rememberExpressiveShape(interactionSource, 20.dp, 10.dp)
     Card(
         onClick = onClick,
         modifier = Modifier
@@ -813,11 +905,12 @@ fun CategoryBentoCard(
             .border(
                 width = 1.dp,
                 color = tintColor.copy(alpha = 0.15f),
-                shape = RoundedCornerShape(20.dp)
+                shape = expressiveShape
             ),
-        shape = RoundedCornerShape(20.dp),
+        shape = expressiveShape,
+        interactionSource = interactionSource,
         colors = CardDefaults.cardColors(
-            containerColor = Color(0xFF131217)
+            containerColor = MaterialTheme.colorScheme.surface
         )
     ) {
         Box(
@@ -827,7 +920,7 @@ fun CategoryBentoCard(
                     Brush.verticalGradient(
                         listOf(
                             tintColor.copy(alpha = 0.08f),
-                            Color(0xFF111015)
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
                         )
                     )
                 )
@@ -874,7 +967,7 @@ fun CategoryBentoCard(
                 Text(
                     text = name,
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = Color.White
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
         }
