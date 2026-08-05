@@ -38,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -142,13 +143,14 @@ fun ExpressiveIconButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    containerColor: Color = Color.Transparent,
     content: @Composable () -> Unit
 ) {
     val source = remember { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val shape = rememberExpressiveShape(source, 24.dp, 10.dp)
     val background by animateColorAsState(
-        if (pressed) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f) else MaterialTheme.colorScheme.surface.copy(alpha = 0f),
+        if (pressed) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f) else containerColor,
         label = "ExpressiveIconBackground"
     )
     Box(

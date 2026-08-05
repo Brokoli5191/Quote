@@ -274,12 +274,8 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 showCategoryFilterDialog = true
                             },
-                            modifier = Modifier
-                                .size(40.dp)
-                                .background(
-                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                    CircleShape
-                                )
+                            modifier = Modifier.size(40.dp),
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.FilterList,
@@ -379,12 +375,6 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                         )
                     }
                 }
-
-                Text(
-                    text = "Filter search findings by multiple selected categories below:",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
 
                 val nestedScrollConnection = remember {
                     object : NestedScrollConnection {
