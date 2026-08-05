@@ -638,9 +638,10 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                             color = statusColor
                         )
 
-                        if (updateStatus is UpdateStatus.Downloading) {
+                        val downloading = updateStatus as? UpdateStatus.Downloading
+                        if (downloading != null) {
                             LinearProgressIndicator(
-                                progress = { (updateStatus as UpdateStatus.Downloading).progress / 100f },
+                                progress = { downloading.progress / 100f },
                                 modifier = Modifier.fillMaxWidth(),
                                 color = MaterialTheme.colorScheme.primary
                             )
