@@ -28,8 +28,12 @@ keystore.properties
 .env
 .env.*
 !.env.example
+.dev.vars
+.dev.vars.*
 
 # Generated packages, reports, and logs
+node_modules/
+.wrangler/
 *.apk
 *.aab
 *.apks

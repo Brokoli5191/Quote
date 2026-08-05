@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.widget.Toast
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlinx.coroutines.delay
@@ -32,7 +33,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import app.brokoli5191.quote.data.QuoteEntity
+import app.brokoli5191.quote.data.QuoteSubmissionStatus
 import app.brokoli5191.quote.ui.QuoteViewModel
 import app.brokoli5191.quote.ui.components.ExpressiveButton
 import app.brokoli5191.quote.ui.components.ExpressiveIconButton
@@ -51,13 +55,17 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 fun SavedScreen(viewModel: QuoteViewModel) {
     val favorites by viewModel.favorites.collectAsState()
     val userAdded by viewModel.userAdded.collectAsState()
+    val submittingQuoteIds by viewModel.submittingQuoteIds.collectAsState()
     
     var activeSubTab by remember { mutableStateOf("Favorites") } // "Favorites" or "My Quotes"
     var showAddDialog by remember { mutableStateOf(false) }
+    var quoteToSubmit by remember { mutableStateOf<QuoteEntity?>(null) }
 
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val fabInteractionSource = remember { MutableInteractionSource() }
+
+    LaunchedEffect(Unit) { viewModel.refreshSubmissionStatuses() }
 
     Box(
         modifier = Modifier
@@ -180,6 +188,8 @@ fun SavedScreen(viewModel: QuoteViewModel) {
                                 quote = quote,
                                 onToggleFavorite = { viewModel.toggleFavorite(quote) },
                                 onDelete = { viewModel.deleteQuote(quote.id) },
+                                isSubmitting = quote.id in submittingQuoteIds,
+                                onSubmit = { quoteToSubmit = quote },
                                 onShare = {
                                     val intent = Intent(Intent.ACTION_SEND).apply {
                                         type = "text/plain"
@@ -226,6 +236,93 @@ fun SavedScreen(viewModel: QuoteViewModel) {
                     activeSubTab = "My Quotes" // switch to showing user added list
                 }
             )
+        }
+
+        quoteToSubmit?.let { quote ->
+            Dialog(
+                onDismissRequest = { quoteToSubmit = null },
+                properties = DialogProperties(usePlatformDefaultWidth = false)
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp)
+                        .widthIn(max = 420.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.background,
+                    contentColor = MaterialTheme.colorScheme.onBackground,
+                    tonalElevation = 0.dp,
+                    border = BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.outline.copy(alpha = 0.28f)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        ) {
+                            Icon(
+                                Icons.Default.CloudUpload,
+                                contentDescription = null,
+                                modifier = Modifier.padding(10.dp).size(22.dp)
+                            )
+                        }
+                        Text(
+                            "Submit for review?",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            "This quote, its author, category, and tags will be sent to Quote for review. " +
+                                "If approved, it may be included in the public quote collection.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        TextButton(
+                            onClick = {
+                                context.startActivity(
+                                    Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://quote.cowsay.win/privacy"))
+                                )
+                            },
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Text("Privacy & submission policy")
+                            Spacer(Modifier.width(6.dp))
+                            Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TextButton(onClick = { quoteToSubmit = null }) {
+                                Text("Cancel")
+                            }
+                            TextButton(
+                                onClick = {
+                                    quoteToSubmit = null
+                                    viewModel.submitQuoteForReview(
+                                        quote = quote,
+                                        onSuccess = {
+                                            Toast.makeText(context, "Submitted for review", Toast.LENGTH_SHORT).show()
+                                        },
+                                        onError = { message ->
+                                            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                                        }
+                                    )
+                                }
+                            ) {
+                                Text("Submit")
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -274,6 +371,8 @@ fun PremiumCollectionQuoteCard(
     quote: QuoteEntity,
     onToggleFavorite: () -> Unit,
     onDelete: () -> Unit,
+    isSubmitting: Boolean,
+    onSubmit: () -> Unit,
     onShare: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
@@ -496,7 +595,72 @@ fun PremiumCollectionQuoteCard(
                         }
                     }
                 }
+
+                if (quote.isUserAdded) {
+                    when (quote.submissionStatus) {
+                        QuoteSubmissionStatus.PENDING -> QuoteReviewStatus(
+                            label = "Pending review",
+                            icon = Icons.Default.Schedule,
+                            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                        QuoteSubmissionStatus.APPROVED -> QuoteReviewStatus(
+                            label = "Approved for community",
+                            icon = Icons.Default.CheckCircle,
+                            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                        QuoteSubmissionStatus.REJECTED -> QuoteReviewStatus(
+                            label = "Not approved",
+                            icon = Icons.Default.Cancel,
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        else -> {
+                            FilledTonalButton(
+                                onClick = onSubmit,
+                                enabled = !isSubmitting,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(14.dp)
+                            ) {
+                                if (isSubmitting) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(18.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Icon(Icons.Default.CloudUpload, contentDescription = null)
+                                }
+                                Spacer(Modifier.width(8.dp))
+                                Text(if (isSubmitting) "Submitting..." else "Submit for review")
+                            }
+                        }
+                    }
+                }
             }
+        }
+    }
+}
+
+@Composable
+private fun QuoteReviewStatus(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    containerColor: Color,
+    contentColor: Color
+) {
+    Surface(
+        color = containerColor.copy(alpha = 0.55f),
+        contentColor = contentColor,
+        shape = RoundedCornerShape(14.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+            Text(label, style = MaterialTheme.typography.labelLarge)
         }
     }
 }

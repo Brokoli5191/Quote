@@ -10,12 +10,20 @@ import androidx.lifecycle.viewModelScope
 import app.brokoli5191.quote.BuildConfig
 import app.brokoli5191.quote.data.QuoteEntity
 import app.brokoli5191.quote.data.QuoteRepository
+import app.brokoli5191.quote.data.QuoteSubmissionClient
+import app.brokoli5191.quote.data.QuoteSubmissionResult
+import app.brokoli5191.quote.data.QuoteSubmissionStatus
+import app.brokoli5191.quote.data.QuoteOrigin
+import app.brokoli5191.quote.data.CommunitySyncManager
+import app.brokoli5191.quote.data.QuoteSourceMode
+import app.brokoli5191.quote.data.matchesSourceMode
 import app.brokoli5191.quote.utils.NotificationHelper
 import app.brokoli5191.quote.utils.NotificationScheduler
 import app.brokoli5191.quote.utils.CategoryQuoteVerifier
 import app.brokoli5191.quote.utils.CategoryVerificationResult
 import app.brokoli5191.quote.utils.UpdateChecker
 import app.brokoli5191.quote.utils.UpdateStatus
+import app.brokoli5191.quote.utils.CommunitySyncWorker
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -25,6 +33,9 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
 
     private val app get() = getApplication<Application>()
     private val prefs get() = app.getSharedPreferences("aura_prefs", Context.MODE_PRIVATE)
+    private val submissionClient = QuoteSubmissionClient()
+    private val communitySyncManager = CommunitySyncManager(app, repository)
+    private var communitySyncRunning = false
 
     private val _dailyQuote = MutableStateFlow<QuoteEntity?>(null)
     val dailyQuote: StateFlow<QuoteEntity?> = _dailyQuote.asStateFlow()
@@ -49,6 +60,12 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
 
     private val _themeAccent = MutableStateFlow("Violet")
     val themeAccent: StateFlow<String> = _themeAccent.asStateFlow()
+
+    private val _quoteSourceMode = MutableStateFlow(QuoteSourceMode.ALL)
+    val quoteSourceMode: StateFlow<String> = _quoteSourceMode.asStateFlow()
+
+    private val _communitySyncFinished = MutableStateFlow(false)
+    val communitySyncFinished: StateFlow<Boolean> = _communitySyncFinished.asStateFlow()
 
     private val _amoledBlack = MutableStateFlow(false)
     val amoledBlack: StateFlow<Boolean> = _amoledBlack.asStateFlow()
@@ -80,6 +97,9 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
     private val _updateStatus = MutableStateFlow<UpdateStatus>(UpdateStatus.Idle)
     val updateStatus: StateFlow<UpdateStatus> = _updateStatus.asStateFlow()
 
+    private val _submittingQuoteIds = MutableStateFlow<Set<Int>>(emptySet())
+    val submittingQuoteIds: StateFlow<Set<Int>> = _submittingQuoteIds.asStateFlow()
+
     private var lastLoadedDate = ""
 
     val allQuotes: StateFlow<List<QuoteEntity>> = repository.allQuotes
@@ -100,9 +120,10 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
     val filteredQuotes: StateFlow<List<QuoteEntity>> = combine(
         allQuotes,
         searchQuery,
-        selectedCategories
-    ) { quotes, query, categories ->
-        var list = quotes
+        selectedCategories,
+        quoteSourceMode
+    ) { quotes, query, categories, sourceMode ->
+        var list = quotes.filter { it.matchesSourceMode(sourceMode) }
         if (categories.isNotEmpty()) {
             list = list.filter { q ->
                 categories.any { cat -> q.category.equals(cat, ignoreCase = true) }
@@ -126,6 +147,22 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
     init {
         loadThemeSettings()
         loadDailyQuote()
+        syncCommunityQuotes()
+        CommunitySyncWorker.schedule(app)
+    }
+
+    fun syncCommunityQuotes() {
+        if (communitySyncRunning) return
+        communitySyncRunning = true
+        viewModelScope.launch {
+            try {
+                communitySyncManager.sync()
+                loadDailyQuote()
+            } finally {
+                communitySyncRunning = false
+                _communitySyncFinished.value = true
+            }
+        }
     }
 
     fun runVerification() {
@@ -165,6 +202,9 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
             _amoledBlack.value = prefs.getBoolean("amoled_black", false)
         }
         _themeAccent.value = prefs.getString("theme_accent", "Violet") ?: "Violet"
+        _quoteSourceMode.value = prefs.getString("quote_source_mode", QuoteSourceMode.ALL)
+            ?.takeIf { it in setOf(QuoteSourceMode.ALL, QuoteSourceMode.CURATED, QuoteSourceMode.COMMUNITY) }
+            ?: QuoteSourceMode.ALL
         _widgetStyle.value = prefs.getString("widget_style", "Quote") ?: "Quote"
         _dailyReminderEnabled.value = prefs.getBoolean("daily_reminder_enabled", false)
         _dailyReminderHour.value = prefs.getInt("daily_reminder_hour", 8)
@@ -251,11 +291,21 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
         prefs.edit().putString("theme_accent", accent).apply()
     }
 
+    fun setQuoteSourceMode(mode: String) {
+        if (mode !in setOf(QuoteSourceMode.ALL, QuoteSourceMode.CURATED, QuoteSourceMode.COMMUNITY)) return
+        _quoteSourceMode.value = mode
+        prefs.edit().putString("quote_source_mode", mode).apply()
+        loadDailyQuote()
+        app.sendBroadcast(Intent("app.brokoli5191.quote.UPDATE_WIDGET").apply {
+            component = ComponentName(app, "app.brokoli5191.quote.widget.QuoteWidgetProvider")
+        })
+    }
+
     fun loadDailyQuote() {
         val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
         lastLoadedDate = todayStr
         viewModelScope.launch {
-            val quote = repository.getDailyQuote(todayStr)
+            val quote = repository.getDailyQuote(todayStr, _quoteSourceMode.value)
             _dailyQuote.value = quote
         }
     }
@@ -270,7 +320,7 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
     fun cycleDailyQuote() {
         val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
         viewModelScope.launch {
-            val quote = repository.cycleDailyQuote(todayStr)
+            val quote = repository.cycleDailyQuote(todayStr, _quoteSourceMode.value)
             _dailyQuote.value = quote
 
             val updateIntent = Intent("app.brokoli5191.quote.UPDATE_WIDGET").apply {
@@ -284,8 +334,10 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-                val quote = repository.getDailyQuote(todayStr)
-                NotificationHelper.showQuoteNotification(app, quote.text, quote.author, notificationId = 1002)
+                val quote = repository.getDailyQuote(todayStr, _quoteSourceMode.value)
+                if (quote != null) {
+                    NotificationHelper.showQuoteNotification(app, quote.text, quote.author, notificationId = 1002)
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -363,6 +415,7 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
                 category = if (category.isBlank()) "Love" else category,
                 tags = tags,
                 isUserAdded = true,
+                origin = QuoteOrigin.PERSONAL,
                 timestamp = System.currentTimeMillis()
             )
             repository.insertQuote(q)
@@ -372,6 +425,40 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
     fun deleteQuote(id: Int) {
         viewModelScope.launch {
             repository.deleteQuote(id)
+        }
+    }
+
+    fun submitQuoteForReview(
+        quote: QuoteEntity,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        if (!quote.isUserAdded || quote.submissionStatus == QuoteSubmissionStatus.PENDING) return
+        if (quote.id in _submittingQuoteIds.value) return
+
+        _submittingQuoteIds.value += quote.id
+        viewModelScope.launch {
+            try {
+                val installationId = prefs.getString("submission_installation_id", null)
+                    ?: UUID.randomUUID().toString().also {
+                        prefs.edit().putString("submission_installation_id", it).apply()
+                    }
+                when (val result = submissionClient.submit(quote, installationId, BuildConfig.VERSION_NAME)) {
+                    is QuoteSubmissionResult.Success -> {
+                        repository.markSubmissionPending(quote.id, result.submissionId)
+                        onSuccess()
+                    }
+                    is QuoteSubmissionResult.Error -> onError(result.message)
+                }
+            } finally {
+                _submittingQuoteIds.value -= quote.id
+            }
+        }
+    }
+
+    fun refreshSubmissionStatuses() {
+        viewModelScope.launch {
+            communitySyncManager.refreshSubmissionStatuses()
         }
     }
 
@@ -463,6 +550,7 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
                                 category = obj.optString("category", "Stoicism"),
                                 isFavorite = isFavorite,
                                 isUserAdded = true,
+                                origin = QuoteOrigin.PERSONAL,
                                 timestamp = obj.optLong("timestamp", System.currentTimeMillis()),
                                 aboutAuthor = obj.optString("aboutAuthor", ""),
                                 tags = obj.optString("tags", ""),

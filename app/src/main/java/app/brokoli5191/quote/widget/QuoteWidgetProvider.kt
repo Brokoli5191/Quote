@@ -23,6 +23,7 @@ import app.brokoli5191.quote.data.AppDatabase
 import app.brokoli5191.quote.data.InstallationSeed
 import app.brokoli5191.quote.data.QuoteEntity
 import app.brokoli5191.quote.data.QuoteRepository
+import app.brokoli5191.quote.data.QuoteSourceMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -64,9 +65,14 @@ class QuoteWidgetProvider : AppWidgetProvider() {
         )
         val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
         CoroutineScope(Dispatchers.Default).launch {
-            val quote = runCatching { repository.getDailyQuote(date) }.getOrElse {
-                QuoteEntity(text = "Stay hungry. Stay foolish.", author = "Steve Jobs", category = "Life")
-            }
+            val sourceMode = context.getSharedPreferences("aura_prefs", Context.MODE_PRIVATE)
+                .getString("quote_source_mode", QuoteSourceMode.ALL) ?: QuoteSourceMode.ALL
+            val quote = runCatching { repository.getDailyQuote(date, sourceMode) }.getOrNull()
+                ?: QuoteEntity(
+                    text = if (sourceMode == QuoteSourceMode.COMMUNITY) "No community quotes available yet." else "Stay hungry. Stay foolish.",
+                    author = if (sourceMode == QuoteSourceMode.COMMUNITY) "Open Quote to sync" else "Steve Jobs",
+                    category = "Life"
+                )
             ids.forEach { updateAppWidget(context, manager, it, quote) }
         }
     }

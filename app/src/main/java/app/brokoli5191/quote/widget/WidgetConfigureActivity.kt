@@ -78,6 +78,7 @@ import app.brokoli5191.quote.data.AppDatabase
 import app.brokoli5191.quote.data.InstallationSeed
 import app.brokoli5191.quote.data.QuoteEntity
 import app.brokoli5191.quote.data.QuoteRepository
+import app.brokoli5191.quote.data.QuoteSourceMode
 import app.brokoli5191.quote.ui.theme.MyApplicationTheme
 import app.brokoli5191.quote.ui.components.ExpressiveButton
 import app.brokoli5191.quote.ui.components.rememberExpressiveShape
@@ -548,9 +549,14 @@ class WidgetConfigureActivity : ComponentActivity() {
                 InstallationSeed.get(this@WidgetConfigureActivity)
             )
             val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-            val quote = runCatching { repository.getDailyQuote(date) }.getOrElse {
-                QuoteEntity(text = "Stay hungry. Stay foolish.", author = "Steve Jobs", category = "Life")
-            }
+            val sourceMode = getSharedPreferences("aura_prefs", Context.MODE_PRIVATE)
+                .getString("quote_source_mode", QuoteSourceMode.ALL) ?: QuoteSourceMode.ALL
+            val quote = runCatching { repository.getDailyQuote(date, sourceMode) }.getOrNull()
+                ?: QuoteEntity(
+                    text = if (sourceMode == QuoteSourceMode.COMMUNITY) "No community quotes available yet." else "Stay hungry. Stay foolish.",
+                    author = if (sourceMode == QuoteSourceMode.COMMUNITY) "Open Quote to sync" else "Steve Jobs",
+                    category = "Life"
+                )
             withContext(Dispatchers.Main) {
                 QuoteWidgetProvider.updateAppWidget(this@WidgetConfigureActivity, manager, appWidgetId, quote)
                 setResult(

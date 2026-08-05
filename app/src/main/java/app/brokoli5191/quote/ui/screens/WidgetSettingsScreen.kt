@@ -30,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import app.brokoli5191.quote.BuildConfig
+import app.brokoli5191.quote.data.QuoteSourceMode
 import app.brokoli5191.quote.ui.QuoteViewModel
 import app.brokoli5191.quote.ui.components.ExpressiveButton
 import app.brokoli5191.quote.ui.components.ExpressiveOutlinedButton
@@ -221,6 +222,55 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                     }
                 }
 
+            }
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Quote Sources",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                val sourceMode by viewModel.quoteSourceMode.collectAsState()
+                val options = listOf(
+                    QuoteSourceMode.ALL to "All",
+                    QuoteSourceMode.CURATED to "Curated",
+                    QuoteSourceMode.COMMUNITY to "Community"
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    options.forEach { (mode, title) ->
+                        val selected = sourceMode == mode
+                        ExpressiveButton(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                viewModel.setQuoteSourceMode(mode)
+                            },
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            restingCorner = 12.dp,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer
+                                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
+                                    else MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
+                            border = if (selected) BorderStroke(
+                                1.dp,
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                            ) else null,
+                            contentPadding = PaddingValues(horizontal = 2.dp)
+                        ) {
+                            Text(title, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(28.dp))

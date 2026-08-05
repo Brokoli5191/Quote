@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Language
@@ -48,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import app.brokoli5191.quote.data.QuoteEntity
+import app.brokoli5191.quote.data.QuoteSourceMode
 import app.brokoli5191.quote.ui.QuoteViewModel
 import app.brokoli5191.quote.ui.components.ExpressiveButton
 import app.brokoli5191.quote.ui.components.ExpressiveTonalButton
@@ -60,6 +62,8 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 fun DailyScreen(viewModel: QuoteViewModel) {
     val quoteState by viewModel.dailyQuote.collectAsState()
     val lowPerformanceMode by viewModel.lowPerformanceMode.collectAsState()
+    val sourceMode by viewModel.quoteSourceMode.collectAsState()
+    val communitySyncFinished by viewModel.communitySyncFinished.collectAsState()
     val context = LocalContext.current
     val scrollState = rememberScrollState()
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -113,7 +117,13 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                 )
             }
 
-                AnimatedContent(
+                if (quoteState == null) {
+                    DailyQuoteEmptyState(
+                        communityOnly = sourceMode == QuoteSourceMode.COMMUNITY,
+                        loading = !communitySyncFinished,
+                        onRetry = { viewModel.syncCommunityQuotes() }
+                    )
+                } else AnimatedContent(
                     targetState = quoteState?.id,
                     transitionSpec = {
                         if (lowPerformanceMode) EnterTransition.None togetherWith ExitTransition.None
@@ -236,6 +246,47 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                 }
             }
         }
+}
+
+@Composable
+private fun DailyQuoteEmptyState(
+    communityOnly: Boolean,
+    loading: Boolean,
+    onRetry: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 56.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        if (loading) {
+            CircularProgressIndicator(modifier = Modifier.size(32.dp), strokeWidth = 3.dp)
+            Text("Syncing quotes...", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            Icon(
+                Icons.Default.CloudOff,
+                contentDescription = null,
+                modifier = Modifier.size(48.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                if (communityOnly) "No community quotes yet" else "No quotes available",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                if (communityOnly) "Approved community quotes will appear here after the next sync."
+                else "Try syncing again in a moment.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            ExpressiveTonalButton(onClick = onRetry) {
+                Icon(Icons.Default.Refresh, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Try again")
+            }
+        }
+    }
 }
 
 @Composable
