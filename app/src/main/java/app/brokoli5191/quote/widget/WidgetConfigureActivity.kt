@@ -7,68 +7,113 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Colorize
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.brokoli5191.quote.data.AppDatabase
+import app.brokoli5191.quote.data.InstallationSeed
 import app.brokoli5191.quote.data.QuoteEntity
 import app.brokoli5191.quote.data.QuoteRepository
 import app.brokoli5191.quote.ui.theme.MyApplicationTheme
-import app.brokoli5191.quote.ui.theme.SerifFontFamily
+import app.brokoli5191.quote.ui.components.ExpressiveButton
+import app.brokoli5191.quote.ui.components.rememberExpressiveShape
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Date
+import java.util.Locale
+import kotlin.math.roundToInt
 
 class WidgetConfigureActivity : ComponentActivity() {
-
     private var appWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // Retrieve widget ID
         appWidgetId = intent.extras?.getInt(
             AppWidgetManager.EXTRA_APPWIDGET_ID,
             AppWidgetManager.INVALID_APPWIDGET_ID
         ) ?: AppWidgetManager.INVALID_APPWIDGET_ID
-
-        // If invalid, abort
         if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
             finish()
             return
         }
+        setResult(
+            RESULT_CANCELED,
+            Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+        )
 
-        // Set result to CANCELED by default so that if the user backs out, the widget is not placed
-        val resultValue = Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-        setResult(RESULT_CANCELED, resultValue)
-
+        val prefs = getSharedPreferences("aura_prefs", Context.MODE_PRIVATE)
+        val mode = prefs.getString("theme_mode", "DARK") ?: "DARK"
+        val accent = prefs.getString("theme_accent", "Violet") ?: "Violet"
+        val amoled = prefs.getBoolean("amoled_black", false)
         setContent {
-            MyApplicationTheme(themeMode = "AMOLED", themeAccent = "Violet") {
+            MyApplicationTheme(themeMode = mode, themeAccent = accent, amoledBlack = amoled) {
                 ConfigureScreen()
             }
         }
@@ -76,568 +121,443 @@ class WidgetConfigureActivity : ComponentActivity() {
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
-    fun ConfigureScreen() {
-        val pref = getSharedPreferences("aura_prefs", Context.MODE_PRIVATE)
-        val initialStyle = pref.getString("widget_style_$appWidgetId", "Quote") ?: "Quote"
-        val initialGlass = pref.getBoolean("widget_glass_$appWidgetId", false)
-        val initialBgStart = pref.getString("widget_bg_color_start_$appWidgetId", "#594983") ?: "#594983"
-        val initialBgEnd = pref.getString("widget_bg_color_end_$appWidgetId", "#37265E") ?: "#37265E"
-        val initialHeader = pref.getString("widget_header_color_$appWidgetId", "#D0BCFF") ?: "#D0BCFF"
-        val initialText = pref.getString("widget_text_color_$appWidgetId", "#E9DDFF") ?: "#E9DDFF"
-        val initialAuthor = pref.getString("widget_author_color_$appWidgetId", "#A0D2AD") ?: "#A0D2AD"
+    private fun ConfigureScreen() {
+        val initial = remember { WidgetConfig.read(this, appWidgetId) }
+        var showAuthor by rememberSaveable { mutableStateOf(initial.showAuthor) }
+        var showIcon by rememberSaveable { mutableStateOf(initial.showIcon) }
+        var showLabel by rememberSaveable { mutableStateOf(initial.showLabel) }
+        var blurBackground by rememberSaveable { mutableStateOf(initial.blurBackground) }
+        var bgStart by rememberSaveable { mutableStateOf(initial.backgroundStart) }
+        var bgEnd by rememberSaveable { mutableStateOf(initial.backgroundEnd) }
+        var labelColor by rememberSaveable { mutableStateOf(initial.labelColor) }
+        var quoteColor by rememberSaveable { mutableStateOf(initial.quoteColor) }
+        var authorColor by rememberSaveable { mutableStateOf(initial.authorColor) }
+        var font by rememberSaveable { mutableStateOf(initial.font) }
+        var quoteScale by rememberSaveable { mutableFloatStateOf(initial.quoteSizeScale) }
+        var authorScale by rememberSaveable { mutableFloatStateOf(initial.authorSizeScale) }
+        var visualScale by rememberSaveable { mutableFloatStateOf(initial.visualScale) }
+        var cornerRadius by rememberSaveable { mutableFloatStateOf(initial.cornerRadius) }
+        var borderEnabled by rememberSaveable { mutableStateOf(initial.borderEnabled) }
+        var borderColor by rememberSaveable { mutableStateOf(initial.borderColor) }
+        var labelX by rememberSaveable { mutableFloatStateOf(initial.labelX) }
+        var labelY by rememberSaveable { mutableFloatStateOf(initial.labelY) }
+        var iconX by rememberSaveable { mutableFloatStateOf(initial.iconX) }
+        var iconY by rememberSaveable { mutableFloatStateOf(initial.iconY) }
+        var quoteX by rememberSaveable { mutableFloatStateOf(initial.quoteX) }
+        var quoteY by rememberSaveable { mutableFloatStateOf(initial.quoteY) }
+        var authorX by rememberSaveable { mutableFloatStateOf(initial.authorX) }
+        var authorY by rememberSaveable { mutableFloatStateOf(initial.authorY) }
 
-        var style by remember { mutableStateOf(initialStyle) }
-        var glassmorphism by remember { mutableStateOf(initialGlass) }
-
-        var bgColorStart by remember { mutableStateOf(initialBgStart) }
-        var bgColorEnd by remember { mutableStateOf(initialBgEnd) }
-        var headerColor by remember { mutableStateOf(initialHeader) }
-        var textColor by remember { mutableStateOf(initialText) }
-        var authorColor by remember { mutableStateOf(initialAuthor) }
-
-        val scrollState = rememberScrollState()
-
-        // Background presets
-        val bgPresets = listOf(
-            Triple("Quote (Purple)", "#594983", "#37265E"),
-            Triple("Quote Gold", "#412D00", "#201600"),
-            Triple("Emerald", "#0A2F1D", "#03170D"),
-            Triple("Navy", "#0D2240", "#050F20"),
-            Triple("Ruby", "#380E1B", "#1B050B"),
-            Triple("Obsidian", "#1C1B1F", "#111015")
-        )
-
-        // Component presets
-        val componentPresets = listOf(
-            "#D0BCFF", "#E9DDFF", "#A0D2AD", "#ADC6FF", "#FFFFB2C5", "#FFDB9C", "#FFFFFF", "#CAC4D0", "#948F9A"
+        val config = WidgetConfig(
+            showAuthor = showAuthor,
+            showIcon = showIcon,
+            showLabel = showLabel,
+            blurBackground = blurBackground,
+            backgroundStart = bgStart,
+            backgroundEnd = bgEnd,
+            labelColor = labelColor,
+            quoteColor = quoteColor,
+            authorColor = authorColor,
+            font = font,
+            quoteSizeScale = quoteScale,
+            authorSizeScale = authorScale,
+            visualScale = visualScale,
+            cornerRadius = cornerRadius,
+            borderEnabled = borderEnabled,
+            borderColor = borderColor,
+            labelX = labelX,
+            labelY = labelY,
+            iconX = iconX,
+            iconY = iconY,
+            quoteX = quoteX,
+            quoteY = quoteY,
+            authorX = authorX,
+            authorY = authorY
         )
 
         Scaffold(
             topBar = {
                 CenterAlignedTopAppBar(
-                    title = { Text("Customize Widget", fontWeight = FontWeight.Bold, fontSize = 20.sp) },
+                    title = { Text("Customize Widget", fontWeight = FontWeight.Bold) },
                     colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background,
-                        titleContentColor = MaterialTheme.colorScheme.onBackground
+                        containerColor = MaterialTheme.colorScheme.background
                     )
                 )
             },
             bottomBar = {
-                Surface(
-                    tonalElevation = 8.dp,
-                    color = MaterialTheme.colorScheme.background,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Box(modifier = Modifier.padding(16.dp).navigationBarsPadding()) {
-                        Button(
-                            onClick = { saveAndFinish(style, glassmorphism, bgColorStart, bgColorEnd, headerColor, textColor, authorColor) },
-                            modifier = Modifier.fillMaxWidth().height(52.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                        ) {
-                            Text("Create Widget ✦", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                        }
+                Surface(color = MaterialTheme.colorScheme.background, tonalElevation = 8.dp) {
+                    ExpressiveButton(
+                        onClick = { saveAndFinish(config) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                            .padding(16.dp)
+                            .height(54.dp),
+                        restingCorner = 18.dp
+                    ) {
+                        Text("Create Widget", fontWeight = FontWeight.Bold)
                     }
                 }
             }
-        ) { innerPadding ->
+        ) { padding ->
             Column(
-                modifier = Modifier
+                Modifier
                     .fillMaxSize()
-                    .padding(innerPadding)
+                    .padding(padding)
                     .background(MaterialTheme.colorScheme.background)
-                    .verticalScroll(scrollState)
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
-                // Widget Preview Card
-                Text(
-                    text = "Live Preview",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .wrapContentHeight()
-                        .padding(vertical = 4.dp),
-                    contentAlignment = Alignment.Center
+                Column(
+                    Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    SimulatedWidgetPreview(
-                        style = style,
-                        glassmorphism = glassmorphism,
-                        bgColorStart = bgColorStart,
-                        bgColorEnd = bgColorEnd,
-                        headerColor = headerColor,
-                        textColor = textColor,
-                        authorColor = authorColor
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        SectionTitle("Live Preview")
+                        Text("Drag elements to move", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    WidgetPreview(
+                        config = config,
+                        onLabelPosition = { labelX = it.first; labelY = it.second },
+                        onIconPosition = { iconX = it.first; iconY = it.second },
+                        onQuotePosition = { quoteX = it.first; quoteY = it.second },
+                        onAuthorPosition = { authorX = it.first; authorY = it.second }
                     )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.16f))
                 }
 
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(22.dp)
+                ) {
+                    SectionTitle("Visible Elements")
+                    WidgetToggle("Author", showAuthor) { showAuthor = it }
+                    WidgetToggle("Decorative Icon", showIcon) { showIcon = it }
+                    WidgetToggle("Quote Label", showLabel) { showLabel = it }
+                    WidgetToggle("Background Blur", blurBackground) { blurBackground = it }
 
-                // Selection for Style
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "Widget Design Style",
-                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                    ExpressiveValueSlider("Visual Widget Size", visualScale, 0.65f..1f, "${(visualScale * 100).toInt()}%") { visualScale = it }
+                    ExpressiveValueSlider("Corner Radius", cornerRadius, 0f..48f, "${cornerRadius.toInt()} dp") { cornerRadius = it }
+                    WidgetToggle("Border", borderEnabled) { borderEnabled = it }
+                    if (borderEnabled) ColorPicker("Border", borderColor) { borderColor = it }
+
+                    SectionTitle("Background Presets")
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        listOf("Quote", "Minimal", "Compact").forEach { s ->
-                            val isSelected = style == s
-                            Button(
-                                onClick = {
-                                    style = s
-                                },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(42.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                                    contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                    widgetBackgroundPresets.forEach { preset ->
+                        val selected = bgStart == preset.start && bgEnd == preset.end
+                        Box(
+                            Modifier
+                                .width(104.dp)
+                                .height(58.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(
+                                    Brush.linearGradient(
+                                        listOf(parseColor(preset.start), parseColor(preset.end))
+                                    )
                                 )
-                            ) {
-                                Text(s, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1)
-                            }
-                        }
-                    }
-                }
-
-                // Glassmorphism toggle
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f))
-                        .clickable { glassmorphism = !glassmorphism }
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Glassmorphism Look",
-                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                        Text(
-                            text = "Translucent blurred backdrop with glass edge glow.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                        )
-                    }
-                    Switch(
-                        checked = glassmorphism,
-                        onCheckedChange = { glassmorphism = it }
-                    )
-                }
-
-                // Background gradient start and end customization
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "Background Presets",
-                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        bgPresets.forEach { (name, start, end) ->
-                            val isSelected = bgColorStart.equals(start, ignoreCase = true) && bgColorEnd.equals(end, ignoreCase = true)
-                            val gradientBrush = Brush.linearGradient(
-                                listOf(safeParseColor(start), safeParseColor(end))
+                                .border(
+                                    if (selected) 3.dp else 1.dp,
+                                    if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                                    RoundedCornerShape(14.dp)
+                                )
+                                .clickable {
+                                    bgStart = preset.start
+                                    bgEnd = preset.end
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                preset.name,
+                                color = if (preset.name == "Paper") Color.Black else Color.White,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold
                             )
-                            Box(
-                                modifier = Modifier
-                                    .size(width = 90.dp, height = 46.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(gradientBrush)
-                                    .border(
-                                        width = if (isSelected) 2.dp else 0.5.dp,
-                                        color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.15f),
-                                        shape = RoundedCornerShape(10.dp)
-                                    )
-                                    .clickable {
-                                        bgColorStart = start
-                                        bgColorEnd = end
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (isSelected) {
-                                    Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = "Selected",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
-                            }
                         }
                     }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    ColorTextField("Start", bgStart, { bgStart = it }, Modifier.weight(1f))
+                    ColorTextField("End", bgEnd, { bgEnd = it }, Modifier.weight(1f))
+                    }
 
-                    Spacer(modifier = Modifier.height(6.dp))
-
+                    SectionTitle("Widget Font")
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        OutlinedTextField(
-                            value = bgColorStart,
-                            onValueChange = { if (it.length <= 9) bgColorStart = it },
-                            label = { Text("BG Gradient Start") },
-                            placeholder = { Text("#594983") },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp),
-                            trailingIcon = { Icon(Icons.Default.Colorize, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
-                        )
-                        OutlinedTextField(
-                            value = bgColorEnd,
-                            onValueChange = { if (it.length <= 9) bgColorEnd = it },
-                            label = { Text("BG Gradient End") },
-                            placeholder = { Text("#37265E") },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp),
-                            trailingIcon = { Icon(Icons.Default.Colorize, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
+                    listOf("Serif", "Serif Bold", "Sans", "Monospace").forEach { option ->
+                        val interactionSource = remember(option) { MutableInteractionSource() }
+                        FilterChip(
+                            selected = font == option,
+                            onClick = { font = option },
+                            label = { Text(option) },
+                            shape = rememberExpressiveShape(interactionSource, 20.dp, 9.dp),
+                            interactionSource = interactionSource,
+                            leadingIcon = if (font == option) {
+                                { Icon(Icons.Default.Check, null, Modifier.size(16.dp)) }
+                            } else null
                         )
                     }
+                    }
+
+                    ExpressiveValueSlider("Quote Font Size", quoteScale, 0.7f..1.4f, "${(quoteScale * 100).toInt()}%") { quoteScale = it }
+                    ExpressiveValueSlider("Author Font Size", authorScale, 0.7f..1.4f, "${(authorScale * 100).toInt()}%") { authorScale = it }
+
+                    SectionTitle("Colors")
+                    ColorPicker("Quote Label", labelColor) { labelColor = it }
+                    ColorPicker("Quote Text", quoteColor) { quoteColor = it }
+                    ColorPicker("Author", authorColor) { authorColor = it }
+                    Spacer(Modifier.height(12.dp))
                 }
-
-                // Component Colors Customization
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Text(
-                        text = "Component Colors",
-                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.primary
-                    )
-
-                    // Header Text Color
-                    ColorPickerComponent(
-                        label = "Header Text Color",
-                        currentColor = headerColor,
-                        presets = componentPresets,
-                        onColorSelected = { headerColor = it }
-                    )
-
-                    // Quote Text Color
-                    ColorPickerComponent(
-                        label = "Quote Text Color",
-                        currentColor = textColor,
-                        presets = componentPresets,
-                        onColorSelected = { textColor = it }
-                    )
-
-                    // Author Color
-                    ColorPickerComponent(
-                        label = "Author Text Color",
-                        currentColor = authorColor,
-                        presets = componentPresets,
-                        onColorSelected = { authorColor = it }
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }
 
     @Composable
-    fun ColorPickerComponent(
+    private fun SectionTitle(text: String) {
+        Text(text, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+    }
+
+    @Composable
+    private fun WidgetToggle(label: String, checked: Boolean, onChecked: (Boolean) -> Unit) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(18.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                .clickable { onChecked(!checked) }
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(label, fontWeight = FontWeight.SemiBold)
+            Switch(checked = checked, onCheckedChange = onChecked)
+        }
+    }
+
+    @Composable
+    private fun ExpressiveValueSlider(
         label: String,
-        currentColor: String,
-        presets: List<String>,
-        onColorSelected: (String) -> Unit
+        value: Float,
+        range: ClosedFloatingPointRange<Float>,
+        valueText: String,
+        onValue: (Float) -> Unit
     ) {
+        Column {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(label, fontWeight = FontWeight.SemiBold)
+                Text(valueText, color = MaterialTheme.colorScheme.primary)
+            }
+            Slider(value = value, onValueChange = onValue, valueRange = range)
+        }
+    }
+
+    @Composable
+    private fun ColorPicker(label: String, value: String, onValue: (String) -> Unit) {
+        val colors = listOf("#FFFFFF", "#E9DDFF", "#D0BCFF", "#A0D2AD", "#ADC6FF", "#FFB2C5", "#FFDB9C", "#CAC4D0", "#1C1B1F")
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(label, style = MaterialTheme.typography.labelLarge)
             Row(
-                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                Modifier.horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                presets.forEach { preset ->
-                    val isSelected = currentColor.equals(preset, ignoreCase = true)
+                colors.forEach { color ->
+                    val selected = color.equals(value, true)
                     Box(
-                        modifier = Modifier
-                            .size(36.dp)
+                        Modifier
+                            .size(38.dp)
                             .clip(CircleShape)
-                            .background(safeParseColor(preset))
+                            .background(parseColor(color))
                             .border(
-                                width = if (isSelected) 2.dp else 0.5.dp,
-                                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.15f),
-                                shape = CircleShape
+                                if (selected) 3.dp else 1.dp,
+                                if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                                CircleShape
                             )
-                            .clickable { onColorSelected(preset) },
+                            .clickable { onValue(color) },
                         contentAlignment = Alignment.Center
                     ) {
-                        if (isSelected) {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = "Selected",
-                                tint = if (preset.equals("#FFFFFF", ignoreCase = true) || preset.equals("#E9DDFF", ignoreCase = true)) Color.Black else Color.White,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
+                        if (selected) Icon(Icons.Default.Check, null, tint = if (color == "#1C1B1F") Color.White else Color.Black)
                     }
                 }
             }
-
-            OutlinedTextField(
-                value = currentColor,
-                onValueChange = { if (it.length <= 9) onColorSelected(it) },
-                placeholder = { Text("#FFFFFF") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                trailingIcon = { Icon(Icons.Default.Colorize, contentDescription = null, tint = safeParseColor(currentColor)) }
-            )
+            ColorTextField(label, value, onValue, Modifier.fillMaxWidth())
         }
     }
 
     @Composable
-    fun SimulatedWidgetPreview(
-        style: String,
-        glassmorphism: Boolean,
-        bgColorStart: String,
-        bgColorEnd: String,
-        headerColor: String,
-        textColor: String,
-        authorColor: String
+    private fun ColorTextField(label: String, value: String, onValue: (String) -> Unit, modifier: Modifier) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = { if (it.length <= 9) onValue(it) },
+            modifier = modifier,
+            label = { Text(label) },
+            singleLine = true,
+            shape = RoundedCornerShape(14.dp),
+            trailingIcon = { Icon(Icons.Default.Colorize, null, tint = parseColor(value)) }
+        )
+    }
+
+    @Composable
+    private fun WidgetPreview(
+        config: WidgetConfig,
+        onLabelPosition: (Pair<Float, Float>) -> Unit,
+        onIconPosition: (Pair<Float, Float>) -> Unit,
+        onQuotePosition: (Pair<Float, Float>) -> Unit,
+        onAuthorPosition: (Pair<Float, Float>) -> Unit
     ) {
-        val parsedBgStart = safeParseColor(bgColorStart)
-        val parsedBgEnd = safeParseColor(bgColorEnd)
-        val parsedHeader = safeParseColor(headerColor)
-        val parsedText = safeParseColor(textColor)
-        val parsedAuthor = safeParseColor(authorColor)
-
-        val text = "The happiness of your life depends upon the quality of your thoughts."
-        val authorName = "Marcus Aurelius"
-
-        val widgetBackground = if (glassmorphism) {
-            val baseColor = if (bgColorStart.isNotBlank()) parsedBgStart else Color(0xFF1C1B1F)
-            Brush.linearGradient(listOf(baseColor.copy(alpha = 0.45f), baseColor.copy(alpha = 0.45f)))
-        } else {
-            Brush.linearGradient(listOf(parsedBgStart, parsedBgEnd))
+        val shape = RoundedCornerShape(config.cornerRadius.dp)
+        val quoteFont = when (config.font) {
+            "Sans" -> FontFamily.SansSerif
+            "Monospace" -> FontFamily.Monospace
+            else -> FontFamily.Serif
         }
-
-        val shape = RoundedCornerShape(24.dp)
-
         Box(
-            modifier = Modifier
-                .width(280.dp)
-                .height(140.dp)
-                .clip(shape)
-                .background(widgetBackground)
-                .border(
-                    BorderStroke(
-                        width = 1.dp,
-                        color = if (glassmorphism) Color.White.copy(alpha = 0.25f) else Color.White.copy(alpha = 0.15f)
-                    ),
-                    shape = shape
-                )
-                .padding(horizontal = 14.dp, vertical = 10.dp)
+            Modifier
+                .fillMaxWidth()
+                .height(180.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainer),
+            contentAlignment = Alignment.Center
         ) {
-            when (style) {
-                "Quote" -> {
-                    // Star decoration top right
-                    Text(
-                        text = "✦",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = parsedHeader.copy(alpha = 0.6f),
-                        modifier = Modifier.align(Alignment.TopEnd)
+            Box(
+                Modifier
+                    .fillMaxWidth(config.visualScale)
+                    .fillMaxHeight(config.visualScale)
+                    .clip(shape)
+                    .background(Brush.linearGradient(listOf(parseColor(config.backgroundStart), parseColor(config.backgroundEnd))))
+                    .then(
+                        if (config.borderEnabled) Modifier.border(1.dp, parseColor(config.borderColor), shape)
+                        else Modifier
                     )
-
-                    // Glow quotation mark in background
+            ) {
+                if (config.blurBackground) {
+                    Box(
+                        Modifier
+                            .size(150.dp)
+                            .offset(x = (-35).dp, y = (-45).dp)
+                            .blur(28.dp)
+                            .background(parseColor(config.labelColor).copy(alpha = 0.45f), CircleShape)
+                    )
+                    Box(
+                        Modifier
+                            .size(170.dp)
+                            .align(Alignment.BottomEnd)
+                            .offset(x = 55.dp, y = 70.dp)
+                            .blur(32.dp)
+                            .background(parseColor(config.authorColor).copy(alpha = 0.35f), CircleShape)
+                    )
+                }
+                if (config.showLabel) {
+                    DraggablePreviewElement(config.labelX, config.labelY, onLabelPosition) {
+                        Text("QUOTE", color = parseColor(config.labelColor), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    }
+                }
+                if (config.showIcon) {
+                    DraggablePreviewElement(config.iconX, config.iconY, onIconPosition) {
+                        Text("✦", color = parseColor(config.labelColor), fontSize = 20.sp)
+                    }
+                }
+                DraggablePreviewElement(config.quoteX, config.quoteY, onQuotePosition) {
                     Text(
-                        text = "“",
-                        style = MaterialTheme.typography.headlineLarge.copy(
-                            fontSize = 72.sp,
-                            fontFamily = SerifFontFamily,
+                        "The happiness of your life depends upon the quality of your thoughts.",
+                        color = parseColor(config.quoteColor),
+                        fontFamily = quoteFont,
+                        fontStyle = if (config.font == "Serif") FontStyle.Italic else FontStyle.Normal,
+                        fontWeight = if (config.font == "Serif Bold") FontWeight.Bold else FontWeight.Normal,
+                        fontSize = (18 * config.quoteSizeScale).sp,
+                        lineHeight = (23 * config.quoteSizeScale).sp,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth(0.82f)
+                    )
+                }
+                if (config.showAuthor) {
+                    DraggablePreviewElement(config.authorX, config.authorY, onAuthorPosition) {
+                        Text(
+                            "— Marcus Aurelius",
+                            color = parseColor(config.authorColor),
+                            fontFamily = quoteFont,
                             fontWeight = FontWeight.Bold,
-                            fontStyle = FontStyle.Italic
-                        ),
-                        color = Color.White.copy(alpha = 0.08f),
-                        modifier = Modifier.align(Alignment.BottomStart).offset(x = 4.dp, y = 14.dp)
-                    )
-
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = "QUOTE",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
-                            color = parsedHeader
-                        )
-
-                        Text(
-                            text = "\"$text\"",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontFamily = SerifFontFamily,
-                                fontStyle = FontStyle.Italic,
-                                lineHeight = 18.sp
-                            ),
-                            color = parsedText,
-                            maxLines = 3,
-                            modifier = Modifier.padding(vertical = 4.dp)
-                        )
-
-                        Text(
-                            text = "— ${authorName.uppercase()}",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                            color = parsedAuthor
+                            fontSize = (12 * config.authorSizeScale).sp
                         )
                     }
                 }
-                "Minimal" -> {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = "QUOTE",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
-                            color = parsedHeader
-                        )
+            }
+        }
+    }
 
-                        Text(
-                            text = "\"$text\"",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontFamily = SerifFontFamily,
-                                fontWeight = FontWeight.Bold,
-                                lineHeight = 18.sp
-                            ),
-                            color = parsedText,
-                            maxLines = 3,
-                            modifier = Modifier.padding(vertical = 4.dp)
-                        )
-
-                        Text(
-                            text = authorName,
-                            style = MaterialTheme.typography.labelSmall.copy(fontStyle = FontStyle.Italic),
-                            color = parsedAuthor
+    @Composable
+    private fun DraggablePreviewElement(
+        x: Float,
+        y: Float,
+        onPosition: (Pair<Float, Float>) -> Unit,
+        content: @Composable () -> Unit
+    ) {
+        var containerSize by remember { mutableStateOf(IntSize.Zero) }
+        val latestX by rememberUpdatedState(x)
+        val latestY by rememberUpdatedState(y)
+        Box(
+            Modifier
+                .fillMaxSize()
+                .onSizeChanged { containerSize = it }
+        ) {
+            Box(
+                Modifier
+                    .offset {
+                        IntOffset(
+                            (x * containerSize.width).roundToInt(),
+                            (y * containerSize.height).roundToInt()
                         )
                     }
-                }
-                else -> { // Compact
-                    Row(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        // Amber vertical accent stripe on the left
-                        Box(
-                            modifier = Modifier
-                                .fillMaxHeight()
-                                .width(4.dp)
-                                .clip(RoundedCornerShape(2.dp))
-                                .background(Color(0xFFFDB700))
-                        )
-
-                        Column(
-                            modifier = Modifier.fillMaxHeight(),
-                            verticalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = "QUOTE",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
-                                color = parsedHeader
-                            )
-
-                            Text(
-                                text = "\"$text\"",
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    fontFamily = SerifFontFamily,
-                                    fontStyle = FontStyle.Italic,
-                                    fontSize = 12.sp,
-                                    lineHeight = 15.sp
-                                ),
-                                color = parsedText,
-                                maxLines = 4,
-                                modifier = Modifier.padding(vertical = 2.dp)
-                            )
-
-                            Text(
-                                text = "— $authorName",
-                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                                color = parsedAuthor
-                            )
+                    .pointerInput(containerSize) {
+                        var currentX = latestX
+                        var currentY = latestY
+                        detectDragGestures(
+                            onDragStart = {
+                                currentX = latestX
+                                currentY = latestY
+                            }
+                        ) { change, dragAmount ->
+                            change.consume()
+                            if (containerSize.width == 0 || containerSize.height == 0) return@detectDragGestures
+                            currentX = (currentX + dragAmount.x / containerSize.width).coerceIn(0f, 0.95f)
+                            currentY = (currentY + dragAmount.y / containerSize.height).coerceIn(0f, 0.95f)
+                            onPosition(currentX to currentY)
                         }
                     }
-                }
+            ) {
+                content()
             }
         }
     }
 
-    private fun safeParseColor(hex: String): Color {
-        return try {
-            if (hex.isBlank()) return Color.White
-            val cleaned = if (hex.startsWith("#")) hex else "#$hex"
-            Color(android.graphics.Color.parseColor(cleaned))
-        } catch (e: Exception) {
-            Color.White
-        }
-    }
+    private fun parseColor(value: String): Color = runCatching {
+        Color(android.graphics.Color.parseColor(if (value.startsWith("#")) value else "#$value"))
+    }.getOrElse { Color.White }
 
-    private fun saveAndFinish(
-        style: String,
-        glassmorphism: Boolean,
-        bgColorStart: String,
-        bgColorEnd: String,
-        headerColor: String,
-        textColor: String,
-        authorColor: String
-    ) {
-        val pref = getSharedPreferences("aura_prefs", Context.MODE_PRIVATE)
-        pref.edit().apply {
-            putString("widget_style_$appWidgetId", style)
-            putBoolean("widget_glass_$appWidgetId", glassmorphism)
-            putString("widget_bg_color_start_$appWidgetId", bgColorStart)
-            putString("widget_bg_color_end_$appWidgetId", bgColorEnd)
-            putString("widget_header_color_$appWidgetId", headerColor)
-            putString("widget_text_color_$appWidgetId", textColor)
-            putString("widget_author_color_$appWidgetId", authorColor)
-            apply()
-        }
-
-        // Trigger widget update
-        val appWidgetManager = AppWidgetManager.getInstance(this)
-        val context = this
-
+    private fun saveAndFinish(config: WidgetConfig) {
+        WidgetConfig.write(this, appWidgetId, config)
+        val manager = AppWidgetManager.getInstance(this)
         CoroutineScope(Dispatchers.IO).launch {
-            val database = AppDatabase.getInstance(context)
-            val repository = QuoteRepository(database.quoteDao())
-            
-            val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-            val todayStr = dateFormat.format(Date())
-            
-            val quote = try {
-                repository.getDailyQuote(todayStr)
-            } catch (e: Exception) {
-                QuoteEntity(
-                    text = "Stay hungry. Stay foolish.",
-                    author = "Steve Jobs",
-                    category = "Love",
-                    aboutAuthor = "Steve Jobs was co-founder of Apple Inc.",
-                    tags = "Focus"
-                )
+            val repository = QuoteRepository(
+                AppDatabase.getInstance(this@WidgetConfigureActivity).quoteDao(),
+                InstallationSeed.get(this@WidgetConfigureActivity)
+            )
+            val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+            val quote = runCatching { repository.getDailyQuote(date) }.getOrElse {
+                QuoteEntity(text = "Stay hungry. Stay foolish.", author = "Steve Jobs", category = "Life")
             }
-
             withContext(Dispatchers.Main) {
-                QuoteWidgetProvider.updateAppWidget(context, appWidgetManager, appWidgetId, quote)
-                
-                // Set result OK and finish
-                val resultValue = Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-                setResult(RESULT_OK, resultValue)
-                
-                Toast.makeText(context, "Widget created successfully! ✦", Toast.LENGTH_SHORT).show()
+                QuoteWidgetProvider.updateAppWidget(this@WidgetConfigureActivity, manager, appWidgetId, quote)
+                setResult(
+                    RESULT_OK,
+                    Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+                )
+                Toast.makeText(this@WidgetConfigureActivity, "Widget created", Toast.LENGTH_SHORT).show()
                 finish()
             }
         }

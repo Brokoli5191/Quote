@@ -22,6 +22,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.brokoli5191.quote.BuildConfig
 import app.brokoli5191.quote.ui.QuoteViewModel
+import app.brokoli5191.quote.ui.components.ExpressiveButton
+import app.brokoli5191.quote.ui.components.ExpressiveOutlinedButton
 
 @Composable
 fun DeveloperScreen(viewModel: QuoteViewModel, modifier: Modifier = Modifier) {
@@ -120,7 +122,7 @@ fun DeveloperScreen(viewModel: QuoteViewModel, modifier: Modifier = Modifier) {
             }
 
             DebugSection(title = "Actions") {
-                Button(
+                ExpressiveButton(
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         viewModel.cycleDailyQuote()
@@ -130,20 +132,20 @@ fun DeveloperScreen(viewModel: QuoteViewModel, modifier: Modifier = Modifier) {
                         containerColor = MaterialTheme.colorScheme.primaryContainer,
                         contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                     ),
-                    shape = RoundedCornerShape(12.dp)
+                    restingCorner = 12.dp
                 ) {
                     Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("Next Quote", fontWeight = FontWeight.Bold)
                 }
 
-                OutlinedButton(
+                ExpressiveOutlinedButton(
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         viewModel.triggerTestNotification()
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    restingCorner = 12.dp
                 ) {
                     Icon(Icons.Default.Notifications, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))

@@ -1,6 +1,6 @@
 --- CATEGORY AUDIT REPORT ---
-Category 'Inspirational': 611 quotes
-Category 'Life': 113 quotes
+Category 'Inspirational': 612 quotes
+Category 'Life': 112 quotes
 Category 'Humor': 101 quotes
 Category 'Love': 108 quotes
 Category 'Books': 63 quotes
@@ -13,5 +13,5 @@ Category 'Inspiration': 7 quotes
 Category 'Philosophy': 16 quotes
 Category 'Death': 10 quotes
 Category 'Poetry': 14 quotes
-Category 'Optimism': 1 quotes
-Total mapped: 1174 / 1174
+Category 'Optimism': 2 quotes
+Total mapped: 1175 / 1175
