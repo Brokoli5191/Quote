@@ -21,10 +21,10 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.brokoli5191.quote.BuildConfig
-import app.brokoli5191.quote.ui.AuraViewModel
+import app.brokoli5191.quote.ui.QuoteViewModel
 
 @Composable
-fun DeveloperScreen(viewModel: AuraViewModel, modifier: Modifier = Modifier) {
+fun DeveloperScreen(viewModel: QuoteViewModel, modifier: Modifier = Modifier) {
     val haptic = LocalHapticFeedback.current
 
     val dailyQuote by viewModel.dailyQuote.collectAsState()

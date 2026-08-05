@@ -42,7 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import app.brokoli5191.quote.data.QuoteEntity
-import app.brokoli5191.quote.ui.AuraViewModel
+import app.brokoli5191.quote.ui.QuoteViewModel
 import app.brokoli5191.quote.ui.theme.SerifFontFamily
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -51,7 +51,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 
 @OptIn(ExperimentalAnimationApi::class, ExperimentalLayoutApi::class)
 @Composable
-fun DailyScreen(viewModel: AuraViewModel) {
+fun DailyScreen(viewModel: QuoteViewModel) {
     val quoteState by viewModel.dailyQuote.collectAsState()
     val lowPerformanceMode by viewModel.lowPerformanceMode.collectAsState()
     val context = LocalContext.current
@@ -69,15 +69,9 @@ fun DailyScreen(viewModel: AuraViewModel) {
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-    ) {
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         ElasticPullDownContainer(
-            onTriggerRefresh = {
-                viewModel.cycleDailyQuote()
-            },
+            onTriggerRefresh = viewModel::cycleDailyQuote,
             scrollState = scrollState,
             lowPerformanceMode = lowPerformanceMode,
             modifier = Modifier.fillMaxSize()
@@ -86,338 +80,167 @@ fun DailyScreen(viewModel: AuraViewModel) {
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(scrollState)
-                    .graphicsLayer {
-                        translationY = offsetY
-                    }
-                    .padding(bottom = 16.dp)
+                    .graphicsLayer { translationY = offsetY }
+                    .padding(bottom = 24.dp)
             ) {
-            // Unified structural Header layout (matches Your Collection layout style)
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 0.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = "Daily Quote",
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            // Big Centerpiece Quote — AnimatedContent so transitions fire on quote change
-            AnimatedContent(
-                targetState = quoteState,
-                transitionSpec = {
-                    if (lowPerformanceMode) {
-                        ContentTransform(
-                            targetContentEnter = EnterTransition.None,
-                            initialContentExit = ExitTransition.None,
-                            sizeTransform = null
-                        )
-                    } else {
-                        ContentTransform(
-                            targetContentEnter = fadeIn(animationSpec = tween(300)),
-                            initialContentExit = fadeOut(animationSpec = tween(300)),
-                            sizeTransform = null
-                        )
-                    }
-                },
-                label = "DailyQuoteTransition",
-                modifier = Modifier.fillMaxWidth()
-            ) { quote ->
-            quote?.let {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 30.dp, end = 30.dp, top = 2.dp, bottom = 12.dp)
-                        .padding(vertical = 4.dp)
+                        .statusBarsPadding()
+                        .padding(start = 20.dp, end = 12.dp, top = 16.dp, bottom = 18.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // Giant Opening Quote Mark in a compact-height Box so it does not push the content down
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(30.dp)
-                    ) {
+                    Column {
                         Text(
-                            text = "“",
-                            fontFamily = SerifFontFamily,
-                            fontSize = 110.sp,
+                            text = "Today",
+                            style = MaterialTheme.typography.headlineLarge,
+                            color = MaterialTheme.colorScheme.onBackground,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-                            modifier = Modifier.offset(y = (-45).dp)
+                        )
+                        Text(
+                            text = "A thought worth keeping",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-
-                    Text(
-                        text = "“${quote.text}”",
-                        style = MaterialTheme.typography.displayMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp),
-                        lineHeight = 38.sp
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text(
-                        text = "— ${quote.author.uppercase()}",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        letterSpacing = 2.sp
-                    )
+                    IconButton(onClick = viewModel::cycleDailyQuote) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Show another quote", tint = MaterialTheme.colorScheme.primary)
+                    }
                 }
 
-                // Daily Insight Card
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp)
-                        .clip(RoundedCornerShape(24.dp))
-                        .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(24.dp)),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
-                    )
-                ) {
+                AnimatedContent(
+                    targetState = quoteState,
+                    transitionSpec = {
+                        if (lowPerformanceMode) EnterTransition.None togetherWith ExitTransition.None
+                        else fadeIn(tween(250)) togetherWith fadeOut(tween(250))
+                    },
+                    label = "DailyQuoteTransition",
+                    modifier = Modifier.fillMaxWidth()
+                ) { quote ->
+                    quote?.let {
                         Column(
-                            modifier = Modifier.padding(16.dp)
+                            modifier = Modifier.padding(horizontal = 20.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            Card(
+                                modifier = Modifier.fillMaxWidth().border(
+                                    1.dp,
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+                                    RoundedCornerShape(30.dp)
+                                ),
+                                shape = RoundedCornerShape(30.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                             ) {
-                                // Author Image (Using custom abstract visual representation or Coil Placeholder)
-                                Box(
-                                    modifier = Modifier
-                                        .size(100.dp)
-                                        .clip(RoundedCornerShape(16.dp))
-                                        .background(
-                                            Brush.linearGradient(
-                                                listOf(
-                                                    MaterialTheme.colorScheme.primaryContainer,
-                                                    MaterialTheme.colorScheme.surfaceVariant
-                                                )
-                                            )
-                                        ),
-                                    contentAlignment = Alignment.Center
-                                ) {
+                                Column(Modifier.padding(horizontal = 24.dp, vertical = 28.dp)) {
                                     Text(
-                                        text = quote.author.take(1).uppercase(),
-                                        fontSize = 36.sp,
+                                        text = "“",
                                         fontFamily = SerifFontFamily,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        fontWeight = FontWeight.Bold
+                                        fontSize = 68.sp,
+                                        lineHeight = 48.sp,
+                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
                                     )
-                                }
-
-                                Column(
-                                    modifier = Modifier.weight(1f),
-                                    verticalArrangement = Arrangement.Center
-                                ) {
                                     Text(
-                                        text = "AUTHOR",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.tertiary,
-                                        fontWeight = FontWeight.Bold,
-                                        letterSpacing = 1.5.sp
+                                        text = quote.text,
+                                        style = MaterialTheme.typography.headlineMedium,
+                                        fontFamily = SerifFontFamily,
+                                        lineHeight = 35.sp,
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
-
-                                    Spacer(modifier = Modifier.height(6.dp))
-
-                                    Text(
-                                        text = quote.author,
-                                        style = MaterialTheme.typography.headlineSmall,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                    Spacer(Modifier.height(24.dp))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            Modifier.size(42.dp).background(
+                                                MaterialTheme.colorScheme.primaryContainer,
+                                                CircleShape
+                                            ),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                quote.author.take(1).uppercase(),
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                                            )
+                                        }
+                                        Spacer(Modifier.width(12.dp))
+                                        Column(Modifier.weight(1f)) {
+                                            Text(
+                                                quote.author,
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Text(
+                                                quote.category,
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            // Tags row (wrapped dynamically if too long)
                             FlowRow(
-                                modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                val splitTags = quote.tags.split(",").filter { it.isNotBlank() }
-                                if (splitTags.isNotEmpty()) {
-                                    splitTags.forEach { tag ->
-                                        Box(
-                                            modifier = Modifier
-                                                .background(
-                                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                                    shape = RoundedCornerShape(100.dp)
-                                                )
-                                                .border(
-                                                    0.5.dp,
-                                                    MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
-                                                    shape = RoundedCornerShape(100.dp)
-                                                )
-                                                .padding(horizontal = 12.dp, vertical = 6.dp)
-                                        ) {
-                                            Text(
-                                                text = "#$tag",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                    }
-                                } else {
-                                    // Fallback tags
-                                    listOf("Wisdom", "Insight").forEach { tag ->
-                                        Box(
-                                            modifier = Modifier
-                                                .background(
-                                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                                    shape = RoundedCornerShape(100.dp)
-                                                )
-                                                .padding(horizontal = 12.dp, vertical = 6.dp)
-                                        ) {
-                                            Text(
-                                                text = "#$tag",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                    }
+                                quote.tags.split(",").map { it.trim() }.filter { it.isNotEmpty() }.take(4).forEach { tag ->
+                                    SuggestionChip(onClick = {}, label = { Text(tag) })
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            // Interactive Row
-                            var isLikedAnim by remember { mutableStateOf(false) }
-                            val heartScale by androidx.compose.animation.core.animateFloatAsState(
-                                targetValue = if (isLikedAnim) 1.35f else 1.0f,
-                                animationSpec = spring(stiffness = 500f, dampingRatio = 0.5f),
-                                finishedListener = { isLikedAnim = false }
-                            )
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                DailyActionButton(
+                                    icon = if (quote.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                    label = if (quote.isFavorite) "Saved" else "Save",
+                                    onClick = { viewModel.toggleFavorite(quote) }
+                                )
+                                DailyActionButton(Icons.Default.ContentCopy, "Copy") {
+                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    clipboard.setPrimaryClip(ClipData.newPlainText("quote", "\"${quote.text}\" — ${quote.author}"))
+                                }
+                                DailyActionButton(Icons.Default.Share, "Share") {
+                                    context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(Intent.EXTRA_TEXT, "\"${quote.text}\" — ${quote.author}")
+                                    }, null))
+                                }
+                            }
+                            Button(
+                                onClick = {
+                                    val url = "https://en.wikipedia.org/wiki/${quote.author.replace(" ", "_")}"
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+                                },
+                                modifier = Modifier.fillMaxWidth().height(52.dp),
+                                shape = RoundedCornerShape(18.dp)
                             ) {
-                                Button(
-                                    onClick = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        isLikedAnim = true
-                                        viewModel.toggleFavorite(quote)
-                                    },
-                                    modifier = Modifier
-                                        .size(56.dp),
-                                    shape = CircleShape,
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (quote.isFavorite)
-                                            MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
-                                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                        contentColor = if (quote.isFavorite)
-                                            MaterialTheme.colorScheme.error
-                                            else MaterialTheme.colorScheme.primary
-                                    ),
-                                    contentPadding = PaddingValues(0.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = if (quote.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                                        contentDescription = "Favorite",
-                                        modifier = Modifier
-                                            .size(24.dp)
-                                    )
-                                }
-
-                                Button(
-                                    onClick = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                        clipboard.setPrimaryClip(ClipData.newPlainText("quote", "\"${quote.text}\" — ${quote.author}"))
-                                    },
-                                    modifier = Modifier.size(56.dp),
-                                    shape = CircleShape,
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                        contentColor = MaterialTheme.colorScheme.primary
-                                    ),
-                                    contentPadding = PaddingValues(0.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.ContentCopy,
-                                        contentDescription = "Copy Quote",
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                }
-
-                                Button(
-                                    onClick = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        val url = "https://en.wikipedia.org/wiki/${quote.author.replace(" ", "_")}"
-                                        val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))
-                                        context.startActivity(intent)
-                                    },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(56.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                                    ),
-                                    shape = RoundedCornerShape(28.dp),
-                                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Language,
-                                        contentDescription = "Learn More",
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "Learn More",
-                                        style = MaterialTheme.typography.labelLarge
-                                    )
-                                }
+                                Icon(Icons.Default.Language, contentDescription = null)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Explore this author")
                             }
                         }
-                }
-                }
-            }
-            }
-        }
-            }
-
-
-        // Floating share FAB in bottom corner (higher visual hierarchy)
-        quoteState?.let { quote ->
-            FloatingActionButton(
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    val sendIntent: Intent = Intent().apply {
-                        action = Intent.ACTION_SEND
-                        putExtra(Intent.EXTRA_TEXT, "\"${quote.text}\" — ${quote.author} (via quote)")
-                        type = "text/plain"
                     }
-                    val shareIntent = Intent.createChooser(sendIntent, null)
-                    context.startActivity(shareIntent)
-                },
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(bottom = 16.dp, end = 16.dp)
-                    .size(56.dp),
-                shape = RoundedCornerShape(16.dp),
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Share,
-                    contentDescription = "Share Quote",
-                    modifier = Modifier.size(24.dp)
-                )
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun RowScope.DailyActionButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit
+) {
+    FilledTonalButton(
+        onClick = onClick,
+        modifier = Modifier.weight(1f).height(52.dp),
+        shape = RoundedCornerShape(18.dp),
+        contentPadding = PaddingValues(horizontal = 8.dp)
+    ) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(label, maxLines = 1)
     }
 }
 

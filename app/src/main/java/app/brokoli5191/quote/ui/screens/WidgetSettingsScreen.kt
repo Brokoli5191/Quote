@@ -30,11 +30,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import app.brokoli5191.quote.BuildConfig
-import app.brokoli5191.quote.ui.AuraViewModel
+import app.brokoli5191.quote.ui.QuoteViewModel
 import app.brokoli5191.quote.utils.UpdateStatus
 
 @Composable
-fun WidgetSettingsScreen(viewModel: AuraViewModel) {
+fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
     val haptic = LocalHapticFeedback.current
@@ -484,6 +484,40 @@ fun WidgetSettingsScreen(viewModel: AuraViewModel) {
                 )
 
                 val isLowPerf by viewModel.lowPerformanceMode.collectAsState()
+                val blurNavigationSurfaces by viewModel.blurNavigationSurfaces.collectAsState()
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f), RoundedCornerShape(20.dp)),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
+                    ),
+                    shape = RoundedCornerShape(20.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                            Text(
+                                text = "Blur navigation surfaces",
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = if (isLowPerf) "Disabled while Low Performance Mode is active" else "Use a translucent glass treatment for fixed bars",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = blurNavigationSurfaces,
+                            onCheckedChange = viewModel::setBlurNavigationSurfaces
+                        )
+                    }
+                }
 
                 Card(
                     modifier = Modifier
@@ -764,7 +798,7 @@ fun WidgetSettingsScreen(viewModel: AuraViewModel) {
                             Button(
                                 onClick = {
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    exportLauncher.launch("aura_backup.json")
+                                    exportLauncher.launch("quote_backup.json")
                                 },
                                 modifier = Modifier
                                     .weight(1f)

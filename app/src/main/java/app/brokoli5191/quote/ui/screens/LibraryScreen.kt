@@ -32,7 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import app.brokoli5191.quote.data.QuoteEntity
-import app.brokoli5191.quote.ui.AuraViewModel
+import app.brokoli5191.quote.ui.QuoteViewModel
 import app.brokoli5191.quote.ui.theme.SerifFontFamily
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -43,13 +43,14 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LibraryScreen(viewModel: AuraViewModel) {
+fun LibraryScreen(viewModel: QuoteViewModel) {
     val searchQuery by viewModel.searchQuery.collectAsState()
     val filteredQuotes by viewModel.filteredQuotes.collectAsState()
     val allQuotes by viewModel.allQuotes.collectAsState()
 
     val selectedCategories by viewModel.selectedCategories.collectAsState()
     val lowPerformanceMode by viewModel.lowPerformanceMode.collectAsState()
+    val blurNavigationSurfaces by viewModel.blurNavigationSurfaces.collectAsState()
     
     val scrollState = rememberScrollState()
     var showCategoryFilterDialog by remember { mutableStateOf(false) }
@@ -132,8 +133,12 @@ fun LibraryScreen(viewModel: AuraViewModel) {
                     .padding(horizontal = 20.dp)
                     .clip(RoundedCornerShape(32.dp)),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = MaterialTheme.colorScheme.surface,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.4f),
+                    focusedContainerColor = MaterialTheme.colorScheme.surface.copy(
+                        alpha = if (blurNavigationSurfaces && !lowPerformanceMode) 0.78f else 1f
+                    ),
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(
+                        alpha = if (blurNavigationSurfaces && !lowPerformanceMode) 0.62f else 0.4f
+                    ),
                     focusedBorderColor = MaterialTheme.colorScheme.primary,
                     unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
                     focusedTextColor = MaterialTheme.colorScheme.onSurface,
@@ -161,8 +166,6 @@ fun LibraryScreen(viewModel: AuraViewModel) {
                 shape = RoundedCornerShape(32.dp),
                 singleLine = true
             )
-
-            Spacer(modifier = Modifier.height(16.dp))
 
             // 3. Main sliding bento content vs list view in same composition
             AnimatedContent(
@@ -222,8 +225,6 @@ fun LibraryScreen(viewModel: AuraViewModel) {
                             .verticalScroll(scrollState)
                             .padding(bottom = 16.dp)
                     ) {
-                        Spacer(modifier = Modifier.height(12.dp))
-
                         // Category Section Header to spacing bento grid correctly down
                         Text(
                             text = "Browse Categories",
@@ -287,9 +288,9 @@ fun LibraryScreen(viewModel: AuraViewModel) {
         ModalBottomSheet(
             onDismissRequest = { showCategoryFilterDialog = false },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = Color(0xFF111015),
+            containerColor = MaterialTheme.colorScheme.surface,
             tonalElevation = 8.dp,
-            dragHandle = { BottomSheetDefaults.DragHandle(color = Color.White.copy(alpha = 0.2f)) }
+            dragHandle = { BottomSheetDefaults.DragHandle(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)) }
         ) {
             Column(
                 modifier = Modifier
@@ -312,7 +313,7 @@ fun LibraryScreen(viewModel: AuraViewModel) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Close",
-                            tint = Color.White.copy(alpha = 0.6f)
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -320,7 +321,7 @@ fun LibraryScreen(viewModel: AuraViewModel) {
                 Text(
                     text = "Filter search findings by multiple selected categories below:",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.7f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 val nestedScrollConnection = remember {
@@ -374,14 +375,14 @@ fun LibraryScreen(viewModel: AuraViewModel) {
                                     colors = FilterChipDefaults.filterChipColors(
                                         selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
                                         selectedLabelColor = MaterialTheme.colorScheme.primary,
-                                        containerColor = Color(0xFF1B1A21),
-                                        labelColor = Color.White.copy(alpha = 0.6f)
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                                        labelColor = MaterialTheme.colorScheme.onSurfaceVariant
                                     ),
                                     border = FilterChipDefaults.filterChipBorder(
                                         enabled = true,
                                         selected = isSelected,
                                         selectedBorderColor = MaterialTheme.colorScheme.primary,
-                                        borderColor = Color.White.copy(alpha = 0.08f)
+                                        borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
                                     )
                                 )
                             }
@@ -549,7 +550,7 @@ fun CategoryBrowseViewInPlace(
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                    // Soft glowing background aura circle
+                    // Soft glowing background circle
                     Box(
                         modifier = Modifier
                             .size(120.dp)
@@ -879,4 +880,3 @@ fun CategoryBentoCard(
         }
     }
 }
-

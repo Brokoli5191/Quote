@@ -100,7 +100,7 @@ class WidgetConfigureActivity : ComponentActivity() {
         // Background presets
         val bgPresets = listOf(
             Triple("Quote (Purple)", "#594983", "#37265E"),
-            Triple("Aura Gold", "#412D00", "#201600"),
+            Triple("Quote Gold", "#412D00", "#201600"),
             Triple("Emerald", "#0A2F1D", "#03170D"),
             Triple("Navy", "#0D2240", "#050F20"),
             Triple("Ruby", "#380E1B", "#1B050B"),
@@ -631,7 +631,7 @@ class WidgetConfigureActivity : ComponentActivity() {
             }
 
             withContext(Dispatchers.Main) {
-                AuraWidgetProvider.updateAppWidget(context, appWidgetManager, appWidgetId, quote)
+                QuoteWidgetProvider.updateAppWidget(context, appWidgetManager, appWidgetId, quote)
                 
                 // Set result OK and finish
                 val resultValue = Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)

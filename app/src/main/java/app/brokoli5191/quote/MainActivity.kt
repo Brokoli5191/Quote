@@ -49,8 +49,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModelProvider
 import app.brokoli5191.quote.data.AppDatabase
 import app.brokoli5191.quote.data.QuoteRepository
-import app.brokoli5191.quote.ui.AuraViewModel
-import app.brokoli5191.quote.ui.AuraViewModelFactory
+import app.brokoli5191.quote.ui.QuoteViewModel
+import app.brokoli5191.quote.ui.QuoteViewModelFactory
 import app.brokoli5191.quote.ui.screens.DailyScreen
 import app.brokoli5191.quote.ui.screens.DeveloperScreen
 import app.brokoli5191.quote.ui.screens.LibraryScreen
@@ -67,10 +67,10 @@ class MainActivity : ComponentActivity() {
 
         val database = AppDatabase.getInstance(applicationContext)
         val repository = QuoteRepository(database.quoteDao())
-        val factory = AuraViewModelFactory(application, repository)
+        val factory = QuoteViewModelFactory(application, repository)
 
         // Create ViewModel before setContent so theme loads synchronously — prevents flash
-        val viewModel = ViewModelProvider(this, factory)[AuraViewModel::class.java]
+        val viewModel = ViewModelProvider(this, factory)[QuoteViewModel::class.java]
 
         setContent {
             LaunchedEffect(Unit) {
@@ -81,6 +81,7 @@ class MainActivity : ComponentActivity() {
             val themeAccent by viewModel.themeAccent.collectAsState()
             val amoledBlack by viewModel.amoledBlack.collectAsState()
             val lowPerformanceMode by viewModel.lowPerformanceMode.collectAsState()
+            val blurNavigationSurfaces by viewModel.blurNavigationSurfaces.collectAsState()
             val showDevScreen by viewModel.showDevScreen.collectAsState()
 
             MyApplicationTheme(themeMode = themeMode, themeAccent = themeAccent, amoledBlack = amoledBlack) {
@@ -174,6 +175,7 @@ class MainActivity : ComponentActivity() {
                             BottomNavigationBar(
                                 activeTab = activeTab,
                                 lowPerformanceMode = lowPerformanceMode,
+                                glassEffectEnabled = blurNavigationSurfaces && !lowPerformanceMode,
                                 onTabSelected = { viewModel.selectTab(it) }
                             )
                         },
@@ -368,9 +370,20 @@ private fun NavBarIcon(
 }
 
 @Composable
-fun BottomNavigationBar(activeTab: String, lowPerformanceMode: Boolean, onTabSelected: (String) -> Unit) {
+fun BottomNavigationBar(
+    activeTab: String,
+    lowPerformanceMode: Boolean,
+    glassEffectEnabled: Boolean,
+    onTabSelected: (String) -> Unit
+) {
     val haptic = LocalHapticFeedback.current
-    Column(modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background)) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                MaterialTheme.colorScheme.background.copy(alpha = if (glassEffectEnabled) 0.82f else 1f)
+            )
+    ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()

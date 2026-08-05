@@ -2,6 +2,7 @@ package app.brokoli5191.quote.data
 
 import android.content.Context
 import kotlinx.coroutines.flow.Flow
+import java.nio.charset.StandardCharsets
 
 class QuoteRepository(private val quoteDao: QuoteDao) {
     val allQuotes: Flow<List<QuoteEntity>> = quoteDao.getAllQuotes()
@@ -36,7 +37,7 @@ class QuoteRepository(private val quoteDao: QuoteDao) {
                 
                 val category = CategoryMapper.map(tagsList, quoteText)
                 val cleanText = quoteText.replace("\"", "").replace("“", "").replace("”", "").trim()
-                val cleanAuthor = author.replace("\"", "").replace("“", "").replace("”", "").trim()
+                val cleanAuthor = normalizeAuthorName(author)
                 val tagsStr = tagsList.joinToString(", ")
 
                 quoteEntities.add(
@@ -172,4 +173,18 @@ class QuoteRepository(private val quoteDao: QuoteDao) {
         return nextQuote
     }
 
+}
+
+internal fun normalizeAuthorName(value: String): String {
+    var author = value.replace("\"", "").replace("“", "").replace("”", "").trim()
+    author = when (author) {
+        "Ø£Ø­ÙØ§Ù… Ù…Ø³ØªØºØ§Ù†Ù…ÙŠ" -> "Ahlam Mosteghanemi"
+        "Ø£Ø­Ù…Ø¯ Ø®Ø§ÙØ¯ ØªÙˆÙ�ÙŠÙ‚" -> "Ahmed Khaled Towfik"
+        else -> author
+    }
+    if (author.any { it == 'Ã' || it == 'Â' || it == 'Ø' || it == 'Ù' }) {
+        val repaired = String(author.toByteArray(StandardCharsets.ISO_8859_1), StandardCharsets.UTF_8)
+        if ('\uFFFD' !in repaired) author = repaired
+    }
+    return author.trim().trimEnd(',').trim()
 }

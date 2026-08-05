@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
-class AuraViewModel(application: Application, private val repository: QuoteRepository) : AndroidViewModel(application) {
+class QuoteViewModel(application: Application, private val repository: QuoteRepository) : AndroidViewModel(application) {
 
     private val app get() = getApplication<Application>()
     private val prefs get() = app.getSharedPreferences("aura_prefs", Context.MODE_PRIVATE)
@@ -64,6 +64,9 @@ class AuraViewModel(application: Application, private val repository: QuoteRepos
 
     private val _lowPerformanceMode = MutableStateFlow(false)
     val lowPerformanceMode: StateFlow<Boolean> = _lowPerformanceMode.asStateFlow()
+
+    private val _blurNavigationSurfaces = MutableStateFlow(false)
+    val blurNavigationSurfaces: StateFlow<Boolean> = _blurNavigationSurfaces.asStateFlow()
 
     private val _devModeUnlocked = MutableStateFlow(false)
     val devModeUnlocked: StateFlow<Boolean> = _devModeUnlocked.asStateFlow()
@@ -134,13 +137,13 @@ class AuraViewModel(application: Application, private val repository: QuoteRepos
 
     fun checkAndSeedDatabase() {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            val isSeeded = prefs.getBoolean("database_json_seeded_v7", false)
+            val isSeeded = prefs.getBoolean("database_json_seeded_v8", false)
             val count = repository.getQuotesCount()
             if (!isSeeded || count < 30) {
                 // Favorite-preserving re-seed: keeps user-added quotes and restores
                 // favorites by (text, author) so the bigger DB costs no user data.
                 repository.reseedPreservingFavorites(app)
-                prefs.edit().putBoolean("database_json_seeded_v7", true).apply()
+                prefs.edit().putBoolean("database_json_seeded_v8", true).apply()
                 loadDailyQuote()
             }
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
@@ -167,6 +170,7 @@ class AuraViewModel(application: Application, private val repository: QuoteRepos
         _dailyReminderHour.value = prefs.getInt("daily_reminder_hour", 8)
         _dailyReminderMinute.value = prefs.getInt("daily_reminder_minute", 0)
         _lowPerformanceMode.value = prefs.getBoolean("low_performance_mode", false)
+        _blurNavigationSurfaces.value = prefs.getBoolean("blur_navigation_surfaces", false)
         _autoUpdateEnabled.value = prefs.getBoolean("auto_update_enabled", true)
     }
 
@@ -227,6 +231,11 @@ class AuraViewModel(application: Application, private val repository: QuoteRepos
         prefs.edit().putBoolean("low_performance_mode", enabled).apply()
     }
 
+    fun setBlurNavigationSurfaces(enabled: Boolean) {
+        _blurNavigationSurfaces.value = enabled
+        prefs.edit().putBoolean("blur_navigation_surfaces", enabled).apply()
+    }
+
     fun setThemeMode(mode: String) {
         _themeMode.value = mode
         prefs.edit().putString("theme_mode", mode).apply()
@@ -265,7 +274,7 @@ class AuraViewModel(application: Application, private val repository: QuoteRepos
             _dailyQuote.value = quote
 
             val updateIntent = Intent("app.brokoli5191.quote.UPDATE_WIDGET").apply {
-                component = ComponentName(app, "app.brokoli5191.quote.widget.AuraWidgetProvider")
+                component = ComponentName(app, "app.brokoli5191.quote.widget.QuoteWidgetProvider")
             }
             app.sendBroadcast(updateIntent)
         }
@@ -483,14 +492,14 @@ class AuraViewModel(application: Application, private val repository: QuoteRepos
     }
 }
 
-class AuraViewModelFactory(
+class QuoteViewModelFactory(
     private val application: Application,
     private val repository: QuoteRepository
 ) : ViewModelProvider.AndroidViewModelFactory(application) {
     override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(AuraViewModel::class.java)) {
+        if (modelClass.isAssignableFrom(QuoteViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return AuraViewModel(application, repository) as T
+            return QuoteViewModel(application, repository) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

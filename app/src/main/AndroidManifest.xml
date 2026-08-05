@@ -39,7 +39,7 @@
         </activity>
         
         <receiver
-            android:name="app.brokoli5191.quote.widget.AuraWidgetProvider"
+            android:name="app.brokoli5191.quote.widget.QuoteWidgetProvider"
             android:exported="true"
             android:label="quote Widget">
             <intent-filter>
@@ -48,7 +48,7 @@
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/aura_widget_info" />
+                android:resource="@xml/quote_widget_info" />
         </receiver>
 
         <receiver

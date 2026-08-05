@@ -31,7 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.brokoli5191.quote.data.QuoteEntity
-import app.brokoli5191.quote.ui.AuraViewModel
+import app.brokoli5191.quote.ui.QuoteViewModel
 import app.brokoli5191.quote.ui.theme.SerifFontFamily
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -42,7 +42,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SavedScreen(viewModel: AuraViewModel) {
+fun SavedScreen(viewModel: QuoteViewModel) {
     val favorites by viewModel.favorites.collectAsState()
     val userAdded by viewModel.userAdded.collectAsState()
     
@@ -555,9 +555,9 @@ fun AddCustomQuoteDialog(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = Color(0xFF111015),
+        containerColor = MaterialTheme.colorScheme.surface,
         tonalElevation = 8.dp,
-        dragHandle = { BottomSheetDefaults.DragHandle(color = Color.White.copy(alpha = 0.2f)) }
+        dragHandle = { BottomSheetDefaults.DragHandle(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)) }
     ) {
         Column(
             modifier = Modifier
@@ -582,7 +582,7 @@ fun AddCustomQuoteDialog(
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Close",
-                        tint = Color.White.copy(alpha = 0.6f)
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -595,10 +595,7 @@ fun AddCustomQuoteDialog(
                 placeholder = { Text("Write inspiring words...") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White
-                )
+                colors = OutlinedTextFieldDefaults.colors()
             )
 
             // Author Input
@@ -609,10 +606,7 @@ fun AddCustomQuoteDialog(
                 placeholder = { Text("e.g. Marcus Aurelius, Self") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White
-                )
+                colors = OutlinedTextFieldDefaults.colors()
             )
 
             // Tags Input
@@ -623,10 +617,7 @@ fun AddCustomQuoteDialog(
                 placeholder = { Text("e.g. wisdom, life (comma-separated)") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White
-                )
+                colors = OutlinedTextFieldDefaults.colors()
             )
 
             // Category Selection (Matches Library's grid style!)
@@ -666,14 +657,14 @@ fun AddCustomQuoteDialog(
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
                                     selectedLabelColor = MaterialTheme.colorScheme.primary,
-                                    containerColor = Color(0xFF1B1A21),
-                                    labelColor = Color.White.copy(alpha = 0.6f)
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant
                                 ),
                                 border = FilterChipDefaults.filterChipBorder(
                                     enabled = true,
                                     selected = isSelected,
                                     selectedBorderColor = MaterialTheme.colorScheme.primary,
-                                    borderColor = Color.White.copy(alpha = 0.08f)
+                                    borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
                                 )
                             )
                         }

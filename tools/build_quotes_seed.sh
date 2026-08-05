@@ -34,13 +34,28 @@ const clean = s => (s || '')
   .replace(/\s+/g, ' ')
   .trim();
 
+const cleanAuthor = value => {
+  let author = clean(value);
+  const knownMojibake = new Map([
+    ['Ø£Ø­ÙØ§Ù… Ù…Ø³ØªØºØ§Ù†Ù…ÙŠ', 'Ahlam Mosteghanemi'],
+    ['Ø£Ø­Ù…Ø¯ Ø®Ø§ÙØ¯ ØªÙˆÙ�ÙŠÙ‚', 'Ahmed Khaled Towfik'],
+  ]);
+  if (knownMojibake.has(author)) return knownMojibake.get(author);
+  // The source occasionally contains UTF-8 decoded as Latin-1 (for example MiÃ©ville).
+  if (/[ÃÂØÙ]/.test(author)) {
+    const repaired = Buffer.from(author, 'latin1').toString('utf8');
+    if (!repaired.includes('\uFFFD')) author = repaired;
+  }
+  return author.replace(/,+$/, '').trim();
+};
+
 const seen = new Set();
 const out = [];
 for (const line of lines) {
   let o;
   try { o = JSON.parse(line); } catch { continue; }
   const text = clean(o.quote);
-  const author = clean(o.author);
+  const author = cleanAuthor(o.author);
   if (!text || !author) continue;
   if (text.length > 90) continue; // keep quotes short enough to look good on the Daily screen
   const key = (text + '|' + author).toLowerCase();
