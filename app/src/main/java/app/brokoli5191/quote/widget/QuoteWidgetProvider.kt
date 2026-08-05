@@ -19,7 +19,7 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
-class AuraWidgetProvider : AppWidgetProvider() {
+class QuoteWidgetProvider : AppWidgetProvider() {
  
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         val database = AppDatabase.getInstance(context)
@@ -80,7 +80,7 @@ class AuraWidgetProvider : AppWidgetProvider() {
         super.onReceive(context, intent)
         if (intent.action == "app.brokoli5191.quote.UPDATE_WIDGET") {
             val appWidgetManager = AppWidgetManager.getInstance(context)
-            val thisWidget = ComponentName(context, AuraWidgetProvider::class.java)
+            val thisWidget = ComponentName(context, QuoteWidgetProvider::class.java)
             val appWidgetIds = appWidgetManager.getAppWidgetIds(thisWidget)
             onUpdate(context, appWidgetManager, appWidgetIds)
         }
@@ -93,7 +93,7 @@ class AuraWidgetProvider : AppWidgetProvider() {
             appWidgetId: Int,
             quote: QuoteEntity
         ) {
-            val views = RemoteViews(context.packageName, R.layout.aura_widget_layout)
+            val views = RemoteViews(context.packageName, R.layout.quote_widget_layout)
             
             val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
             val isPortrait = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT

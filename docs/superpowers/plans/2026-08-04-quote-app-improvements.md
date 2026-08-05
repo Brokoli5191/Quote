@@ -4,7 +4,7 @@
 
 **Goal:** Ship 7 user-requested improvements to the Quote Android app: larger tagged quote DB with a real category system, a true zero-animation low-performance mode, startup + runtime jank fixes, a decluttered Daily screen, combinable AMOLED + Material You theming, subtitle-free Library category cards, and a new open-book adaptive icon.
 
-**Architecture:** Single-Activity Jetpack Compose app, Room persistence, `AuraViewModel` (AndroidViewModel) holding all UI state as StateFlows, SharedPreferences for settings. Changes are additive and per-workstream; each task builds and is committed on its own.
+**Architecture:** Single-Activity Jetpack Compose app, Room persistence, `QuoteViewModel` (AndroidViewModel) holding all UI state as StateFlows, SharedPreferences for settings. Changes are additive and per-workstream; each task builds and is committed on its own.
 
 **Tech Stack:** Kotlin 2.3, Jetpack Compose (Material3), Room + KSP, kotlinx-coroutines, JUnit + Robolectric for unit tests, Gradle 9.4 (`./gradlew`).
 
@@ -62,7 +62,7 @@ git commit -m "F: remove category-card subtitles in Library"
 - Modify: `app/src/main/java/app/brokoli5191/quote/ui/screens/DailyScreen.kt`
 
 **Interfaces:**
-- Consumes: `AuraViewModel.dailyQuote` (unchanged), `QuoteEntity.{author, tags}`.
+- Consumes: `QuoteViewModel.dailyQuote` (unchanged), `QuoteEntity.{author, tags}`.
 - Produces: no new public symbols.
 
 - [ ] **Step 1: Remove the fake "About the Sage" description text**
@@ -103,20 +103,20 @@ git commit -m "D: declutter Daily screen, drop fake About-the-Sage filler"
 
 **Files:**
 - Modify: `app/src/main/java/app/brokoli5191/quote/ui/theme/Theme.kt`
-- Modify: `app/src/main/java/app/brokoli5191/quote/ui/AuraViewModel.kt`
+- Modify: `app/src/main/java/app/brokoli5191/quote/ui/QuoteViewModel.kt`
 - Modify: `app/src/main/java/app/brokoli5191/quote/MainActivity.kt`
 - Modify: `app/src/main/java/app/brokoli5191/quote/ui/screens/WidgetSettingsScreen.kt`
 
 **Interfaces:**
 - Produces:
-  - `AuraViewModel.amoledBlack: StateFlow<Boolean>` and `fun setAmoledBlack(enabled: Boolean)`.
+  - `QuoteViewModel.amoledBlack: StateFlow<Boolean>` and `fun setAmoledBlack(enabled: Boolean)`.
   - `MyApplicationTheme(themeMode: String, themeAccent: String, amoledBlack: Boolean, content)` — new `amoledBlack` param (default `false`).
   - `themeMode` values reduced to `"LIGHT" | "DARK" | "DYNAMIC"` (no `"AMOLED"`).
 - Consumes: existing `themeMode`, `themeAccent` flows.
 
 - [ ] **Step 1: ViewModel — add amoledBlack state + migration**
 
-In `AuraViewModel`, add:
+In `QuoteViewModel`, add:
 ```kotlin
 private val _amoledBlack = MutableStateFlow(false)
 val amoledBlack: StateFlow<Boolean> = _amoledBlack.asStateFlow()
@@ -188,7 +188,7 @@ Expected: BUILD SUCCESSFUL. Grep confirms no remaining `"AMOLED"` mode string is
 - [ ] **Step 6: Commit**
 
 ```bash
-git add app/src/main/java/app/brokoli5191/quote/ui/theme/Theme.kt app/src/main/java/app/brokoli5191/quote/ui/AuraViewModel.kt app/src/main/java/app/brokoli5191/quote/MainActivity.kt app/src/main/java/app/brokoli5191/quote/ui/screens/WidgetSettingsScreen.kt
+git add app/src/main/java/app/brokoli5191/quote/ui/theme/Theme.kt app/src/main/java/app/brokoli5191/quote/ui/QuoteViewModel.kt app/src/main/java/app/brokoli5191/quote/MainActivity.kt app/src/main/java/app/brokoli5191/quote/ui/screens/WidgetSettingsScreen.kt
 git commit -m "E: decouple AMOLED pure-black from theme mode so it combines with Material You"
 ```
 
@@ -359,7 +359,7 @@ git commit -m "A2: single source of truth for Library category list"
 - Create: `tools/build_quotes_seed.sh` (offline build-time script, not shipped)
 - Modify: `app/src/main/res/raw/quotes_seed.json` (regenerated)
 - Modify: `app/src/main/java/app/brokoli5191/quote/data/QuoteRepository.kt`
-- Modify: `app/src/main/java/app/brokoli5191/quote/ui/AuraViewModel.kt`
+- Modify: `app/src/main/java/app/brokoli5191/quote/ui/QuoteViewModel.kt`
 
 **Interfaces:**
 - Produces: `QuoteRepository.reseedPreservingFavorites(context)` — clears non-user rows, re-inserts seed, restores favorites matched by `(text, author)`.
@@ -398,7 +398,7 @@ Add DAO query in `QuoteDao.kt`: `@Query("DELETE FROM quotes WHERE isUserAdded = 
 
 - [ ] **Step 4: Wire re-seed into version-bumped seeding**
 
-In `AuraViewModel.checkAndSeedDatabase()`, change the pref key `"database_json_seeded_v5_2"` → `"database_json_seeded_v6"`, and on a not-seeded-or-count-low condition call `repository.reseedPreservingFavorites(app)` instead of `clearAllQuotes()` + `preseedDatabase(app)`. Keep the `loadDailyQuote()` and deferred update-check calls.
+In `QuoteViewModel.checkAndSeedDatabase()`, change the pref key `"database_json_seeded_v5_2"` → `"database_json_seeded_v6"`, and on a not-seeded-or-count-low condition call `repository.reseedPreservingFavorites(app)` instead of `clearAllQuotes()` + `preseedDatabase(app)`. Keep the `loadDailyQuote()` and deferred update-check calls.
 
 - [ ] **Step 5: Build + unit tests**
 
@@ -408,7 +408,7 @@ Expected: BUILD SUCCESSFUL; CategoryMapper tests still pass.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add tools/build_quotes_seed.sh app/src/main/res/raw/quotes_seed.json app/src/main/java/app/brokoli5191/quote/data/QuoteRepository.kt app/src/main/java/app/brokoli5191/quote/data/QuoteDao.kt app/src/main/java/app/brokoli5191/quote/ui/AuraViewModel.kt
+git add tools/build_quotes_seed.sh app/src/main/res/raw/quotes_seed.json app/src/main/java/app/brokoli5191/quote/data/QuoteRepository.kt app/src/main/java/app/brokoli5191/quote/data/QuoteDao.kt app/src/main/java/app/brokoli5191/quote/ui/QuoteViewModel.kt
 git commit -m "A3: regenerate ~2500-quote seed, favorite-preserving re-seed, v6 seed key"
 ```
 
@@ -422,7 +422,7 @@ git commit -m "A3: regenerate ~2500-quote seed, favorite-preserving re-seed, v6 
 - Modify: `app/src/main/java/app/brokoli5191/quote/ui/screens/LibraryScreen.kt`
 
 **Interfaces:**
-- Consumes: `AuraViewModel.lowPerformanceMode: StateFlow<Boolean>`.
+- Consumes: `QuoteViewModel.lowPerformanceMode: StateFlow<Boolean>`.
 - Produces: no new symbols; behavior change only.
 
 - [ ] **Step 1: MainActivity tab transition → instant when low-perf**
@@ -492,7 +492,7 @@ git commit -m "C1: add splash screen for smoother cold start"
 
 **Files:**
 - Modify: `app/src/main/java/app/brokoli5191/quote/MainActivity.kt`
-- Modify: `app/src/main/java/app/brokoli5191/quote/ui/AuraViewModel.kt`
+- Modify: `app/src/main/java/app/brokoli5191/quote/ui/QuoteViewModel.kt`
 
 **Interfaces:**
 - Consumes: existing flows.
@@ -500,7 +500,7 @@ git commit -m "C1: add splash screen for smoother cold start"
 
 - [ ] **Step 1: Move filtering off the main thread**
 
-In `AuraViewModel`, the `filteredQuotes` `combine {}` runs its filter on the collector's context. Add `.flowOn(Dispatchers.Default)` before `.stateIn(...)` so filtering ~2500 rows on search keystrokes doesn't jank the main thread.
+In `QuoteViewModel`, the `filteredQuotes` `combine {}` runs its filter on the collector's context. Add `.flowOn(Dispatchers.Default)` before `.stateIn(...)` so filtering ~2500 rows on search keystrokes doesn't jank the main thread.
 
 - [ ] **Step 2: Lighten the predictive-back double composition**
 
