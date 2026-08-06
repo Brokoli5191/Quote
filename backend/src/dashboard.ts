@@ -46,21 +46,18 @@ export function dashboardPage(): Response {
     .mast { height: 66px; display: flex; align-items: center; justify-content: space-between; padding: 0 clamp(20px, 4vw, 64px); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--paper) 94%, transparent); backdrop-filter: blur(14px); }
     .brand { display: flex; align-items: center; gap: 11px; text-transform: uppercase; letter-spacing: .13em; font-size: 10px; font-weight: bold; }
     .brand-mark { font: 28px Georgia, serif; border-right: 1px solid var(--line); padding-right: 11px; }
-    .mast-actions { display: flex; align-items: center; gap: 18px; }
-    .sync { font: 9px monospace; color: var(--muted); text-transform: uppercase; }
-    .sync::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px var(--soft); margin-right: 10px; }
     .theme { width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; background: var(--panel); font-size: 16px; }
     .theme .sun { display: none; }
     [data-theme="dark"] .theme .sun { display: inline; }
     [data-theme="dark"] .theme .moon { display: none; }
-    .page { padding: 42px clamp(20px, 5vw, 80px) 70px; max-width: 1600px; margin: auto; }
-    .intro { display: flex; align-items: end; justify-content: space-between; padding: 12px 0 38px; }
+    .page { padding: 34px clamp(20px, 5vw, 72px) 64px; max-width: 1500px; margin: auto; }
+    .intro { display: flex; align-items: end; justify-content: space-between; padding: 8px 0 30px; }
     .over, .head, .review-top, .field-label, .origin { font-size: 9px; text-transform: uppercase; letter-spacing: .17em; font-weight: bold; }
     .over { color: var(--accent); margin: 0 0 13px; }
-    .intro h1 { font: clamp(52px, 6vw, 88px)/.86 Georgia, serif; margin: 0; letter-spacing: -.055em; }
+    .intro h1 { font: clamp(46px, 5.2vw, 76px)/.94 Georgia, serif; margin: 0; letter-spacing: -.045em; }
     .intro h1 i { font-weight: normal; color: var(--accent); }
     .count { display: flex; align-items: end; gap: 12px; }
-    .count b { font: 58px/.78 monospace; color: var(--accent); }
+    .count b { font: 52px/.82 monospace; color: var(--accent); }
     .count span { font-size: 9px; text-transform: uppercase; color: var(--muted); }
     .controls { display: flex; justify-content: space-between; align-items: center; background: var(--panel); padding: 8px 10px; border: 1px solid var(--line); }
     .tabs { display: flex; gap: 3px; }
@@ -70,22 +67,22 @@ export function dashboardPage(): Response {
     .search { display: flex; align-items: center; gap: 8px; color: var(--muted); border-left: 1px solid var(--line); padding-left: 17px; }
     .search input { width: min(24vw, 270px); border: 0; outline: 0; color: var(--ink); background: transparent; }
     .search input::placeholder { color: var(--muted); }
-    .content { display: grid; grid-template-columns: minmax(0, 1.48fr) minmax(330px, .72fr); margin-top: 28px; border: 1px solid var(--line); background: var(--panel); }
-    .queue { min-width: 0; padding: 24px 27px 35px; }
+    .content { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(320px, .65fr); margin-top: 22px; border: 1px solid var(--line); background: var(--panel); }
+    .queue { min-width: 0; padding: 22px 24px 32px; }
     .head { display: flex; justify-content: space-between; color: var(--muted); padding: 0 2px 15px; }
     .list { border-top: 1px solid var(--line); }
-    .row { width: 100%; min-height: 112px; display: grid; grid-template-columns: 32px minmax(0, 1fr) auto 24px; align-items: center; gap: 16px; padding: 18px 12px; text-align: left; border: 0; border-bottom: 1px solid var(--line); background: transparent; transition: background .15s ease; }
+    .row { width: 100%; min-height: 104px; display: grid; grid-template-columns: 32px minmax(0, 1fr) auto 24px; align-items: center; gap: 15px; padding: 16px 12px; text-align: left; border: 0; border-bottom: 1px solid var(--line); background: transparent; transition: background .15s ease; }
     .row:hover, .row.active { background: var(--soft); }
     .num, .row time { color: var(--muted); font: 9px monospace; }
     .copy { min-width: 0; }
-    .copy q { display: block; font: 18px/1.35 Georgia, serif; quotes: none; }
+    .copy q { display: block; font: 17px/1.4 Georgia, serif; quotes: none; }
     .copy small { display: block; margin-top: 9px; color: var(--accent); font-size: 10px; font-weight: bold; }
     .status-dot { width: 7px; height: 7px; margin-right: 6px; display: inline-block; border-radius: 50%; background: var(--accent); }
     .row.unpublished { opacity: .62; }
-    .review { min-width: 0; position: relative; display: flex; flex-direction: column; padding: 31px 32px; border-left: 1px solid var(--line); background: var(--panel-strong); }
+    .review { min-width: 0; position: relative; display: flex; flex-direction: column; padding: 28px 30px; border-left: 1px solid var(--line); background: var(--panel-strong); }
     .review-top { display: flex; justify-content: space-between; color: var(--muted); }
     .mark { height: 74px; margin-top: 25px; color: var(--accent); font: 82px/.9 Georgia, serif; }
-    .review blockquote { margin: 0; font: clamp(25px, 2.2vw, 37px)/1.14 Georgia, serif; letter-spacing: -.025em; overflow-wrap: anywhere; }
+    .review blockquote { margin: 0; font: clamp(23px, 1.8vw, 31px)/1.22 Georgia, serif; letter-spacing: -.02em; overflow-wrap: anywhere; }
     .author { margin: 31px 0 20px; padding-top: 18px; border-top: 1px solid var(--line); }
     .author strong { display: block; margin-top: 8px; font: 19px Georgia, serif; }
     .details { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 0 0 18px; }
@@ -114,17 +111,22 @@ export function dashboardPage(): Response {
     .dialog-actions .primary { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
     #notice { position: fixed; z-index: 60; left: 50%; bottom: 24px; width: max-content; max-width: calc(100% - 28px); margin: 0; padding: 11px 15px; transform: translateX(-50%); border: 1px solid var(--line); background: var(--panel-strong); color: var(--muted); box-shadow: 0 10px 35px var(--shadow); font-size: 12px; }
     #notice.error { color: var(--danger); border-color: var(--danger); }
+    @media (min-width: 721px) and (max-width: 1050px) {
+      .page { padding-inline: 28px; }
+      .content { grid-template-columns: minmax(0, 1.25fr) minmax(290px, .75fr); }
+      .queue { padding-inline: 18px; }
+      .review { padding-inline: 22px; }
+      .row { grid-template-columns: 26px minmax(0, 1fr) 20px; gap: 10px; }
+      .row time { display: none; }
+    }
     @media (max-width: 720px) {
       body.sheet-open { overflow: hidden; }
       .mast { height: 58px; padding: 0 17px; }
       .brand-mark { font-size: 23px; }
-      .mast-actions { gap: 10px; }
-      .sync { font-size: 0; }
-      .sync::after { content: "Connected"; font-size: 8px; }
       .theme { width: 34px; height: 34px; }
-      .page { padding: 22px 14px 88px; }
-      .intro { padding: 17px 3px 26px; }
-      .intro h1 { font-size: 45px; }
+      .page { padding: 18px 14px 76px; }
+      .intro { padding: 12px 3px 22px; }
+      .intro h1 { font-size: clamp(36px, 11vw, 42px); line-height: .98; letter-spacing: -.04em; }
       .count { display: none; }
       .controls { display: block; padding: 6px; position: sticky; top: 58px; z-index: 10; }
       .tabs { display: grid; grid-template-columns: repeat(3, 1fr); }
@@ -132,19 +134,19 @@ export function dashboardPage(): Response {
       .tabs b { margin-left: 5px; }
       .search { margin-top: 6px; border: 0; border-top: 1px solid var(--line); padding: 5px 7px 0; }
       .search input { width: 100%; height: 38px; font-size: 13px; }
-      .content { display: block; border: 0; background: none; margin-top: 20px; }
+      .content { display: block; border: 0; background: none; margin-top: 16px; }
       .queue { padding: 0; }
       .head { padding-inline: 4px; }
       .list { background: var(--panel); border: 1px solid var(--line); }
-      .row { min-height: 104px; grid-template-columns: 25px minmax(0, 1fr) 24px; gap: 9px; padding: 17px 12px; }
+      .row { min-height: 94px; grid-template-columns: 24px minmax(0, 1fr) 20px; gap: 9px; padding: 14px 11px; }
       .row time { display: none; }
-      .copy q { font-size: 16px; }
+      .copy q { font-size: 15px; line-height: 1.42; }
       .review { position: fixed; z-index: 40; left: 0; right: 0; bottom: 0; min-height: 0; max-height: 86dvh; border: 0; border-top: 1px solid var(--line); border-radius: 18px 18px 0 0; padding: 22px 20px max(20px, env(safe-area-inset-bottom)); box-shadow: 0 -18px 60px var(--shadow); transform: translateY(105%); transition: transform .25s ease; overflow: auto; }
       .review.open { transform: translateY(0); }
       .review.open::before { content: ""; width: 38px; height: 4px; border-radius: 4px; background: var(--line); position: absolute; top: 8px; left: 50%; transform: translateX(-50%); }
       .review-top { padding-top: 13px; padding-right: 30px; }
       .mark { height: 55px; font-size: 58px; margin-top: 24px; }
-      .review blockquote { font-size: 24px; }
+      .review blockquote { font-size: 22px; line-height: 1.28; }
       .actions { position: sticky; bottom: -1px; background: var(--panel-strong); padding-top: 10px; }
       .actions button { min-height: 50px; font-size: 9px; }
       .close { display: block; }
@@ -158,14 +160,11 @@ export function dashboardPage(): Response {
 <body>
   <header class="mast">
     <div class="brand"><span class="brand-mark">Q</span> Quote queue</div>
-    <div class="mast-actions">
-      <span class="sync">App connected · Access protected</span>
-      <button class="theme" id="theme" type="button" aria-label="Switch color theme"><span class="moon">☾</span><span class="sun">☀</span></button>
-    </div>
+    <button class="theme" id="theme" type="button" aria-label="Switch color theme"><span class="moon">☾</span><span class="sun">☀</span></button>
   </header>
   <main class="page">
     <section class="intro">
-      <div><p class="over">Incoming from the app</p><h1>Words awaiting<br><i>consideration.</i></h1></div>
+      <div><h1>Words awaiting<br><i>consideration.</i></h1></div>
       <div class="count"><b id="pendingCount">00</b><span>quotes<br>to review</span></div>
     </section>
     <section class="controls">
