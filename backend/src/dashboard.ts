@@ -41,13 +41,14 @@ export function dashboardPage(): Response {
     html { background: var(--paper); }
     body { margin: 0; min-height: 100vh; background: var(--paper); color: var(--ink); font: 14px Arial, sans-serif; }
     button, input, textarea { font: inherit; }
+    button, input, textarea, a { -webkit-tap-highlight-color: transparent; }
     button { color: inherit; cursor: pointer; }
     button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     .mast { height: 66px; display: flex; align-items: center; justify-content: space-between; padding: 0 clamp(20px, 4vw, 64px); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--paper) 94%, transparent); backdrop-filter: blur(14px); }
     .brand { display: flex; align-items: center; gap: 11px; text-transform: uppercase; letter-spacing: .13em; font-size: 10px; font-weight: bold; }
     .brand-mark { font: 28px Georgia, serif; border-right: 1px solid var(--line); padding-right: 11px; }
-    .theme { width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; background: var(--panel); font-size: 16px; transition: transform .45s cubic-bezier(.2, 1.65, .4, 1), background .2s ease; }
-    .theme:hover { transform: rotate(16deg) scale(1.08); background: var(--soft); }
+    .theme { width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; background: var(--panel); font-size: 16px; transition: background .18s ease; }
+    .theme:hover { background: var(--soft); }
     .theme .sun { display: none; }
     [data-theme="dark"] .theme .sun { display: inline; }
     [data-theme="dark"] .theme .moon { display: none; }
@@ -62,8 +63,8 @@ export function dashboardPage(): Response {
     .count span { font-size: 11px; line-height: 1.35; text-transform: uppercase; color: var(--muted); }
     .controls { display: flex; justify-content: space-between; align-items: center; background: var(--panel); padding: 8px 10px; border: 1px solid var(--line); }
     .tabs { display: flex; align-items: stretch; gap: 3px; }
-    .tabs button { min-height: 42px; display: inline-flex; align-items: center; justify-content: center; gap: 9px; border: 0; background: transparent; color: var(--muted); padding: 9px 15px; font-size: 13px; line-height: 1; transition: color .2s ease, background .2s ease, transform .4s cubic-bezier(.2, 1.65, .4, 1); }
-    .tabs button:hover { background: var(--soft); transform: translateY(-2px); }
+    .tabs button { min-height: 42px; display: inline-flex; align-items: center; justify-content: center; gap: 9px; border: 0; background: transparent; color: var(--muted); padding: 9px 15px; font-size: 13px; line-height: 1; transition: color .18s ease, background .18s ease; }
+    .tabs button:hover { background: var(--soft); }
     .tabs button.active { background: var(--accent); color: var(--accent-ink); }
     .tabs b { flex: 0 0 22px; width: 22px; height: 22px; display: inline-grid; place-items: center; border: 1px solid currentColor; border-radius: 50%; font-size: 11px; line-height: 1; }
     .search { display: flex; align-items: center; gap: 8px; color: var(--muted); border-left: 1px solid var(--line); padding-left: 17px; }
@@ -73,8 +74,8 @@ export function dashboardPage(): Response {
     .queue { min-width: 0; padding: 22px 24px 32px; }
     .head { display: flex; justify-content: space-between; color: var(--muted); padding: 0 2px 15px; }
     .list { border-top: 1px solid var(--line); }
-    .row { width: 100%; min-height: 108px; display: grid; grid-template-columns: 36px minmax(0, 1fr) auto 24px; align-items: center; gap: 15px; padding: 17px 12px; text-align: left; border: 0; border-bottom: 1px solid var(--line); background: transparent; transition: background .2s ease, transform .42s cubic-bezier(.2, 1.65, .4, 1), box-shadow .2s ease; animation: row-in .55s backwards cubic-bezier(.2, .9, .3, 1.2); animation-delay: var(--delay, 0ms); }
-    .row:hover, .row.active { background: var(--soft); transform: translateX(5px); box-shadow: -5px 0 0 var(--accent); }
+    .row { width: 100%; min-height: 108px; display: grid; grid-template-columns: 36px minmax(0, 1fr) auto 24px; align-items: center; gap: 15px; padding: 17px 12px; text-align: left; border: 0; border-bottom: 1px solid var(--line); background: transparent; transition: background .18s ease, box-shadow .18s ease; }
+    .row:hover, .row.active { background: var(--soft); box-shadow: inset 4px 0 0 var(--accent); }
     .num, .row time { color: var(--muted); font: 12px/1.2 monospace; }
     .copy { min-width: 0; }
     .copy q { display: block; font: 19px/1.4 Georgia, serif; quotes: none; }
@@ -93,17 +94,17 @@ export function dashboardPage(): Response {
     .tag { padding: 5px 8px; background: var(--soft); color: var(--accent); font-size: 12px; }
     .origin { margin: auto 0 0; padding-top: 24px; color: var(--muted); }
     .actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); gap: 7px; margin-top: 19px; }
-    .actions button { min-height: 46px; border: 1px solid var(--line); background: transparent; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: .06em; transition: transform .4s cubic-bezier(.2, 1.65, .4, 1), background .2s ease, box-shadow .2s ease; }
-    .actions button:hover, .dialog-actions button:hover { transform: translateY(-3px); box-shadow: 0 7px 16px var(--shadow); }
-    .actions button:active, .dialog-actions button:active { transform: scale(.96); }
+    .actions button { min-height: 46px; border: 1px solid var(--line); background: transparent; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: .06em; transition: background .18s ease; }
+    .actions button:hover, .dialog-actions button:hover { background: var(--soft); }
+    .actions .primary:hover, .dialog-actions .primary:hover { background: var(--accent); }
     .actions .primary { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
     .actions .danger { color: var(--danger); border-color: var(--danger); }
     .empty { padding: 80px 20px; text-align: center; color: var(--muted); font: 15px Georgia, serif; }
     .review-empty { margin: auto; }
     .close { display: none; position: absolute; top: 17px; right: 18px; width: 34px; height: 34px; border: 0; background: transparent; font-size: 25px; }
-    .backdrop { display: none; }
+    .backdrop { display: none; appearance: none; margin: 0; padding: 0; border: 0; background: rgba(7, 13, 10, .52); touch-action: manipulation; }
     dialog { width: min(580px, calc(100% - 28px)); max-height: calc(100dvh - 28px); overflow: auto; border: 1px solid var(--line); border-radius: 0; padding: 0; color: var(--ink); background: var(--panel-strong); box-shadow: 0 24px 80px var(--shadow); }
-    dialog::backdrop { background: color-mix(in srgb, var(--ink) 45%, transparent); backdrop-filter: blur(4px); }
+    dialog::backdrop { background: rgba(7, 13, 10, .52); backdrop-filter: blur(4px); }
     .editor-form { display: grid; gap: 16px; padding: 28px; }
     .editor-head { display: flex; justify-content: space-between; align-items: start; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
     .editor-head h2 { margin: 5px 0 0; font: 30px Georgia, serif; letter-spacing: -.03em; }
@@ -115,15 +116,6 @@ export function dashboardPage(): Response {
     .dialog-actions .primary { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
     #notice { position: fixed; z-index: 60; left: 50%; bottom: 24px; width: max-content; max-width: calc(100% - 28px); margin: 0; padding: 11px 15px; transform: translateX(-50%); border: 1px solid var(--line); background: var(--panel-strong); color: var(--muted); box-shadow: 0 10px 35px var(--shadow); font-size: 12px; }
     #notice.error { color: var(--danger); border-color: var(--danger); }
-    .mast { animation: mast-in .55s both cubic-bezier(.2, .9, .3, 1.15); }
-    .intro { animation: rise-in .65s .08s both cubic-bezier(.2, .9, .3, 1.15); }
-    .controls { animation: rise-in .65s .16s both cubic-bezier(.2, .9, .3, 1.15); }
-    .content { animation: rise-in .7s .24s both cubic-bezier(.2, .9, .3, 1.15); }
-    .review > * { animation: detail-in .45s both cubic-bezier(.2, .9, .3, 1.15); }
-    @keyframes mast-in { from { opacity: 0; transform: translateY(-14px); } }
-    @keyframes rise-in { from { opacity: 0; transform: translateY(22px) scale(.985); } }
-    @keyframes row-in { from { opacity: 0; transform: translateY(12px); } }
-    @keyframes detail-in { from { opacity: 0; transform: translateX(10px); } }
     @media (min-width: 721px) and (max-width: 1050px) {
       .page { padding-inline: 28px; }
       .content { grid-template-columns: minmax(0, 1.25fr) minmax(290px, .75fr); }
@@ -155,8 +147,8 @@ export function dashboardPage(): Response {
       .row time { display: none; }
       .copy q { font-size: 17px; line-height: 1.42; }
       .copy small { font-size: 12px; }
-      .review { position: fixed; z-index: 40; left: 0; right: 0; bottom: 0; min-height: 0; max-height: 86dvh; border: 0; border-top: 1px solid var(--line); border-radius: 18px 18px 0 0; padding: 22px 20px max(20px, env(safe-area-inset-bottom)); box-shadow: 0 -18px 60px var(--shadow); transform: translateY(105%); transition: transform .25s ease; overflow: auto; }
-      .review.open { transform: translateY(0); }
+      .review { position: fixed; z-index: 100; left: 0; right: 0; bottom: 0; min-height: 0; max-height: 86dvh; visibility: hidden; pointer-events: none; border: 0; border-top: 1px solid var(--line); border-radius: 18px 18px 0 0; padding: 22px 20px max(20px, env(safe-area-inset-bottom)); box-shadow: 0 -18px 60px var(--shadow); transform: translateY(105%); transition: transform .32s cubic-bezier(.22, .82, .32, 1.08), visibility 0s linear .32s; overflow: auto; }
+      .review.open { visibility: visible; pointer-events: auto; transform: translateY(0); transition-delay: 0s; }
       .review.open::before { content: ""; width: 38px; height: 4px; border-radius: 4px; background: var(--line); position: absolute; top: 8px; left: 50%; transform: translateX(-50%); }
       .review-top { padding-top: 13px; padding-right: 30px; }
       .mark { height: 55px; font-size: 58px; margin-top: 24px; }
@@ -164,7 +156,7 @@ export function dashboardPage(): Response {
       .actions { position: sticky; bottom: -1px; background: var(--panel-strong); padding-top: 10px; }
       .actions button { min-height: 50px; font-size: 10px; }
       .close { display: block; }
-      .backdrop.open { display: block; position: fixed; inset: 0; z-index: 30; border: 0; background: color-mix(in srgb, var(--ink) 45%, transparent); }
+      .backdrop.open { display: block; position: fixed; inset: 0; z-index: 90; }
       .review-empty { display: none; }
       .editor-form { padding: 22px; }
     }
@@ -269,7 +261,7 @@ export function dashboardPage(): Response {
         list.innerHTML = visible.map((item, index) => {
           const unpublished = item.status === 'approved' && item.communityActive === 0;
           const state = unpublished ? '<span class="status-dot"></span>Unpublished · ' : '';
-          return '<button type="button" class="row ' + (item.id === selectedId ? 'active ' : '') + (unpublished ? 'unpublished' : '') + '" style="--delay:' + Math.min(index * 45, 360) + 'ms" data-id="' + escapeHtml(item.id) + '"><span class="num">' + String(index + 1).padStart(2, '0') + '</span><span class="copy"><q>' + escapeHtml(item.quoteText) + '</q><small>' + state + escapeHtml(item.author || 'Unknown') + '</small></span><time>' + escapeHtml(formatDate(item.submittedAt)) + '</time><span>↗</span></button>';
+          return '<button type="button" class="row ' + (item.id === selectedId ? 'active ' : '') + (unpublished ? 'unpublished' : '') + '" data-id="' + escapeHtml(item.id) + '"><span class="num">' + String(index + 1).padStart(2, '0') + '</span><span class="copy"><q>' + escapeHtml(item.quoteText) + '</q><small>' + state + escapeHtml(item.author || 'Unknown') + '</small></span><time>' + escapeHtml(formatDate(item.submittedAt)) + '</time><span>↗</span></button>';
         }).join('');
       }
       list.querySelectorAll('.row').forEach(button => button.onclick = () => { selectedId = button.dataset.id; render(); openReview(); });
