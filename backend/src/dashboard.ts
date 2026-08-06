@@ -3,60 +3,188 @@ export function dashboardPage(): Response {
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Quote Moderation</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Quote Queue</title>
+  <script>try{const t=localStorage.getItem('quote-theme');if(t)document.documentElement.dataset.theme=t;else if(matchMedia('(prefers-color-scheme: dark)').matches)document.documentElement.dataset.theme='dark'}catch(e){}</script>
   <style>
-    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: #0b090e; color: #f5efff; }
+    :root {
+      color-scheme: light;
+      --paper: #eef0ec;
+      --ink: #14201b;
+      --muted: #69756f;
+      --line: #c5ccc7;
+      --panel: #f7f8f5;
+      --panel-strong: #fbfcfa;
+      --accent: #1f6950;
+      --accent-ink: #ffffff;
+      --soft: #dce8e2;
+      --danger: #8c403d;
+      --danger-soft: #f1dfdc;
+      --shadow: #14201b2b;
+    }
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --paper: #111713;
+      --ink: #edf2ee;
+      --muted: #94a29b;
+      --line: #35423b;
+      --panel: #19211c;
+      --panel-strong: #1d2721;
+      --accent: #72c5a4;
+      --accent-ink: #102119;
+      --soft: #243e33;
+      --danger: #ef9b95;
+      --danger-soft: #402724;
+      --shadow: #00000066;
+    }
     * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 80% -10%, #38255a 0, transparent 34rem), #0b090e; }
+    html { background: var(--paper); }
+    body { margin: 0; min-height: 100vh; background: var(--paper); color: var(--ink); font: 14px Arial, sans-serif; }
     button, input, textarea { font: inherit; }
-    header { max-width: 76rem; margin: auto; padding: 3.5rem 1.25rem 1.5rem; display: flex; gap: 1rem; align-items: end; justify-content: space-between; }
-    .eyebrow { color: #cbb4ec; font-size: .72rem; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
-    h1 { margin: .35rem 0 0; font-family: Georgia, serif; font-size: clamp(2.4rem, 7vw, 4.8rem); font-weight: 500; letter-spacing: -.05em; }
-    .live { color: #a5e6bc; border: 1px solid #355944; border-radius: 99rem; padding: .5rem .8rem; font-size: .78rem; font-weight: 700; background: #102419; }
-    main { max-width: 76rem; margin: auto; padding: 0 1.25rem 5rem; }
-    nav { display: flex; gap: .5rem; overflow-x: auto; padding: .8rem 0 1.5rem; }
-    nav button { border: 1px solid #3c3347; color: #cfc3db; background: #17131d; border-radius: .8rem; padding: .7rem .9rem; cursor: pointer; white-space: nowrap; }
-    nav button.active { color: #241633; border-color: #d8baff; background: #d8baff; font-weight: 800; }
-    .count { opacity: .7; margin-left: .25rem; }
-    #notice { min-height: 1.5rem; color: #cbbbd8; }
-    #list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr)); gap: 1rem; }
-    article { display: flex; flex-direction: column; min-height: 19rem; padding: 1.25rem; border: 1px solid #352d3f; border-radius: 1.3rem; background: linear-gradient(145deg, #1c1723, #121016); box-shadow: 0 1.2rem 3rem #0005; }
-    article.unpublished { opacity: .52; filter: grayscale(.9); border-color: #4a4850; background: #151419; }
-    blockquote { margin: .8rem 0; font-family: Georgia, serif; font-size: 1.45rem; line-height: 1.35; }
-    .author { color: #d1b9ef; font-weight: 750; }
-    .meta { margin-top: auto; color: #a99db5; font-size: .78rem; line-height: 1.6; }
-    .tags { display: flex; flex-wrap: wrap; gap: .35rem; margin: .8rem 0; }
-    .tag { padding: .22rem .5rem; border-radius: 99rem; background: #2a2135; color: #d9c3f5; font-size: .72rem; }
-    .actions { display: flex; gap: .5rem; margin-top: 1rem; }
-    .actions button, dialog button { border: 0; border-radius: .75rem; padding: .7rem .9rem; font-weight: 800; cursor: pointer; }
-    .approve { background: #a6e9bd; color: #102519; }
-    .reject { background: #38232a; color: #ffc2cb; }
-    .empty { grid-column: 1 / -1; padding: 5rem 1rem; text-align: center; color: #9e91aa; }
-    dialog { width: min(36rem, calc(100% - 2rem)); border: 1px solid #51445f; border-radius: 1.4rem; padding: 0; color: #f5efff; background: #17131d; box-shadow: 0 2rem 7rem #000c; }
-    dialog::backdrop { background: #050307c7; backdrop-filter: blur(5px); }
-    form { display: grid; gap: .9rem; padding: 1.25rem; }
-    form h2 { margin: 0; font-family: Georgia, serif; font-size: 1.8rem; }
-    label { display: grid; gap: .35rem; color: #c8bbd3; font-size: .78rem; font-weight: 700; }
-    input, textarea { width: 100%; border: 1px solid #493c57; border-radius: .7rem; padding: .75rem; color: #fff; background: #0e0b12; resize: vertical; }
-    .dialog-actions { display: flex; justify-content: end; gap: .5rem; }
-    .cancel { color: #d3c5df; background: transparent; }
-    @media (max-width: 36rem) { header { padding-top: 2rem; align-items: start; } .live { margin-top: .5rem; } article { min-height: 0; } }
+    button { color: inherit; cursor: pointer; }
+    button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .mast { height: 66px; display: flex; align-items: center; justify-content: space-between; padding: 0 clamp(20px, 4vw, 64px); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--paper) 94%, transparent); backdrop-filter: blur(14px); }
+    .brand { display: flex; align-items: center; gap: 11px; text-transform: uppercase; letter-spacing: .13em; font-size: 10px; font-weight: bold; }
+    .brand-mark { font: 28px Georgia, serif; border-right: 1px solid var(--line); padding-right: 11px; }
+    .mast-actions { display: flex; align-items: center; gap: 18px; }
+    .sync { font: 9px monospace; color: var(--muted); text-transform: uppercase; }
+    .sync::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px var(--soft); margin-right: 10px; }
+    .theme { width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; background: var(--panel); font-size: 16px; }
+    .theme .sun { display: none; }
+    [data-theme="dark"] .theme .sun { display: inline; }
+    [data-theme="dark"] .theme .moon { display: none; }
+    .page { padding: 42px clamp(20px, 5vw, 80px) 70px; max-width: 1600px; margin: auto; }
+    .intro { display: flex; align-items: end; justify-content: space-between; padding: 12px 0 38px; }
+    .over, .head, .review-top, .field-label, .origin { font-size: 9px; text-transform: uppercase; letter-spacing: .17em; font-weight: bold; }
+    .over { color: var(--accent); margin: 0 0 13px; }
+    .intro h1 { font: clamp(52px, 6vw, 88px)/.86 Georgia, serif; margin: 0; letter-spacing: -.055em; }
+    .intro h1 i { font-weight: normal; color: var(--accent); }
+    .count { display: flex; align-items: end; gap: 12px; }
+    .count b { font: 58px/.78 monospace; color: var(--accent); }
+    .count span { font-size: 9px; text-transform: uppercase; color: var(--muted); }
+    .controls { display: flex; justify-content: space-between; align-items: center; background: var(--panel); padding: 8px 10px; border: 1px solid var(--line); }
+    .tabs { display: flex; gap: 3px; }
+    .tabs button { border: 0; background: transparent; color: var(--muted); padding: 11px 15px; }
+    .tabs button.active { background: var(--accent); color: var(--accent-ink); }
+    .tabs b { font-size: 10px; margin-left: 9px; border: 1px solid currentColor; border-radius: 50%; min-width: 19px; height: 19px; display: inline-grid; place-items: center; }
+    .search { display: flex; align-items: center; gap: 8px; color: var(--muted); border-left: 1px solid var(--line); padding-left: 17px; }
+    .search input { width: min(24vw, 270px); border: 0; outline: 0; color: var(--ink); background: transparent; }
+    .search input::placeholder { color: var(--muted); }
+    .content { display: grid; grid-template-columns: minmax(0, 1.48fr) minmax(330px, .72fr); margin-top: 28px; border: 1px solid var(--line); background: var(--panel); }
+    .queue { min-width: 0; padding: 24px 27px 35px; }
+    .head { display: flex; justify-content: space-between; color: var(--muted); padding: 0 2px 15px; }
+    .list { border-top: 1px solid var(--line); }
+    .row { width: 100%; min-height: 112px; display: grid; grid-template-columns: 32px minmax(0, 1fr) auto 24px; align-items: center; gap: 16px; padding: 18px 12px; text-align: left; border: 0; border-bottom: 1px solid var(--line); background: transparent; transition: background .15s ease; }
+    .row:hover, .row.active { background: var(--soft); }
+    .num, .row time { color: var(--muted); font: 9px monospace; }
+    .copy { min-width: 0; }
+    .copy q { display: block; font: 18px/1.35 Georgia, serif; quotes: none; }
+    .copy small { display: block; margin-top: 9px; color: var(--accent); font-size: 10px; font-weight: bold; }
+    .status-dot { width: 7px; height: 7px; margin-right: 6px; display: inline-block; border-radius: 50%; background: var(--accent); }
+    .row.unpublished { opacity: .62; }
+    .review { min-width: 0; position: relative; display: flex; flex-direction: column; padding: 31px 32px; border-left: 1px solid var(--line); background: var(--panel-strong); }
+    .review-top { display: flex; justify-content: space-between; color: var(--muted); }
+    .mark { height: 74px; margin-top: 25px; color: var(--accent); font: 82px/.9 Georgia, serif; }
+    .review blockquote { margin: 0; font: clamp(25px, 2.2vw, 37px)/1.14 Georgia, serif; letter-spacing: -.025em; overflow-wrap: anywhere; }
+    .author { margin: 31px 0 20px; padding-top: 18px; border-top: 1px solid var(--line); }
+    .author strong { display: block; margin-top: 8px; font: 19px Georgia, serif; }
+    .details { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 0 0 18px; }
+    .detail span { display: block; margin-top: 5px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+    .tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+    .tag { padding: 4px 7px; background: var(--soft); color: var(--accent); font-size: 10px; }
+    .origin { margin: auto 0 0; padding-top: 24px; color: var(--muted); }
+    .actions { display: grid; grid-template-columns: 1fr 1.4fr; gap: 7px; margin-top: 19px; }
+    .actions button { min-height: 46px; border: 1px solid var(--line); background: transparent; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: .08em; }
+    .actions .primary { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+    .actions .danger { color: var(--danger); border-color: var(--danger); }
+    .empty { padding: 80px 20px; text-align: center; color: var(--muted); font: 15px Georgia, serif; }
+    .review-empty { margin: auto; }
+    .close { display: none; position: absolute; top: 17px; right: 18px; width: 34px; height: 34px; border: 0; background: transparent; font-size: 25px; }
+    .backdrop { display: none; }
+    dialog { width: min(580px, calc(100% - 28px)); max-height: calc(100dvh - 28px); overflow: auto; border: 1px solid var(--line); border-radius: 0; padding: 0; color: var(--ink); background: var(--panel-strong); box-shadow: 0 24px 80px var(--shadow); }
+    dialog::backdrop { background: color-mix(in srgb, var(--ink) 45%, transparent); backdrop-filter: blur(4px); }
+    .editor-form { display: grid; gap: 16px; padding: 28px; }
+    .editor-head { display: flex; justify-content: space-between; align-items: start; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+    .editor-head h2 { margin: 5px 0 0; font: 30px Georgia, serif; letter-spacing: -.03em; }
+    .editor-close { border: 0; background: transparent; font-size: 24px; }
+    .editor-form label { display: grid; gap: 7px; color: var(--muted); font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: .1em; }
+    .editor-form input, .editor-form textarea { width: 100%; border: 1px solid var(--line); border-radius: 0; padding: 11px 12px; color: var(--ink); background: var(--paper); resize: vertical; text-transform: none; letter-spacing: normal; font-weight: normal; }
+    .dialog-actions { display: flex; justify-content: end; gap: 7px; padding-top: 5px; }
+    .dialog-actions button { min-height: 44px; padding: 0 17px; border: 1px solid var(--line); background: transparent; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: .08em; }
+    .dialog-actions .primary { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+    #notice { position: fixed; z-index: 60; left: 50%; bottom: 24px; width: max-content; max-width: calc(100% - 28px); margin: 0; padding: 11px 15px; transform: translateX(-50%); border: 1px solid var(--line); background: var(--panel-strong); color: var(--muted); box-shadow: 0 10px 35px var(--shadow); font-size: 12px; }
+    #notice.error { color: var(--danger); border-color: var(--danger); }
+    @media (max-width: 720px) {
+      body.sheet-open { overflow: hidden; }
+      .mast { height: 58px; padding: 0 17px; }
+      .brand-mark { font-size: 23px; }
+      .mast-actions { gap: 10px; }
+      .sync { font-size: 0; }
+      .sync::after { content: "Connected"; font-size: 8px; }
+      .theme { width: 34px; height: 34px; }
+      .page { padding: 22px 14px 88px; }
+      .intro { padding: 17px 3px 26px; }
+      .intro h1 { font-size: 45px; }
+      .count { display: none; }
+      .controls { display: block; padding: 6px; position: sticky; top: 58px; z-index: 10; }
+      .tabs { display: grid; grid-template-columns: repeat(3, 1fr); }
+      .tabs button { padding: 10px 5px; font-size: 11px; }
+      .tabs b { margin-left: 5px; }
+      .search { margin-top: 6px; border: 0; border-top: 1px solid var(--line); padding: 5px 7px 0; }
+      .search input { width: 100%; height: 38px; font-size: 13px; }
+      .content { display: block; border: 0; background: none; margin-top: 20px; }
+      .queue { padding: 0; }
+      .head { padding-inline: 4px; }
+      .list { background: var(--panel); border: 1px solid var(--line); }
+      .row { min-height: 104px; grid-template-columns: 25px minmax(0, 1fr) 24px; gap: 9px; padding: 17px 12px; }
+      .row time { display: none; }
+      .copy q { font-size: 16px; }
+      .review { position: fixed; z-index: 40; left: 0; right: 0; bottom: 0; min-height: 0; max-height: 86dvh; border: 0; border-top: 1px solid var(--line); border-radius: 18px 18px 0 0; padding: 22px 20px max(20px, env(safe-area-inset-bottom)); box-shadow: 0 -18px 60px var(--shadow); transform: translateY(105%); transition: transform .25s ease; overflow: auto; }
+      .review.open { transform: translateY(0); }
+      .review.open::before { content: ""; width: 38px; height: 4px; border-radius: 4px; background: var(--line); position: absolute; top: 8px; left: 50%; transform: translateX(-50%); }
+      .review-top { padding-top: 13px; padding-right: 30px; }
+      .mark { height: 55px; font-size: 58px; margin-top: 24px; }
+      .review blockquote { font-size: 24px; }
+      .actions { position: sticky; bottom: -1px; background: var(--panel-strong); padding-top: 10px; }
+      .actions button { min-height: 50px; font-size: 9px; }
+      .close { display: block; }
+      .backdrop.open { display: block; position: fixed; inset: 0; z-index: 30; border: 0; background: color-mix(in srgb, var(--ink) 45%, transparent); }
+      .review-empty { display: none; }
+      .editor-form { padding: 22px; }
+    }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; } }
   </style>
 </head>
 <body>
-  <header>
-    <div><div class="eyebrow">Private review desk</div><h1>Quote queue</h1></div>
-    <div class="live">Access protected</div>
+  <header class="mast">
+    <div class="brand"><span class="brand-mark">Q</span> Quote queue</div>
+    <div class="mast-actions">
+      <span class="sync">App connected · Access protected</span>
+      <button class="theme" id="theme" type="button" aria-label="Switch color theme"><span class="moon">☾</span><span class="sun">☀</span></button>
+    </div>
   </header>
-  <main>
-    <nav id="tabs"></nav>
-    <p id="notice">Loading submissions...</p>
-    <section id="list"></section>
+  <main class="page">
+    <section class="intro">
+      <div><p class="over">Incoming from the app</p><h1>Words awaiting<br><i>consideration.</i></h1></div>
+      <div class="count"><b id="pendingCount">00</b><span>quotes<br>to review</span></div>
+    </section>
+    <section class="controls">
+      <nav class="tabs" id="tabs" aria-label="Submission status"></nav>
+      <label class="search">⌕ <input id="search" type="search" placeholder="Search quote or author" autocomplete="off"></label>
+    </section>
+    <section class="content">
+      <div class="queue">
+        <div class="head"><span id="heading">Pending</span><span id="results">Loading</span></div>
+        <div class="list" id="list" aria-live="polite"></div>
+      </div>
+      <aside class="review" id="review"><div class="empty review-empty">Select a quote to review.</div></aside>
+    </section>
+    <p id="notice" role="status" hidden></p>
   </main>
+  <button class="backdrop" id="backdrop" aria-label="Close review"></button>
   <dialog id="editor">
-    <form id="form">
-      <h2 id="editorTitle">Edit and approve</h2>
+    <form class="editor-form" id="form">
+      <div class="editor-head"><div><span class="over">Moderation details</span><h2 id="editorTitle">Edit and approve</h2></div><button class="editor-close" type="button" id="editorClose" aria-label="Close editor">×</button></div>
       <input id="id" type="hidden">
       <input id="communityId" type="hidden">
       <label>Quote<textarea id="quoteText" rows="5" maxlength="500" required></textarea></label>
@@ -64,126 +192,171 @@ export function dashboardPage(): Response {
       <label>Category<input id="category" maxlength="50" required></label>
       <label>Tags, comma-separated<input id="tags"></label>
       <label>Private reviewer note<textarea id="note" rows="2" maxlength="500"></textarea></label>
-      <div class="dialog-actions">
-        <button class="cancel" type="button" id="cancel">Cancel</button>
-        <button class="approve" type="submit">Approve quote</button>
-      </div>
+      <div class="dialog-actions"><button type="button" id="cancel">Cancel</button><button class="primary" type="submit">Approve quote</button></div>
     </form>
   </dialog>
   <script>
     const statuses = ['pending', 'approved', 'rejected'];
     let active = 'pending';
     let current = [];
+    let counts = [];
+    let selectedId = null;
+    let query = '';
     const list = document.querySelector('#list');
     const notice = document.querySelector('#notice');
     const tabs = document.querySelector('#tabs');
+    const review = document.querySelector('#review');
     const editor = document.querySelector('#editor');
-    const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
+    const parseTags = value => { try { const tags = JSON.parse(value || '[]'); return Array.isArray(tags) ? tags : []; } catch (error) { return []; } };
+    const titleCase = value => value[0].toUpperCase() + value.slice(1);
+    const selected = () => current.find(item => item.id === selectedId);
+
+    function showNotice(message, isError = false) {
+      notice.textContent = message;
+      notice.classList.toggle('error', isError);
+      notice.hidden = !message;
+    }
 
     async function load(status = active) {
       active = status;
-      notice.textContent = 'Loading submissions...';
+      showNotice('Loading submissions...');
       list.innerHTML = '';
       try {
         const response = await fetch('/admin/api/submissions?status=' + encodeURIComponent(status));
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Could not load submissions.');
         current = data.submissions;
-        renderTabs(data.counts);
+        counts = data.counts;
+        if (!current.some(item => item.id === selectedId)) selectedId = current[0]?.id ?? null;
+        renderTabs();
         render();
-        notice.textContent = current.length + ' ' + status + ' submission' + (current.length === 1 ? '' : 's');
+        showNotice('');
       } catch (error) {
-        notice.textContent = error.message;
+        showNotice(error.message, true);
+        list.innerHTML = '<div class="empty">The queue could not be loaded.</div>';
+        document.querySelector('#results').textContent = 'Unavailable';
       }
     }
 
-    function renderTabs(counts) {
-      const countMap = Object.fromEntries(counts.map(item => [item.status, item.count]));
-      tabs.innerHTML = statuses.map(status => '<button data-status="' + status + '" class="' + (status === active ? 'active' : '') + '">' + status[0].toUpperCase() + status.slice(1) + '<span class="count">' + (countMap[status] || 0) + '</span></button>').join('');
-      tabs.querySelectorAll('button').forEach(button => button.onclick = () => load(button.dataset.status));
+    function renderTabs() {
+      const countMap = Object.fromEntries(counts.map(item => [item.status, Number(item.count)]));
+      tabs.innerHTML = statuses.map(status => '<button type="button" data-status="' + status + '" class="' + (status === active ? 'active' : '') + '">' + titleCase(status) + '<b>' + (countMap[status] || 0) + '</b></button>').join('');
+      tabs.querySelectorAll('button').forEach(button => button.onclick = () => { closeReview(); load(button.dataset.status); });
+      document.querySelector('#pendingCount').textContent = String(countMap.pending || 0).padStart(2, '0');
     }
 
     function render() {
-      if (!current.length) {
-        list.innerHTML = '<div class="empty">Nothing here. The queue is clear.</div>';
+      const visible = current.filter(item => (item.quoteText + ' ' + (item.author || '') + ' ' + item.category).toLowerCase().includes(query));
+      document.querySelector('#heading').textContent = titleCase(active);
+      document.querySelector('#results').textContent = visible.length + ' quote' + (visible.length === 1 ? '' : 's');
+      if (!visible.length) {
+        list.innerHTML = '<div class="empty">' + (query ? 'No quotes match your search.' : 'Nothing here. The queue is clear.') + '</div>';
+      } else {
+        list.innerHTML = visible.map((item, index) => {
+          const unpublished = item.status === 'approved' && item.communityActive === 0;
+          const state = unpublished ? '<span class="status-dot"></span>Unpublished · ' : '';
+          return '<button type="button" class="row ' + (item.id === selectedId ? 'active ' : '') + (unpublished ? 'unpublished' : '') + '" data-id="' + escapeHtml(item.id) + '"><span class="num">' + String(index + 1).padStart(2, '0') + '</span><span class="copy"><q>' + escapeHtml(item.quoteText) + '</q><small>' + state + escapeHtml(item.author || 'Unknown') + '</small></span><time>' + escapeHtml(formatDate(item.submittedAt)) + '</time><span>↗</span></button>';
+        }).join('');
+      }
+      list.querySelectorAll('.row').forEach(button => button.onclick = () => { selectedId = button.dataset.id; render(); openReview(); });
+      renderReview();
+    }
+
+    function renderReview() {
+      const item = selected();
+      if (!item) {
+        review.innerHTML = '<div class="empty review-empty">Select a quote to review.</div>';
         return;
       }
-      list.innerHTML = current.map(item => {
-        const tags = JSON.parse(item.tagsJson || '[]');
-        let actions = '';
-        if (item.status === 'pending') actions = '<div class="actions"><button class="approve" data-approve="' + item.id + '">Review & approve</button><button class="reject" data-reject="' + item.id + '">Reject</button></div>';
-        if (item.status === 'rejected') actions = '<div class="actions"><button class="approve" data-approve="' + item.id + '">Review & approve</button><button class="reject" data-delete="' + item.id + '">Delete permanently</button></div>';
-        if (item.status === 'approved' && item.communityQuoteId) actions = '<div class="actions"><button class="approve" data-edit-community="' + item.communityQuoteId + '">Edit</button><button class="reject" data-toggle-community="' + item.communityQuoteId + '" data-active="' + item.communityActive + '">' + (item.communityActive ? 'Unpublish' : 'Republish') + '</button></div>';
-        const publication = item.status === 'approved' ? '<br>' + (item.communityActive ? 'Published' : 'Unpublished') + ' · revision ' + item.communityRevision : '';
-        const articleClass = item.status === 'approved' && item.communityActive === 0 ? ' class="unpublished"' : '';
-        return '<article' + articleClass + '><div class="eyebrow">' + escapeHtml(item.category) + '</div><blockquote>“' + escapeHtml(item.quoteText) + '”</blockquote><div class="author">— ' + escapeHtml(item.author || 'Unknown') + '</div><div class="tags">' + tags.map(tag => '<span class="tag">#' + escapeHtml(tag) + '</span>').join('') + '</div><div class="meta">Submitted ' + new Date(item.submittedAt * 1000).toLocaleString() + (item.appVersion ? '<br>App ' + escapeHtml(item.appVersion) : '') + publication + '</div>' + actions + '</article>';
-      }).join('');
-      list.querySelectorAll('[data-approve]').forEach(button => button.onclick = () => openEditor(button.dataset.approve));
-      list.querySelectorAll('[data-reject]').forEach(button => button.onclick = () => reject(button.dataset.reject));
-      list.querySelectorAll('[data-delete]').forEach(button => button.onclick = () => deleteRejected(button.dataset.delete));
-      list.querySelectorAll('[data-edit-community]').forEach(button => button.onclick = () => openCommunityEditor(button.dataset.editCommunity));
-      list.querySelectorAll('[data-toggle-community]').forEach(button => button.onclick = () => toggleCommunity(button.dataset.toggleCommunity, button.dataset.active === '1'));
+      const tags = parseTags(item.tagsJson);
+      const publication = item.status === 'approved' ? (item.communityActive ? 'Published' : 'Unpublished') + ' · revision ' + item.communityRevision : titleCase(item.status);
+      let actions = '';
+      if (item.status === 'pending') actions = '<button class="danger" data-reject>Reject</button><button class="primary" data-approve>Review & approve ↗</button>';
+      if (item.status === 'rejected') actions = '<button class="danger" data-delete>Delete permanently</button><button class="primary" data-approve>Review & approve</button>';
+      if (item.status === 'approved' && item.communityQuoteId) actions = '<button data-toggle>' + (item.communityActive ? 'Unpublish' : 'Republish') + '</button><button class="primary" data-edit>Edit quote</button>';
+      review.innerHTML = '<button class="close" type="button" aria-label="Close review">×</button><div class="review-top"><span>Selected quote</span><span>' + escapeHtml(formatDate(item.submittedAt)) + '</span></div><span class="mark">“</span><blockquote>' + escapeHtml(item.quoteText) + '</blockquote><div class="author"><span class="field-label">Author</span><strong>' + escapeHtml(item.author || 'Unknown') + '</strong></div><div class="details"><div class="detail"><span class="field-label">Category</span><span>' + escapeHtml(item.category) + '</span></div><div class="detail"><span class="field-label">Status</span><span>' + escapeHtml(publication) + '</span></div></div>' + (tags.length ? '<div><span class="field-label">Tags</span><div class="tags">' + tags.map(tag => '<span class="tag">#' + escapeHtml(tag) + '</span>').join('') + '</div></div>' : '') + '<p class="origin">Received through the app' + (item.appVersion ? ' · Version ' + escapeHtml(item.appVersion) : '') + '</p><div class="actions">' + actions + '</div>';
+      review.querySelector('.close').onclick = closeReview;
+      const approveButton = review.querySelector('[data-approve]');
+      const rejectButton = review.querySelector('[data-reject]');
+      const deleteButton = review.querySelector('[data-delete]');
+      const editButton = review.querySelector('[data-edit]');
+      const toggleButton = review.querySelector('[data-toggle]');
+      if (approveButton) approveButton.onclick = () => openEditor(item.id);
+      if (rejectButton) rejectButton.onclick = () => reject(item.id);
+      if (deleteButton) deleteButton.onclick = () => deleteRejected(item.id);
+      if (editButton) editButton.onclick = () => openCommunityEditor(item.communityQuoteId);
+      if (toggleButton) toggleButton.onclick = () => toggleCommunity(item.communityQuoteId, item.communityActive === 1);
+    }
+
+    function formatDate(timestamp) {
+      if (!timestamp) return '';
+      return new Date(timestamp * 1000).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    }
+
+    function openReview() {
+      review.classList.add('open');
+      document.querySelector('#backdrop').classList.add('open');
+      document.body.classList.add('sheet-open');
+    }
+
+    function closeReview() {
+      review.classList.remove('open');
+      document.querySelector('#backdrop').classList.remove('open');
+      document.body.classList.remove('sheet-open');
+    }
+
+    function fillEditor(item, communityId = '') {
+      document.querySelector('#id').value = item.id;
+      document.querySelector('#communityId').value = communityId;
+      document.querySelector('#editorTitle').textContent = communityId ? 'Edit community quote' : 'Edit and approve';
+      document.querySelector('#quoteText').value = item.quoteText;
+      document.querySelector('#author').value = item.author || '';
+      document.querySelector('#category').value = item.category;
+      document.querySelector('#tags').value = parseTags(item.tagsJson).join(', ');
+      document.querySelector('#note').value = '';
+      editor.showModal();
     }
 
     function openEditor(id) {
       const item = current.find(value => value.id === id);
-      document.querySelector('#id').value = item.id;
-      document.querySelector('#communityId').value = '';
-      document.querySelector('#editorTitle').textContent = 'Edit and approve';
-      document.querySelector('#quoteText').value = item.quoteText;
-      document.querySelector('#author').value = item.author;
-      document.querySelector('#category').value = item.category;
-      document.querySelector('#tags').value = JSON.parse(item.tagsJson || '[]').join(', ');
-      document.querySelector('#note').value = '';
-      editor.showModal();
+      if (item) fillEditor(item);
     }
 
     function openCommunityEditor(id) {
       const item = current.find(value => value.communityQuoteId === id);
-      document.querySelector('#id').value = item.id;
-      document.querySelector('#communityId').value = id;
-      document.querySelector('#editorTitle').textContent = 'Edit community quote';
-      document.querySelector('#quoteText').value = item.quoteText;
-      document.querySelector('#author').value = item.author;
-      document.querySelector('#category').value = item.category;
-      document.querySelector('#tags').value = JSON.parse(item.tagsJson || '[]').join(', ');
-      document.querySelector('#note').value = '';
-      editor.showModal();
+      if (item) fillEditor(item, id);
     }
 
     async function moderate(id, action, values) {
-      const response = await fetch('/admin/api/submissions/' + id, {
-        method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({...values, action})
-      });
+      const response = await fetch('/admin/api/submissions/' + id, { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({...values, action}) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Review failed.');
+      selectedId = null;
+      closeReview();
       await load(active);
     }
 
     async function reject(id) {
       const item = current.find(value => value.id === id);
-      if (!confirm('Reject this submission?')) return;
-      try {
-        await moderate(id, 'reject', {quoteText:item.quoteText, author:item.author, category:item.category, tags:JSON.parse(item.tagsJson || '[]'), note:''});
-      } catch (error) { notice.textContent = error.message; }
+      if (!item || !confirm('Reject this submission?')) return;
+      try { await moderate(id, 'reject', { quoteText:item.quoteText, author:item.author, category:item.category, tags:parseTags(item.tagsJson), note:'' }); }
+      catch (error) { showNotice(error.message, true); }
     }
 
     async function deleteRejected(id) {
       if (!confirm('Permanently delete this rejected submission? This cannot be undone.')) return;
       try {
         const response = await fetch('/admin/api/submissions/' + id, {method: 'DELETE'});
-        if (!response.ok) {
-          const data = await response.json();
-          throw new Error(data.error || 'Delete failed.');
-        }
+        if (!response.ok) { const data = await response.json(); throw new Error(data.error || 'Delete failed.'); }
+        selectedId = null;
+        closeReview();
         await load(active);
-      } catch (error) { notice.textContent = error.message; }
+      } catch (error) { showNotice(error.message, true); }
     }
 
     async function updateCommunity(id, action, values = {}) {
-      const response = await fetch('/admin/api/community/' + id, {
-        method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({...values, action})
-      });
+      const response = await fetch('/admin/api/community/' + id, { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({...values, action}) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Community update failed.');
       await load(active);
@@ -193,10 +366,18 @@ export function dashboardPage(): Response {
       const action = activeNow ? 'unpublish' : 'republish';
       if (!confirm((activeNow ? 'Unpublish' : 'Republish') + ' this community quote?')) return;
       try { await updateCommunity(id, action); }
-      catch (error) { notice.textContent = error.message; }
+      catch (error) { showNotice(error.message, true); }
     }
 
+    document.querySelector('#search').oninput = event => { query = event.target.value.trim().toLowerCase(); render(); };
+    document.querySelector('#backdrop').onclick = closeReview;
     document.querySelector('#cancel').onclick = () => editor.close();
+    document.querySelector('#editorClose').onclick = () => editor.close();
+    document.querySelector('#theme').onclick = () => {
+      const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+      document.documentElement.dataset.theme = theme;
+      try { localStorage.setItem('quote-theme', theme); } catch (error) {}
+    };
     document.querySelector('#form').onsubmit = async event => {
       event.preventDefault();
       const values = {
@@ -211,8 +392,7 @@ export function dashboardPage(): Response {
         if (communityId) await updateCommunity(communityId, 'update', values);
         else await moderate(document.querySelector('#id').value, 'approve', values);
         editor.close();
-      }
-      catch (error) { alert(error.message); }
+      } catch (error) { alert(error.message); }
     };
     load();
   </script>
