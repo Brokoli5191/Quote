@@ -271,12 +271,17 @@ async function communityUpdates(request: Request, env: Env): Promise<Response> {
   const result = await env.DB.prepare(
     `SELECT id, quote_text AS quoteText, author, category, tags_json AS tagsJson,
       revision, active, published_at AS publishedAt
-     FROM community_quotes WHERE revision > ? ORDER BY revision LIMIT 501`
-  ).bind(after).all<{
+     FROM community_quotes WHERE revision > ?
+     UNION ALL
+     SELECT id, NULL AS quoteText, NULL AS author, NULL AS category, '[]' AS tagsJson,
+      revision, 0 AS active, deleted_at AS publishedAt
+     FROM community_quote_deletions WHERE revision > ?
+     ORDER BY revision LIMIT 501`
+  ).bind(after, after).all<{
     id: string;
-    quoteText: string;
-    author: string;
-    category: string;
+    quoteText: string | null;
+    author: string | null;
+    category: string | null;
     tagsJson: string;
     revision: number;
     active: number;
@@ -292,9 +297,9 @@ async function communityUpdates(request: Request, env: Env): Promise<Response> {
     hasMore,
     quotes: rows.filter(row => row.active === 1).map(row => ({
       id: row.id,
-      text: row.quoteText,
-      author: row.author,
-      category: row.category,
+      text: row.quoteText!,
+      author: row.author!,
+      category: row.category!,
       tags: JSON.parse(row.tagsJson),
       revision: row.revision,
       publishedAt: row.publishedAt

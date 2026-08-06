@@ -211,6 +211,26 @@ async function deleteRejectedSubmission(env: Env, id: string): Promise<Response>
   return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
 }
 
+async function deleteUnpublishedCommunityQuote(env: Env, id: string): Promise<Response> {
+  const existing = await env.DB.prepare(
+    "SELECT id, submission_id AS submissionId, active FROM community_quotes WHERE id = ? LIMIT 1"
+  ).bind(id).first<{ id: string; submissionId: string; active: number }>();
+  if (!existing) return adminJson({ error: "Community quote not found." }, 404);
+  if (existing.active !== 0) {
+    return adminJson({ error: "Only unpublished community quotes can be deleted." }, 409);
+  }
+
+  await env.DB.batch([
+    env.DB.prepare("UPDATE sync_state SET revision = revision + 1 WHERE id = 1"),
+    env.DB.prepare(
+      "INSERT INTO community_quote_deletions (id, revision) VALUES (?, (SELECT revision FROM sync_state WHERE id = 1))"
+    ).bind(id),
+    env.DB.prepare("DELETE FROM community_quotes WHERE id = ? AND active = 0").bind(id),
+    env.DB.prepare("DELETE FROM submissions WHERE id = ?").bind(existing.submissionId)
+  ]);
+  return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
+}
+
 export async function handleAdmin(request: Request, env: Env): Promise<Response> {
   if (!env.ACCESS_TEAM_DOMAIN || !env.ACCESS_AUD) {
     return new Response("Cloudflare Access is not configured for this dashboard.", { status: 503 });
@@ -235,6 +255,9 @@ export async function handleAdmin(request: Request, env: Env): Promise<Response>
   const communityMatch = url.pathname.match(/^\/admin\/api\/community\/([0-9a-f-]+)$/i);
   if (communityMatch && request.method === "PATCH") {
     return updateCommunityQuote(request, env, communityMatch[1], reviewer);
+  }
+  if (communityMatch && request.method === "DELETE") {
+    return deleteUnpublishedCommunityQuote(env, communityMatch[1]);
   }
   return adminJson({ error: "Not found." }, 404);
 }

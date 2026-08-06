@@ -46,24 +46,26 @@ export function dashboardPage(): Response {
     .mast { height: 66px; display: flex; align-items: center; justify-content: space-between; padding: 0 clamp(20px, 4vw, 64px); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--paper) 94%, transparent); backdrop-filter: blur(14px); }
     .brand { display: flex; align-items: center; gap: 11px; text-transform: uppercase; letter-spacing: .13em; font-size: 10px; font-weight: bold; }
     .brand-mark { font: 28px Georgia, serif; border-right: 1px solid var(--line); padding-right: 11px; }
-    .theme { width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; background: var(--panel); font-size: 16px; }
+    .theme { width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; background: var(--panel); font-size: 16px; transition: transform .45s cubic-bezier(.2, 1.65, .4, 1), background .2s ease; }
+    .theme:hover { transform: rotate(16deg) scale(1.08); background: var(--soft); }
     .theme .sun { display: none; }
     [data-theme="dark"] .theme .sun { display: inline; }
     [data-theme="dark"] .theme .moon { display: none; }
     .page { padding: 34px clamp(20px, 5vw, 72px) 64px; max-width: 1500px; margin: auto; }
     .intro { display: flex; align-items: end; justify-content: space-between; padding: 8px 0 30px; }
-    .over, .head, .review-top, .field-label, .origin { font-size: 9px; text-transform: uppercase; letter-spacing: .17em; font-weight: bold; }
+    .over, .head, .review-top, .field-label, .origin { font-size: 11px; text-transform: uppercase; letter-spacing: .13em; font-weight: bold; }
     .over { color: var(--accent); margin: 0 0 13px; }
     .intro h1 { font: clamp(46px, 5.2vw, 76px)/.94 Georgia, serif; margin: 0; letter-spacing: -.045em; }
     .intro h1 i { font-weight: normal; color: var(--accent); }
     .count { display: flex; align-items: end; gap: 12px; }
     .count b { font: 52px/.82 monospace; color: var(--accent); }
-    .count span { font-size: 9px; text-transform: uppercase; color: var(--muted); }
+    .count span { font-size: 11px; line-height: 1.35; text-transform: uppercase; color: var(--muted); }
     .controls { display: flex; justify-content: space-between; align-items: center; background: var(--panel); padding: 8px 10px; border: 1px solid var(--line); }
-    .tabs { display: flex; gap: 3px; }
-    .tabs button { border: 0; background: transparent; color: var(--muted); padding: 11px 15px; }
+    .tabs { display: flex; align-items: stretch; gap: 3px; }
+    .tabs button { min-height: 42px; display: inline-flex; align-items: center; justify-content: center; gap: 9px; border: 0; background: transparent; color: var(--muted); padding: 9px 15px; font-size: 13px; line-height: 1; transition: color .2s ease, background .2s ease, transform .4s cubic-bezier(.2, 1.65, .4, 1); }
+    .tabs button:hover { background: var(--soft); transform: translateY(-2px); }
     .tabs button.active { background: var(--accent); color: var(--accent-ink); }
-    .tabs b { font-size: 10px; margin-left: 9px; border: 1px solid currentColor; border-radius: 50%; min-width: 19px; height: 19px; display: inline-grid; place-items: center; }
+    .tabs b { flex: 0 0 22px; width: 22px; height: 22px; display: inline-grid; place-items: center; border: 1px solid currentColor; border-radius: 50%; font-size: 11px; line-height: 1; }
     .search { display: flex; align-items: center; gap: 8px; color: var(--muted); border-left: 1px solid var(--line); padding-left: 17px; }
     .search input { width: min(24vw, 270px); border: 0; outline: 0; color: var(--ink); background: transparent; }
     .search input::placeholder { color: var(--muted); }
@@ -71,14 +73,14 @@ export function dashboardPage(): Response {
     .queue { min-width: 0; padding: 22px 24px 32px; }
     .head { display: flex; justify-content: space-between; color: var(--muted); padding: 0 2px 15px; }
     .list { border-top: 1px solid var(--line); }
-    .row { width: 100%; min-height: 104px; display: grid; grid-template-columns: 32px minmax(0, 1fr) auto 24px; align-items: center; gap: 15px; padding: 16px 12px; text-align: left; border: 0; border-bottom: 1px solid var(--line); background: transparent; transition: background .15s ease; }
-    .row:hover, .row.active { background: var(--soft); }
-    .num, .row time { color: var(--muted); font: 9px monospace; }
+    .row { width: 100%; min-height: 108px; display: grid; grid-template-columns: 36px minmax(0, 1fr) auto 24px; align-items: center; gap: 15px; padding: 17px 12px; text-align: left; border: 0; border-bottom: 1px solid var(--line); background: transparent; transition: background .2s ease, transform .42s cubic-bezier(.2, 1.65, .4, 1), box-shadow .2s ease; animation: row-in .55s backwards cubic-bezier(.2, .9, .3, 1.2); animation-delay: var(--delay, 0ms); }
+    .row:hover, .row.active { background: var(--soft); transform: translateX(5px); box-shadow: -5px 0 0 var(--accent); }
+    .num, .row time { color: var(--muted); font: 12px/1.2 monospace; }
     .copy { min-width: 0; }
-    .copy q { display: block; font: 17px/1.4 Georgia, serif; quotes: none; }
-    .copy small { display: block; margin-top: 9px; color: var(--accent); font-size: 10px; font-weight: bold; }
+    .copy q { display: block; font: 19px/1.4 Georgia, serif; quotes: none; }
+    .copy small { display: block; margin-top: 10px; color: var(--accent); font-size: 13px; line-height: 1.35; font-weight: bold; }
     .status-dot { width: 7px; height: 7px; margin-right: 6px; display: inline-block; border-radius: 50%; background: var(--accent); }
-    .row.unpublished { opacity: .62; }
+    .row.unpublished { background: color-mix(in srgb, var(--soft) 38%, transparent); }
     .review { min-width: 0; position: relative; display: flex; flex-direction: column; padding: 28px 30px; border-left: 1px solid var(--line); background: var(--panel-strong); }
     .review-top { display: flex; justify-content: space-between; color: var(--muted); }
     .mark { height: 74px; margin-top: 25px; color: var(--accent); font: 82px/.9 Georgia, serif; }
@@ -86,12 +88,14 @@ export function dashboardPage(): Response {
     .author { margin: 31px 0 20px; padding-top: 18px; border-top: 1px solid var(--line); }
     .author strong { display: block; margin-top: 8px; font: 19px Georgia, serif; }
     .details { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 0 0 18px; }
-    .detail span { display: block; margin-top: 5px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+    .detail span { display: block; margin-top: 6px; color: var(--muted); font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; }
     .tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
-    .tag { padding: 4px 7px; background: var(--soft); color: var(--accent); font-size: 10px; }
+    .tag { padding: 5px 8px; background: var(--soft); color: var(--accent); font-size: 12px; }
     .origin { margin: auto 0 0; padding-top: 24px; color: var(--muted); }
-    .actions { display: grid; grid-template-columns: 1fr 1.4fr; gap: 7px; margin-top: 19px; }
-    .actions button { min-height: 46px; border: 1px solid var(--line); background: transparent; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: .08em; }
+    .actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); gap: 7px; margin-top: 19px; }
+    .actions button { min-height: 46px; border: 1px solid var(--line); background: transparent; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: .06em; transition: transform .4s cubic-bezier(.2, 1.65, .4, 1), background .2s ease, box-shadow .2s ease; }
+    .actions button:hover, .dialog-actions button:hover { transform: translateY(-3px); box-shadow: 0 7px 16px var(--shadow); }
+    .actions button:active, .dialog-actions button:active { transform: scale(.96); }
     .actions .primary { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
     .actions .danger { color: var(--danger); border-color: var(--danger); }
     .empty { padding: 80px 20px; text-align: center; color: var(--muted); font: 15px Georgia, serif; }
@@ -111,6 +115,15 @@ export function dashboardPage(): Response {
     .dialog-actions .primary { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
     #notice { position: fixed; z-index: 60; left: 50%; bottom: 24px; width: max-content; max-width: calc(100% - 28px); margin: 0; padding: 11px 15px; transform: translateX(-50%); border: 1px solid var(--line); background: var(--panel-strong); color: var(--muted); box-shadow: 0 10px 35px var(--shadow); font-size: 12px; }
     #notice.error { color: var(--danger); border-color: var(--danger); }
+    .mast { animation: mast-in .55s both cubic-bezier(.2, .9, .3, 1.15); }
+    .intro { animation: rise-in .65s .08s both cubic-bezier(.2, .9, .3, 1.15); }
+    .controls { animation: rise-in .65s .16s both cubic-bezier(.2, .9, .3, 1.15); }
+    .content { animation: rise-in .7s .24s both cubic-bezier(.2, .9, .3, 1.15); }
+    .review > * { animation: detail-in .45s both cubic-bezier(.2, .9, .3, 1.15); }
+    @keyframes mast-in { from { opacity: 0; transform: translateY(-14px); } }
+    @keyframes rise-in { from { opacity: 0; transform: translateY(22px) scale(.985); } }
+    @keyframes row-in { from { opacity: 0; transform: translateY(12px); } }
+    @keyframes detail-in { from { opacity: 0; transform: translateX(10px); } }
     @media (min-width: 721px) and (max-width: 1050px) {
       .page { padding-inline: 28px; }
       .content { grid-template-columns: minmax(0, 1.25fr) minmax(290px, .75fr); }
@@ -130,17 +143,18 @@ export function dashboardPage(): Response {
       .count { display: none; }
       .controls { display: block; padding: 6px; position: sticky; top: 58px; z-index: 10; }
       .tabs { display: grid; grid-template-columns: repeat(3, 1fr); }
-      .tabs button { padding: 10px 5px; font-size: 11px; }
-      .tabs b { margin-left: 5px; }
+      .tabs button { gap: 6px; padding: 9px 5px; font-size: 12px; }
+      .tabs b { flex-basis: 21px; width: 21px; height: 21px; font-size: 10px; }
       .search { margin-top: 6px; border: 0; border-top: 1px solid var(--line); padding: 5px 7px 0; }
       .search input { width: 100%; height: 38px; font-size: 13px; }
       .content { display: block; border: 0; background: none; margin-top: 16px; }
       .queue { padding: 0; }
       .head { padding-inline: 4px; }
       .list { background: var(--panel); border: 1px solid var(--line); }
-      .row { min-height: 94px; grid-template-columns: 24px minmax(0, 1fr) 20px; gap: 9px; padding: 14px 11px; }
+      .row { min-height: 100px; grid-template-columns: 29px minmax(0, 1fr) 20px; gap: 9px; padding: 15px 11px; }
       .row time { display: none; }
-      .copy q { font-size: 15px; line-height: 1.42; }
+      .copy q { font-size: 17px; line-height: 1.42; }
+      .copy small { font-size: 12px; }
       .review { position: fixed; z-index: 40; left: 0; right: 0; bottom: 0; min-height: 0; max-height: 86dvh; border: 0; border-top: 1px solid var(--line); border-radius: 18px 18px 0 0; padding: 22px 20px max(20px, env(safe-area-inset-bottom)); box-shadow: 0 -18px 60px var(--shadow); transform: translateY(105%); transition: transform .25s ease; overflow: auto; }
       .review.open { transform: translateY(0); }
       .review.open::before { content: ""; width: 38px; height: 4px; border-radius: 4px; background: var(--line); position: absolute; top: 8px; left: 50%; transform: translateX(-50%); }
@@ -148,13 +162,13 @@ export function dashboardPage(): Response {
       .mark { height: 55px; font-size: 58px; margin-top: 24px; }
       .review blockquote { font-size: 22px; line-height: 1.28; }
       .actions { position: sticky; bottom: -1px; background: var(--panel-strong); padding-top: 10px; }
-      .actions button { min-height: 50px; font-size: 9px; }
+      .actions button { min-height: 50px; font-size: 10px; }
       .close { display: block; }
       .backdrop.open { display: block; position: fixed; inset: 0; z-index: 30; border: 0; background: color-mix(in srgb, var(--ink) 45%, transparent); }
       .review-empty { display: none; }
       .editor-form { padding: 22px; }
     }
-    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; } }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; } }
   </style>
 </head>
 <body>
@@ -255,7 +269,7 @@ export function dashboardPage(): Response {
         list.innerHTML = visible.map((item, index) => {
           const unpublished = item.status === 'approved' && item.communityActive === 0;
           const state = unpublished ? '<span class="status-dot"></span>Unpublished · ' : '';
-          return '<button type="button" class="row ' + (item.id === selectedId ? 'active ' : '') + (unpublished ? 'unpublished' : '') + '" data-id="' + escapeHtml(item.id) + '"><span class="num">' + String(index + 1).padStart(2, '0') + '</span><span class="copy"><q>' + escapeHtml(item.quoteText) + '</q><small>' + state + escapeHtml(item.author || 'Unknown') + '</small></span><time>' + escapeHtml(formatDate(item.submittedAt)) + '</time><span>↗</span></button>';
+          return '<button type="button" class="row ' + (item.id === selectedId ? 'active ' : '') + (unpublished ? 'unpublished' : '') + '" style="--delay:' + Math.min(index * 45, 360) + 'ms" data-id="' + escapeHtml(item.id) + '"><span class="num">' + String(index + 1).padStart(2, '0') + '</span><span class="copy"><q>' + escapeHtml(item.quoteText) + '</q><small>' + state + escapeHtml(item.author || 'Unknown') + '</small></span><time>' + escapeHtml(formatDate(item.submittedAt)) + '</time><span>↗</span></button>';
         }).join('');
       }
       list.querySelectorAll('.row').forEach(button => button.onclick = () => { selectedId = button.dataset.id; render(); openReview(); });
@@ -273,17 +287,19 @@ export function dashboardPage(): Response {
       let actions = '';
       if (item.status === 'pending') actions = '<button class="danger" data-reject>Reject</button><button class="primary" data-approve>Review & approve ↗</button>';
       if (item.status === 'rejected') actions = '<button class="danger" data-delete>Delete permanently</button><button class="primary" data-approve>Review & approve</button>';
-      if (item.status === 'approved' && item.communityQuoteId) actions = '<button data-toggle>' + (item.communityActive ? 'Unpublish' : 'Republish') + '</button><button class="primary" data-edit>Edit quote</button>';
+      if (item.status === 'approved' && item.communityQuoteId) actions = (item.communityActive ? '<button data-toggle>Unpublish</button>' : '<button class="danger" data-delete-community>Delete permanently</button><button data-toggle>Republish</button>') + '<button class="primary" data-edit>Edit quote</button>';
       review.innerHTML = '<button class="close" type="button" aria-label="Close review">×</button><div class="review-top"><span>Selected quote</span><span>' + escapeHtml(formatDate(item.submittedAt)) + '</span></div><span class="mark">“</span><blockquote>' + escapeHtml(item.quoteText) + '</blockquote><div class="author"><span class="field-label">Author</span><strong>' + escapeHtml(item.author || 'Unknown') + '</strong></div><div class="details"><div class="detail"><span class="field-label">Category</span><span>' + escapeHtml(item.category) + '</span></div><div class="detail"><span class="field-label">Status</span><span>' + escapeHtml(publication) + '</span></div></div>' + (tags.length ? '<div><span class="field-label">Tags</span><div class="tags">' + tags.map(tag => '<span class="tag">#' + escapeHtml(tag) + '</span>').join('') + '</div></div>' : '') + '<p class="origin">Received through the app' + (item.appVersion ? ' · Version ' + escapeHtml(item.appVersion) : '') + '</p><div class="actions">' + actions + '</div>';
       review.querySelector('.close').onclick = closeReview;
       const approveButton = review.querySelector('[data-approve]');
       const rejectButton = review.querySelector('[data-reject]');
       const deleteButton = review.querySelector('[data-delete]');
+      const deleteCommunityButton = review.querySelector('[data-delete-community]');
       const editButton = review.querySelector('[data-edit]');
       const toggleButton = review.querySelector('[data-toggle]');
       if (approveButton) approveButton.onclick = () => openEditor(item.id);
       if (rejectButton) rejectButton.onclick = () => reject(item.id);
       if (deleteButton) deleteButton.onclick = () => deleteRejected(item.id);
+      if (deleteCommunityButton) deleteCommunityButton.onclick = () => deleteCommunity(item.communityQuoteId);
       if (editButton) editButton.onclick = () => openCommunityEditor(item.communityQuoteId);
       if (toggleButton) toggleButton.onclick = () => toggleCommunity(item.communityQuoteId, item.communityActive === 1);
     }
@@ -366,6 +382,17 @@ export function dashboardPage(): Response {
       if (!confirm((activeNow ? 'Unpublish' : 'Republish') + ' this community quote?')) return;
       try { await updateCommunity(id, action); }
       catch (error) { showNotice(error.message, true); }
+    }
+
+    async function deleteCommunity(id) {
+      if (!confirm('Permanently delete this unpublished quote? This cannot be undone.')) return;
+      try {
+        const response = await fetch('/admin/api/community/' + id, {method: 'DELETE'});
+        if (!response.ok) { const data = await response.json(); throw new Error(data.error || 'Delete failed.'); }
+        selectedId = null;
+        closeReview();
+        await load(active);
+      } catch (error) { showNotice(error.message, true); }
     }
 
     document.querySelector('#search').oninput = event => { query = event.target.value.trim().toLowerCase(); render(); };
