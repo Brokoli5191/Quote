@@ -8,10 +8,9 @@ import androidx.compose.animation.*
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -46,6 +45,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import app.brokoli5191.quote.data.QuoteEntity
@@ -60,22 +60,14 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun DailyScreen(viewModel: QuoteViewModel) {
-    val quoteState by viewModel.dailyQuote.collectAsState()
-    val lowPerformanceMode by viewModel.lowPerformanceMode.collectAsState()
-    val sourceMode by viewModel.quoteSourceMode.collectAsState()
-    val communitySyncFinished by viewModel.communitySyncFinished.collectAsState()
+    val quoteState by viewModel.dailyQuote.collectAsStateWithLifecycle()
+    val lowPerformanceMode by viewModel.lowPerformanceMode.collectAsStateWithLifecycle()
+    val sourceMode by viewModel.quoteSourceMode.collectAsStateWithLifecycle()
+    val communitySyncFinished by viewModel.communitySyncFinished.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
     val scrollState = rememberScrollState()
     val lifecycleOwner = LocalLifecycleOwner.current
-    var pageVisible by remember { mutableStateOf(false) }
-    val pageAlpha by animateFloatAsState(
-        targetValue = if (pageVisible) 1f else 0f,
-        animationSpec = if (lowPerformanceMode) snap() else tween(600),
-        label = "DailyPageFadeIn"
-    )
-
-    LaunchedEffect(Unit) { pageVisible = true }
-
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
@@ -90,7 +82,6 @@ fun DailyScreen(viewModel: QuoteViewModel) {
         Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .graphicsLayer { alpha = pageAlpha }
     ) {
         Column(
             modifier = Modifier
@@ -126,8 +117,7 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                 } else AnimatedContent(
                     targetState = quoteState?.id,
                     transitionSpec = {
-                        if (lowPerformanceMode) EnterTransition.None togetherWith ExitTransition.None
-                        else fadeIn(tween(250)) togetherWith fadeOut(tween(250))
+                        EnterTransition.None togetherWith ExitTransition.None
                     },
                     label = "DailyQuoteTransition",
                     modifier = Modifier.fillMaxWidth()
@@ -231,6 +221,7 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                             Spacer(Modifier.height(10.dp))
                             ExpressiveButton(
                                 onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     val url = "https://en.wikipedia.org/wiki/${quote.author.replace(" ", "_")}"
                                     context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
                                 },
@@ -291,40 +282,42 @@ private fun DailyQuoteEmptyState(
 
 @Composable
 private fun QuoteTags(tags: List<String>) {
-    Layout(
-        modifier = Modifier.fillMaxWidth(),
-        content = {
-            tags.forEach { tag ->
-                SuggestionChip(
-                    onClick = {},
-                    label = { Text(tag, maxLines = 1) }
-                )
+    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
+        Layout(
+            modifier = Modifier.fillMaxWidth(),
+            content = {
+                tags.forEach { tag ->
+                    SuggestionChip(
+                        onClick = {},
+                        label = { Text(tag, maxLines = 1) }
+                    )
+                }
             }
-        }
-    ) { measurables, constraints ->
-        val spacing = 8.dp.roundToPx()
-        val placeables = measurables.map { it.measure(constraints.copy(minWidth = 0, minHeight = 0)) }
-        val positions = ArrayList<Pair<Int, Int>>(placeables.size)
-        var x = 0
-        var y = 0
-        var rowHeight = 0
+        ) { measurables, constraints ->
+            val spacing = 8.dp.roundToPx()
+            val placeables = measurables.map { it.measure(constraints.copy(minWidth = 0, minHeight = 0)) }
+            val positions = ArrayList<Pair<Int, Int>>(placeables.size)
+            var x = 0
+            var y = 0
+            var rowHeight = 0
 
-        placeables.forEach { placeable ->
-            if (x > 0 && x + placeable.width > constraints.maxWidth) {
-                x = 0
-                y += rowHeight + spacing
-                rowHeight = 0
+            placeables.forEach { placeable ->
+                if (x > 0 && x + placeable.width > constraints.maxWidth) {
+                    x = 0
+                    y += rowHeight + spacing
+                    rowHeight = 0
+                }
+                positions += x to y
+                x += placeable.width + spacing
+                rowHeight = maxOf(rowHeight, placeable.height)
             }
-            positions += x to y
-            x += placeable.width + spacing
-            rowHeight = maxOf(rowHeight, placeable.height)
-        }
 
-        val height = (y + rowHeight).coerceIn(constraints.minHeight, constraints.maxHeight)
-        layout(constraints.maxWidth, height) {
-            placeables.forEachIndexed { index, placeable ->
-                val (placeX, placeY) = positions[index]
-                placeable.placeRelative(placeX, placeY)
+            val height = (y + rowHeight).coerceIn(constraints.minHeight, constraints.maxHeight)
+            layout(constraints.maxWidth, height) {
+                placeables.forEachIndexed { index, placeable ->
+                    val (placeX, placeY) = positions[index]
+                    placeable.placeRelative(placeX, placeY)
+                }
             }
         }
     }
@@ -336,8 +329,12 @@ private fun RowScope.DailyActionButton(
     label: String,
     onClick: () -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
     ExpressiveTonalButton(
-        onClick = onClick,
+        onClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            onClick()
+        },
         modifier = Modifier.weight(1f).height(52.dp),
         restingCorner = 18.dp,
         colors = ButtonDefaults.filledTonalButtonColors(

@@ -8,6 +8,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -25,6 +26,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -43,11 +45,10 @@ import app.brokoli5191.quote.ui.components.rememberExpressiveShape
 import app.brokoli5191.quote.ui.theme.SerifFontFamily
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.zIndex
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
@@ -56,14 +57,14 @@ import kotlinx.coroutines.delay
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryScreen(viewModel: QuoteViewModel) {
-    val searchQuery by viewModel.searchQuery.collectAsState()
-    val filteredQuotes by viewModel.filteredQuotes.collectAsState()
-    val sourceMode by viewModel.quoteSourceMode.collectAsState()
-    val communitySyncFinished by viewModel.communitySyncFinished.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val filteredQuotes by viewModel.filteredQuotes.collectAsStateWithLifecycle()
+    val sourceMode by viewModel.quoteSourceMode.collectAsStateWithLifecycle()
+    val communitySyncFinished by viewModel.communitySyncFinished.collectAsStateWithLifecycle()
 
-    val selectedCategories by viewModel.selectedCategories.collectAsState()
-    val lowPerformanceMode by viewModel.lowPerformanceMode.collectAsState()
-    val blurNavigationSurfaces by viewModel.blurNavigationSurfaces.collectAsState()
+    val selectedCategories by viewModel.selectedCategories.collectAsStateWithLifecycle()
+    val lowPerformanceMode by viewModel.lowPerformanceMode.collectAsStateWithLifecycle()
+    val blurNavigationSurfaces by viewModel.blurNavigationSurfaces.collectAsStateWithLifecycle()
     val isBrowsing = selectedCategories.isNotEmpty() || searchQuery.isNotBlank()
     val categoryLabel = when {
         selectedCategories.size > 1 -> "${selectedCategories.size} categories"
@@ -349,141 +350,167 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
 
     // Category Filter Picker Sheet (allows selecting multiple categories at once)
     if (showCategoryFilterDialog) {
-        ModalBottomSheet(
+        var sheetDragOffset by remember { mutableFloatStateOf(0f) }
+        Dialog(
             onDismissRequest = { showCategoryFilterDialog = false },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = MaterialTheme.colorScheme.background,
-            tonalElevation = 8.dp,
-            dragHandle = { BottomSheetDefaults.DragHandle(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)) }
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false
+            )
         ) {
-            Column(
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.42f))
+                    .clickable { showCategoryFilterDialog = false },
+                contentAlignment = Alignment.BottomCenter
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Select Categories",
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    ExpressiveIconButton(onClick = { showCategoryFilterDialog = false }) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Close",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                val nestedScrollConnection = remember {
-                    object : NestedScrollConnection {
-                        override fun onPostScroll(
-                            consumed: Offset,
-                            available: Offset,
-                            source: NestedScrollSource
-                        ): Offset {
-                            return if (available.y > 0f) {
-                                Offset(0f, available.y)
-                            } else {
-                                Offset.Zero
-                            }
-                        }
-                    }
-                }
-
-                Column(
+                Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 280.dp)
-                        .nestedScroll(nestedScrollConnection)
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                        .graphicsLayer { translationY = sheetDragOffset }
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) {},
+                    shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                    color = MaterialTheme.colorScheme.background,
+                    tonalElevation = 8.dp
                 ) {
-                    val categoriesList = filterCategoryNames
-
-                    categoriesList.chunked(2).forEach { rowCategoryList ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                            .padding(bottom = 24.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .pointerInput(Unit) {
+                                    detectVerticalDragGestures(
+                                        onDragStart = { sheetDragOffset = 0f },
+                                        onDragCancel = { sheetDragOffset = 0f },
+                                        onDragEnd = {
+                                            if (sheetDragOffset > 120f) {
+                                                showCategoryFilterDialog = false
+                                            } else {
+                                                sheetDragOffset = 0f
+                                            }
+                                        }
+                                    ) { change, dragAmount ->
+                                        change.consume()
+                                        sheetDragOffset = (sheetDragOffset + dragAmount).coerceAtLeast(0f)
+                                    }
+                                },
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            rowCategoryList.forEach { categoryName ->
-                                val isSelected = selectedCategories.contains(categoryName)
-                                val interactionSource = remember(categoryName) { MutableInteractionSource() }
-                                FilterChip(
-                                    selected = isSelected,
-                                    onClick = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        viewModel.toggleCategorySelected(categoryName)
-                                    },
-                                    label = {
-                                        Text(
-                                            text = categoryName,
-                                            style = MaterialTheme.typography.labelMedium.copy(
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                            )
-                                        )
-                                    },
-                                    modifier = Modifier.weight(1f).height(46.dp),
-                                    shape = rememberExpressiveShape(interactionSource, 23.dp, 10.dp),
-                                    interactionSource = interactionSource,
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
-                                        selectedLabelColor = MaterialTheme.colorScheme.primary,
-                                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                                        labelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                                    ),
-                                    border = FilterChipDefaults.filterChipBorder(
-                                        enabled = true,
-                                        selected = isSelected,
-                                        selectedBorderColor = MaterialTheme.colorScheme.primary,
-                                        borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
-                                    )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 24.dp, end = 24.dp, top = 10.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                BottomSheetDefaults.DragHandle(
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                                 )
                             }
-                            if (rowCategoryList.size == 1) {
-                                Spacer(modifier = Modifier.weight(1f))
+
+                            Text(
+                                text = "Select Categories",
+                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 24.dp)
+                            )
+                        }
+
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 280.dp)
+                                .verticalScroll(rememberScrollState())
+                                .padding(horizontal = 24.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            filterCategoryNames.chunked(2).forEach { rowCategoryList ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    rowCategoryList.forEach { categoryName ->
+                                        val isSelected = selectedCategories.contains(categoryName)
+                                        val interactionSource = remember(categoryName) { MutableInteractionSource() }
+                                        FilterChip(
+                                            selected = isSelected,
+                                            onClick = {
+                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                viewModel.toggleCategorySelected(categoryName)
+                                            },
+                                            label = {
+                                                Text(
+                                                    text = categoryName,
+                                                    style = MaterialTheme.typography.labelMedium.copy(
+                                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                                    )
+                                                )
+                                            },
+                                            modifier = Modifier.weight(1f).height(46.dp),
+                                            shape = rememberExpressiveShape(interactionSource, 23.dp, 10.dp),
+                                            interactionSource = interactionSource,
+                                            colors = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+                                                selectedLabelColor = MaterialTheme.colorScheme.primary,
+                                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                            ),
+                                            border = FilterChipDefaults.filterChipBorder(
+                                                enabled = true,
+                                                selected = isSelected,
+                                                selectedBorderColor = MaterialTheme.colorScheme.primary,
+                                                borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                                            )
+                                        )
+                                    }
+                                    if (rowCategoryList.size == 1) {
+                                        Spacer(modifier = Modifier.weight(1f))
+                                    }
+                                }
                             }
                         }
-                    }
-                }
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    ExpressiveTextButton(
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            viewModel.clearCategorySelection()
-                            showCategoryFilterDialog = false
-                        },
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.primary
-                        ),
-                        modifier = Modifier.padding(end = 8.dp)
-                    ) {
-                        Text("Clear All")
-                    }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            ExpressiveTextButton(
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    viewModel.clearCategorySelection()
+                                    showCategoryFilterDialog = false
+                                },
+                                colors = ButtonDefaults.textButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.primary
+                                ),
+                                modifier = Modifier.padding(end = 8.dp)
+                            ) {
+                                Text("Clear All")
+                            }
 
-                    ExpressiveButton(
-                        onClick = { showCategoryFilterDialog = false },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
-                        ),
-                        restingCorner = 12.dp
-                    ) {
-                        Text("Apply Filter")
+                            ExpressiveButton(
+                                onClick = { showCategoryFilterDialog = false },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                ),
+                                restingCorner = 12.dp
+                            ) {
+                                Text("Apply Filter")
+                            }
+                        }
                     }
                 }
             }
@@ -510,25 +537,17 @@ fun CategoryBrowseViewInPlace(
         onBack()
     }
 
-    // Don't flash empty-state on first frame before filteredQuotes arrives
-    var hasReceivedQuotes by remember { mutableStateOf(quotes.isNotEmpty()) }
-    LaunchedEffect(quotes) { if (quotes.isNotEmpty()) hasReceivedQuotes = true }
-    LaunchedEffect(Unit) {
-        delay(600)
-        hasReceivedQuotes = true
-    }
-
     Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 20.dp)
     ) {
-        if (hasReceivedQuotes && quotes.isEmpty()) {
+        if (quotes.isEmpty()) {
             val infiniteTransition = rememberInfiniteTransition(label = "EmptyStateAnimation")
             
             // Smoother floating micro-animations
             val floatAnim by if (lowPerformanceMode) {
-                remember { mutableStateOf(0f) }
+                remember { mutableFloatStateOf(0f) }
             } else {
                 infiniteTransition.animateFloat(
                     initialValue = -8f,
@@ -542,7 +561,7 @@ fun CategoryBrowseViewInPlace(
             }
             
             val scaleAnim by if (lowPerformanceMode) {
-                remember { mutableStateOf(1f) }
+                remember { mutableFloatStateOf(1f) }
             } else {
                 infiniteTransition.animateFloat(
                     initialValue = 0.95f,
@@ -556,7 +575,7 @@ fun CategoryBrowseViewInPlace(
             }
 
             val alphaPulse by if (lowPerformanceMode) {
-                remember { mutableStateOf(1f) }
+                remember { mutableFloatStateOf(1f) }
             } else {
                 infiniteTransition.animateFloat(
                     initialValue = 0.65f,
@@ -659,20 +678,22 @@ fun CategoryBrowseViewInPlace(
                     textAlign = TextAlign.Center
                 )
                 
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Text(
-                    text = if (communityOnly) {
+                if (communityOnly) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text =
                         if (communitySyncFinished) "Approved community quotes will appear here after the next sync."
-                        else "Checking for newly approved community quotes..."
-                    } else "We couldn't find any quotes matching your interest. Reset the filters to explore other profound areas of wisdom.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth(0.85f)
-                        .padding(bottom = 24.dp)
-                )
+                        else "Checking for newly approved community quotes...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth(0.85f)
+                            .padding(bottom = 24.dp)
+                    )
+                } else {
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
 
                 // Beautiful interactive button to clear filters
                 ExpressiveButton(

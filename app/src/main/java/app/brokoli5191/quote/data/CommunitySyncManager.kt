@@ -14,6 +14,7 @@ class CommunitySyncManager(
         var revision = prefs.getLong("community_quote_revision", 0L)
         do {
             val page = communityClient.updates(revision).getOrElse { return false }
+            if (page.hasMore && page.revision <= revision) return false
             repository.applyCommunityUpdates(page.quotes, page.deletedIds)
             revision = page.revision
             prefs.edit().putLong("community_quote_revision", revision).apply()
@@ -24,12 +25,8 @@ class CommunitySyncManager(
 
     suspend fun refreshSubmissionStatuses() {
         val installationId = prefs.getString("submission_installation_id", null) ?: return
-        repository.getAllQuotesSync()
-            .filter {
-                it.isUserAdded &&
-                    it.submissionStatus == QuoteSubmissionStatus.PENDING &&
-                    !it.submissionId.isNullOrBlank()
-            }
+        repository.getPendingSubmittedQuotes()
+            .filter { !it.submissionId.isNullOrBlank() }
             .forEach { quote ->
                 val status = submissionClient.status(quote.submissionId!!, installationId).getOrNull()
                 if (status == QuoteSubmissionStatus.APPROVED || status == QuoteSubmissionStatus.REJECTED) {

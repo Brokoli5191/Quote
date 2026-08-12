@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.concurrent.atomic.AtomicBoolean
 
 class QuoteViewModel(application: Application, private val repository: QuoteRepository) : AndroidViewModel(application) {
 
@@ -36,6 +37,7 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
     private val submissionClient = QuoteSubmissionClient()
     private val communitySyncManager = CommunitySyncManager(app, repository)
     private var communitySyncRunning = false
+    private val updateCheckRunning = AtomicBoolean(false)
 
     private val _dailyQuote = MutableStateFlow<QuoteEntity?>(null)
     val dailyQuote: StateFlow<QuoteEntity?> = _dailyQuote.asStateFlow()
@@ -91,6 +93,12 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
     private val _showDevScreen = MutableStateFlow(false)
     val showDevScreen: StateFlow<Boolean> = _showDevScreen.asStateFlow()
 
+    private val _showNewQuoteScreen = MutableStateFlow(false)
+    val showNewQuoteScreen: StateFlow<Boolean> = _showNewQuoteScreen.asStateFlow()
+
+    private val _savedSubTab = MutableStateFlow("Favorites")
+    val savedSubTab: StateFlow<String> = _savedSubTab.asStateFlow()
+
     private val _autoUpdateEnabled = MutableStateFlow(false)
     val autoUpdateEnabled: StateFlow<Boolean> = _autoUpdateEnabled.asStateFlow()
 
@@ -101,6 +109,7 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
     val submittingQuoteIds: StateFlow<Set<Int>> = _submittingQuoteIds.asStateFlow()
 
     private var lastLoadedDate = ""
+    private var submissionStatusRefreshRunning = false
 
     val allQuotes: StateFlow<List<QuoteEntity>> = repository.allQuotes
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -112,9 +121,9 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val hasBackStack: StateFlow<Boolean> = combine(
-        _showDevScreen, _selectedTab, _selectedCategories, _searchQuery
-    ) { devScreen, tab, categories, query ->
-        devScreen || tab != "Daily" || categories.isNotEmpty() || query.isNotBlank()
+        _showDevScreen, _showNewQuoteScreen, _selectedTab, _selectedCategories, _searchQuery
+    ) { devScreen, newQuoteScreen, tab, categories, query ->
+        devScreen || newQuoteScreen || tab != "Daily" || categories.isNotEmpty() || query.isNotBlank()
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     val filteredQuotes: StateFlow<List<QuoteEntity>> = combine(
@@ -123,22 +132,37 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
         selectedCategories,
         quoteSourceMode
     ) { quotes, query, categories, sourceMode ->
-        var list = quotes.filter { it.matchesSourceMode(sourceMode) }
+        var list = if ("Community" in categories || "Local" in categories) {
+            quotes
+        } else {
+            quotes.filter { it.matchesSourceMode(sourceMode) }
+        }
         if (categories.isNotEmpty()) {
             list = list.filter { q ->
-                categories.any { cat -> q.category.equals(cat, ignoreCase = true) }
+                categories.any { cat ->
+                    when (cat) {
+                        "Community" -> q.origin == QuoteOrigin.COMMUNITY ||
+                            (q.origin == QuoteOrigin.PERSONAL && q.submissionStatus == QuoteSubmissionStatus.APPROVED)
+                        "Local" -> q.origin == QuoteOrigin.PERSONAL &&
+                            q.submissionStatus != QuoteSubmissionStatus.APPROVED
+                        else -> q.category.equals(cat, ignoreCase = true)
+                    }
+                }
             }
         }
         if (query.isNotEmpty()) {
             list = list.filter {
                 it.text.contains(query, ignoreCase = true) ||
                 it.author.contains(query, ignoreCase = true) ||
-                it.tags.split(",").map { tag -> tag.trim() }.any { tag ->
+                it.tags.splitToSequence(',').any { rawTag ->
+                    val tag = rawTag.trim()
                     tag.contains(query, ignoreCase = true) && (!tag.contains("misattributed", ignoreCase = true) || query.contains("misattributed", ignoreCase = true))
                 }
             }
         }
-        list
+        list.distinctBy {
+            it.text.trim().lowercase(Locale.ROOT) to it.author.trim().lowercase(Locale.ROOT)
+        }
     }
         // Filter ~2500 rows off the main thread so search keystrokes don't jank.
         .flowOn(kotlinx.coroutines.Dispatchers.Default)
@@ -181,6 +205,11 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
                 // favorites by (text, author) so the bigger DB costs no user data.
                 repository.reseedPreservingFavorites(app)
                 prefs.edit().putBoolean("database_json_seeded_v9", true).apply()
+                loadDailyQuote()
+            }
+            if (!prefs.getBoolean("stored_quote_text_repaired_v1", false)) {
+                repository.repairStoredText()
+                prefs.edit().putBoolean("stored_quote_text_repaired_v1", true).apply()
                 loadDailyQuote()
             }
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
@@ -229,19 +258,33 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
     }
 
     fun checkForUpdates() {
+        if (!updateCheckRunning.compareAndSet(false, true)) return
+        _updateStatus.value = UpdateStatus.Checking
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            _updateStatus.value = UpdateStatus.Checking
-            val release = UpdateChecker.checkLatestRelease()
-            if (release == null) {
-                _updateStatus.value = UpdateStatus.Error("Could not reach update server")
-                return@launch
-            }
-            if (UpdateChecker.isNewerVersion(BuildConfig.VERSION_NAME, release.version)) {
-                _updateStatus.value = UpdateStatus.UpdateAvailable(release.version, release.downloadUrl, release.sizeBytes)
-            } else {
-                _updateStatus.value = UpdateStatus.UpToDate
+            try {
+                val release = UpdateChecker.checkLatestRelease()
+                if (release == null) {
+                    _updateStatus.value = UpdateStatus.Error("Could not reach update server")
+                    return@launch
+                }
+                if (UpdateChecker.isNewerVersion(BuildConfig.VERSION_NAME, release.version)) {
+                    _updateStatus.value = UpdateStatus.UpdateAvailable(
+                        release.version,
+                        release.downloadUrl,
+                        release.sizeBytes
+                    )
+                } else {
+                    _updateStatus.value = UpdateStatus.UpToDate
+                }
+            } finally {
+                updateCheckRunning.set(false)
             }
         }
+    }
+
+    fun checkForUpdatesManually() {
+        syncCommunityQuotes()
+        checkForUpdates()
     }
 
     fun downloadUpdate(downloadUrl: String, version: String) {
@@ -357,8 +400,23 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
         _showDevScreen.value = false
     }
 
+    fun openNewQuoteScreen() {
+        _showNewQuoteScreen.value = true
+    }
+
+    fun closeNewQuoteScreen() {
+        _showNewQuoteScreen.value = false
+    }
+
+    fun selectSavedSubTab(tab: String) {
+        if (tab == "Favorites" || tab == "My Quotes") {
+            _savedSubTab.value = tab
+        }
+    }
+
     fun popBackStack() {
         when {
+            _showNewQuoteScreen.value -> closeNewQuoteScreen()
             _showDevScreen.value -> closeDevScreen()
             _selectedTab.value == "Library" && (_selectedCategories.value.isNotEmpty() || _searchQuery.value.isNotBlank()) -> {
                 clearCategorySelection()
@@ -457,8 +515,14 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
     }
 
     fun refreshSubmissionStatuses() {
+        if (submissionStatusRefreshRunning) return
+        submissionStatusRefreshRunning = true
         viewModelScope.launch {
-            communitySyncManager.refreshSubmissionStatuses()
+            try {
+                communitySyncManager.refreshSubmissionStatuses()
+            } finally {
+                submissionStatusRefreshRunning = false
+            }
         }
     }
 
@@ -530,6 +594,10 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
 
                 val jsonArray = org.json.JSONArray(content)
                 val dbQuotes = repository.getAllQuotesSync()
+                val existingCustomKeys = dbQuotes
+                    .filter { it.isUserAdded }
+                    .map { it.text.trim() to it.author.trim() }
+                    .toMutableSet()
 
                 var insertedCustom = 0
                 var updatedFavs = 0
@@ -542,8 +610,8 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
                     val isUserAdded = obj.optBoolean("isUserAdded", false)
 
                     if (isUserAdded) {
-                        val alreadyExists = dbQuotes.any { it.text.trim() == text.trim() && it.author.trim() == author.trim() }
-                        if (!alreadyExists) {
+                        val customKey = text.trim() to author.trim()
+                        if (existingCustomKeys.add(customKey)) {
                             repository.insertQuote(QuoteEntity(
                                 text = text,
                                 author = author,

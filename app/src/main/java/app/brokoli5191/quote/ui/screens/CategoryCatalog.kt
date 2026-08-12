@@ -6,6 +6,7 @@ import androidx.compose.material.icons.filled.Balance
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Create
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Diversity3
 import androidx.compose.material.icons.filled.DriveFileRenameOutline
 import androidx.compose.material.icons.filled.EmojiEvents
@@ -16,6 +17,7 @@ import androidx.compose.material.icons.filled.HistoryEdu
 import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Park
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.SelfImprovement
 import androidx.compose.material.icons.filled.SentimentVerySatisfied
@@ -47,6 +49,8 @@ private val Neutral = Color(0xFFB6B2BE)
 
 val categoryCatalog: List<CategoryTileData> = listOf(
     CategoryTileData("Inspirational", Icons.Default.EmojiObjects, Cream, isFullWidth = true),
+    CategoryTileData("Community", Icons.Default.Public, Green),
+    CategoryTileData("Local", Icons.Default.PhoneAndroid, Neutral),
     CategoryTileData("Life", Icons.Default.Spa, Green),
     CategoryTileData("Love", Icons.Default.Favorite, Rose),
     CategoryTileData("Wisdom", Icons.Default.SelfImprovement, Amber),

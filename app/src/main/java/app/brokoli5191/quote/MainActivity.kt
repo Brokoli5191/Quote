@@ -47,6 +47,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import app.brokoli5191.quote.data.AppDatabase
 import app.brokoli5191.quote.data.QuoteRepository
 import app.brokoli5191.quote.data.InstallationSeed
@@ -55,6 +59,7 @@ import app.brokoli5191.quote.ui.QuoteViewModelFactory
 import app.brokoli5191.quote.ui.screens.DailyScreen
 import app.brokoli5191.quote.ui.screens.DeveloperScreen
 import app.brokoli5191.quote.ui.screens.LibraryScreen
+import app.brokoli5191.quote.ui.screens.NewQuoteScreen
 import app.brokoli5191.quote.ui.screens.SavedScreen
 import app.brokoli5191.quote.ui.screens.WidgetSettingsScreen
 import app.brokoli5191.quote.ui.theme.MyApplicationTheme
@@ -62,9 +67,12 @@ import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
+    @OptIn(ExperimentalLayoutApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
@@ -82,30 +90,87 @@ class MainActivity : ComponentActivity() {
                 viewModel.checkAndSeedDatabase()
             }
 
-            val themeMode by viewModel.themeMode.collectAsState()
-            val themeAccent by viewModel.themeAccent.collectAsState()
-            val amoledBlack by viewModel.amoledBlack.collectAsState()
-            val lowPerformanceMode by viewModel.lowPerformanceMode.collectAsState()
-            val blurNavigationSurfaces by viewModel.blurNavigationSurfaces.collectAsState()
-            val showDevScreen by viewModel.showDevScreen.collectAsState()
+            val lifecycleOwner = LocalLifecycleOwner.current
+            LaunchedEffect(lifecycleOwner) {
+                lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                    while (true) {
+                        viewModel.refreshSubmissionStatuses()
+                        delay(60_000L)
+                    }
+                }
+            }
+
+            val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+            val themeAccent by viewModel.themeAccent.collectAsStateWithLifecycle()
+            val amoledBlack by viewModel.amoledBlack.collectAsStateWithLifecycle()
+            val lowPerformanceMode by viewModel.lowPerformanceMode.collectAsStateWithLifecycle()
+            val blurNavigationSurfaces by viewModel.blurNavigationSurfaces.collectAsStateWithLifecycle()
+            val showDevScreen by viewModel.showDevScreen.collectAsStateWithLifecycle()
+            val showNewQuoteScreen by viewModel.showNewQuoteScreen.collectAsStateWithLifecycle()
 
             MyApplicationTheme(themeMode = themeMode, themeAccent = themeAccent, amoledBlack = amoledBlack) {
-                val activeTab by viewModel.selectedTab.collectAsState()
+                val activeTab by viewModel.selectedTab.collectAsStateWithLifecycle()
                 val blurActive = blurNavigationSurfaces && !lowPerformanceMode
                 val navigationHazeState = rememberHazeState(blurEnabled = blurActive)
 
-                val hasBackStack by viewModel.hasBackStack.collectAsState()
-                val selectedCategories by viewModel.selectedCategories.collectAsState()
-                val searchQuery by viewModel.searchQuery.collectAsState()
+                val hasBackStack by viewModel.hasBackStack.collectAsStateWithLifecycle()
+                val selectedCategories by viewModel.selectedCategories.collectAsStateWithLifecycle()
+                val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+                val savedSubTab by viewModel.savedSubTab.collectAsStateWithLifecycle()
+                val imeVisible = WindowInsets.isImeVisible
 
                 val backProgressAnim = remember { Animatable(0f) }
                 val backProgress = backProgressAnim.value
+                val newQuoteProgressAnim = remember { Animatable(1f) }
+                val newQuoteProgress = newQuoteProgressAnim.value
+                val animationScope = rememberCoroutineScope()
 
                 var isCompletingPredictiveBack by remember { mutableStateOf(false) }
                 var isCompletingDevBack by remember { mutableStateOf(false) }
                 var completionPreviewTab by remember { mutableStateOf<String?>(null) }
+                var newQuoteBackInProgress by remember { mutableStateOf(false) }
 
-                PredictiveBackHandler(enabled = hasBackStack) { progress ->
+                LaunchedEffect(showNewQuoteScreen) {
+                    if (showNewQuoteScreen && !newQuoteBackInProgress) {
+                        newQuoteProgressAnim.animateTo(
+                            0f,
+                            animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing)
+                        )
+                    }
+                }
+
+                PredictiveBackHandler(enabled = showNewQuoteScreen) { progress ->
+                    newQuoteBackInProgress = true
+                    var completed = false
+                    try {
+                        newQuoteProgressAnim.stop()
+                        progress.collect { event ->
+                            newQuoteProgressAnim.snapTo(event.progress)
+                        }
+                        newQuoteProgressAnim.animateTo(
+                            1f,
+                            animationSpec = spring(dampingRatio = 0.9f, stiffness = 500f)
+                        )
+                        completed = true
+                        viewModel.closeNewQuoteScreen()
+                    } finally {
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                            if (completed) {
+                                kotlinx.coroutines.delay(32L)
+                            } else {
+                                newQuoteProgressAnim.animateTo(
+                                    0f,
+                                    animationSpec = spring(dampingRatio = 0.82f, stiffness = 420f)
+                                )
+                            }
+                            newQuoteBackInProgress = false
+                        }
+                    }
+                }
+
+                PredictiveBackHandler(
+                    enabled = hasBackStack && !showNewQuoteScreen && !newQuoteBackInProgress
+                ) { progress ->
                     var capturedIsFilterClear = false
                     var capturedIsDevBack = false
                     var capturedPreviewTab: String? = null
@@ -113,9 +178,9 @@ class MainActivity : ComponentActivity() {
                         progress.collect { event ->
                             backProgressAnim.snapTo(event.progress)
                             capturedIsDevBack = showDevScreen
-                            capturedIsFilterClear = !showDevScreen && activeTab == "Library"
+                            capturedIsFilterClear = !showDevScreen && !showNewQuoteScreen && activeTab == "Library"
                                 && (selectedCategories.isNotEmpty() || searchQuery.isNotBlank())
-                            capturedPreviewTab = if (!capturedIsFilterClear && !showDevScreen && activeTab != "Daily") "Daily" else null
+                            capturedPreviewTab = if (!capturedIsFilterClear && !showDevScreen && !showNewQuoteScreen && activeTab != "Daily") "Daily" else null
                         }
                         if (capturedIsFilterClear) {
                             backProgressAnim.snapTo(0f)
@@ -129,23 +194,24 @@ class MainActivity : ComponentActivity() {
                         viewModel.popBackStack()
                         kotlinx.coroutines.delay(50L)
                     } finally {
-                        kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
-                            backProgressAnim.snapTo(0f)
-                        }
                         isCompletingPredictiveBack = false
                         isCompletingDevBack = false
                         completionPreviewTab = null
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                            kotlinx.coroutines.delay(32L)
+                            backProgressAnim.snapTo(0f)
+                        }
                     }
                 }
 
                 // Which tab to preview on the left during back gesture / completion
-                val isFilterClearBack = !showDevScreen && !isCompletingPredictiveBack
+                val isFilterClearBack = !showDevScreen && !showNewQuoteScreen && !isCompletingPredictiveBack
                     && backProgress > 0f && activeTab == "Library"
                     && (selectedCategories.isNotEmpty() || searchQuery.isNotBlank())
 
                 val backPreviewTab: String? = when {
                     isCompletingPredictiveBack -> completionPreviewTab
-                    showDevScreen -> null
+                    showDevScreen || showNewQuoteScreen -> null
                     isFilterClearBack -> null
                     backProgress > 0f && activeTab != "Daily" -> "Daily"
                     else -> null
@@ -154,15 +220,36 @@ class MainActivity : ComponentActivity() {
                 val tabOrder = listOf("Daily", "Library", "Saved", "Settings")
                 var swipeDeltaX by remember { mutableFloatStateOf(0f) }
 
+                fun closeNewQuoteScreen(afterClose: () -> Unit = {}) {
+                    if (newQuoteBackInProgress) return
+                    animationScope.launch {
+                        newQuoteBackInProgress = true
+                        newQuoteProgressAnim.animateTo(
+                            1f,
+                            animationSpec = tween(
+                                durationMillis = 220,
+                                easing = FastOutSlowInEasing
+                            )
+                        )
+                        viewModel.closeNewQuoteScreen()
+                        afterClose()
+                        newQuoteBackInProgress = false
+                    }
+                }
+
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .pointerInput(activeTab, showDevScreen) {
-                            if (showDevScreen) return@pointerInput
+                        .pointerInput(activeTab, showDevScreen, showNewQuoteScreen) {
+                            if (showDevScreen || showNewQuoteScreen) return@pointerInput
                             detectHorizontalDragGestures(
                                 onDragEnd = {
                                     val idx = tabOrder.indexOf(activeTab)
                                     when {
+                                        swipeDeltaX < -80f && activeTab == "Saved" && savedSubTab == "Favorites" ->
+                                            viewModel.selectSavedSubTab("My Quotes")
+                                        swipeDeltaX > 80f && activeTab == "Saved" && savedSubTab == "My Quotes" ->
+                                            viewModel.selectSavedSubTab("Favorites")
                                         swipeDeltaX < -80f && idx < tabOrder.lastIndex ->
                                             viewModel.selectTab(tabOrder[idx + 1])
                                         swipeDeltaX > 80f && idx > 0 ->
@@ -179,13 +266,21 @@ class MainActivity : ComponentActivity() {
                     Scaffold(
                         modifier = Modifier.fillMaxSize(),
                         bottomBar = {
-                            BottomNavigationBar(
-                                activeTab = activeTab,
-                                lowPerformanceMode = lowPerformanceMode,
-                                blurEnabled = blurActive,
-                                hazeState = navigationHazeState,
-                                onTabSelected = { viewModel.selectTab(it) }
-                            )
+                            if (!showDevScreen && !imeVisible) {
+                                BottomNavigationBar(
+                                    activeTab = activeTab,
+                                    lowPerformanceMode = lowPerformanceMode,
+                                    blurEnabled = blurActive,
+                                    hazeState = navigationHazeState,
+                                    onTabSelected = { tab ->
+                                        if (showNewQuoteScreen) {
+                                            closeNewQuoteScreen { viewModel.selectTab(tab) }
+                                        } else {
+                                            viewModel.selectTab(tab)
+                                        }
+                                    }
+                                )
+                            }
                         },
                         contentWindowInsets = WindowInsets(0, 0, 0, 0)
                     ) {
@@ -226,7 +321,7 @@ class MainActivity : ComponentActivity() {
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .graphicsLayer {
-                                        if (!showDevScreen && backProgress > 0f && !isFilterClearBack && !lowPerformanceMode) {
+                                        if (!showDevScreen && !showNewQuoteScreen && backProgress > 0f && !isFilterClearBack && !lowPerformanceMode) {
                                             translationX = size.width * backProgress
                                         }
                                     }
@@ -280,6 +375,20 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             }
+
+                            if (showNewQuoteScreen || newQuoteBackInProgress) {
+                                NewQuoteScreen(
+                                    viewModel = viewModel,
+                                    onBack = { closeNewQuoteScreen() },
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(bottom = 80.dp)
+                                        .graphicsLayer {
+                                            translationX = size.width * newQuoteProgress
+                                            alpha = 1f - newQuoteProgress * 0.15f
+                                        }
+                                )
+                            }
                         }
                     }
 
@@ -301,6 +410,7 @@ class MainActivity : ComponentActivity() {
                                 }
                         )
                     }
+
                 }
             }
         }

@@ -9,7 +9,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.FactCheck
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Rule
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -20,7 +23,10 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.brokoli5191.quote.BuildConfig
+import app.brokoli5191.quote.data.QuoteOrigin
+import app.brokoli5191.quote.data.QuoteSubmissionStatus
 import app.brokoli5191.quote.ui.QuoteViewModel
 import app.brokoli5191.quote.ui.components.ExpressiveButton
 import app.brokoli5191.quote.ui.components.ExpressiveOutlinedButton
@@ -29,14 +35,17 @@ import app.brokoli5191.quote.ui.components.ExpressiveOutlinedButton
 fun DeveloperScreen(viewModel: QuoteViewModel, modifier: Modifier = Modifier) {
     val haptic = LocalHapticFeedback.current
 
-    val dailyQuote by viewModel.dailyQuote.collectAsState()
-    val allQuotes by viewModel.allQuotes.collectAsState()
-    val themeMode by viewModel.themeMode.collectAsState()
-    val themeAccent by viewModel.themeAccent.collectAsState()
-    val lowPerf by viewModel.lowPerformanceMode.collectAsState()
-    val reminderEnabled by viewModel.dailyReminderEnabled.collectAsState()
-    val reminderHour by viewModel.dailyReminderHour.collectAsState()
-    val reminderMinute by viewModel.dailyReminderMinute.collectAsState()
+    val dailyQuote by viewModel.dailyQuote.collectAsStateWithLifecycle()
+    val allQuotes by viewModel.allQuotes.collectAsStateWithLifecycle()
+    val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+    val themeAccent by viewModel.themeAccent.collectAsStateWithLifecycle()
+    val lowPerf by viewModel.lowPerformanceMode.collectAsStateWithLifecycle()
+    val reminderEnabled by viewModel.dailyReminderEnabled.collectAsStateWithLifecycle()
+    val reminderHour by viewModel.dailyReminderHour.collectAsStateWithLifecycle()
+    val reminderMinute by viewModel.dailyReminderMinute.collectAsStateWithLifecycle()
+    val quoteSourceMode by viewModel.quoteSourceMode.collectAsStateWithLifecycle()
+    val communitySyncFinished by viewModel.communitySyncFinished.collectAsStateWithLifecycle()
+    val verificationResult by viewModel.verificationResult.collectAsStateWithLifecycle()
 
     Box(
         modifier = modifier
@@ -121,6 +130,24 @@ fun DeveloperScreen(viewModel: QuoteViewModel, modifier: Modifier = Modifier) {
                 )
             }
 
+            DebugSection(title = "Data Health") {
+                DebugRow("Bundled", allQuotes.count { it.origin == QuoteOrigin.BUNDLED }.toString())
+                DebugRow("Community", allQuotes.count { it.origin == QuoteOrigin.COMMUNITY }.toString())
+                DebugRow("Personal", allQuotes.count { it.origin == QuoteOrigin.PERSONAL }.toString())
+                DebugRow("Favorites", allQuotes.count { it.isFavorite }.toString())
+                DebugRow(
+                    "Pending reviews",
+                    allQuotes.count { it.submissionStatus == QuoteSubmissionStatus.PENDING }.toString()
+                )
+                DebugRow("Source mode", quoteSourceMode)
+                DebugRow("Initial sync", if (communitySyncFinished) "Finished" else "Waiting")
+                verificationResult?.let { result ->
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+                    DebugRow("Verification", if (result.isValid) "Passed" else "Needs attention")
+                    DebugRow("Empty categories", result.emptyCategories.size.toString())
+                }
+            }
+
             DebugSection(title = "Actions") {
                 ExpressiveButton(
                     onClick = {
@@ -150,6 +177,45 @@ fun DeveloperScreen(viewModel: QuoteViewModel, modifier: Modifier = Modifier) {
                     Icon(Icons.Default.Notifications, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("Send Test Notification")
+                }
+
+                ExpressiveOutlinedButton(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        viewModel.syncCommunityQuotes()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    restingCorner = 12.dp
+                ) {
+                    Icon(Icons.Default.CloudSync, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Sync Community Quotes")
+                }
+
+                ExpressiveOutlinedButton(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        viewModel.refreshSubmissionStatuses()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    restingCorner = 12.dp
+                ) {
+                    Icon(Icons.Default.Rule, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Refresh Review Statuses")
+                }
+
+                ExpressiveOutlinedButton(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        viewModel.runVerification()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    restingCorner = 12.dp
+                ) {
+                    Icon(Icons.Default.FactCheck, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Verify Quote Database")
                 }
             }
         }

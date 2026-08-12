@@ -32,40 +32,40 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.brokoli5191.quote.data.QuoteEntity
 import app.brokoli5191.quote.data.QuoteSubmissionStatus
 import app.brokoli5191.quote.ui.QuoteViewModel
-import app.brokoli5191.quote.ui.components.ExpressiveButton
 import app.brokoli5191.quote.ui.components.ExpressiveIconButton
-import app.brokoli5191.quote.ui.components.ExpressiveTextButton
 import app.brokoli5191.quote.ui.components.rememberExpressiveShape
 import app.brokoli5191.quote.ui.theme.SerifFontFamily
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SavedScreen(viewModel: QuoteViewModel) {
-    val favorites by viewModel.favorites.collectAsState()
-    val userAdded by viewModel.userAdded.collectAsState()
-    val submittingQuoteIds by viewModel.submittingQuoteIds.collectAsState()
+    val favorites by viewModel.favorites.collectAsStateWithLifecycle()
+    val userAdded by viewModel.userAdded.collectAsStateWithLifecycle()
+    val submittingQuoteIds by viewModel.submittingQuoteIds.collectAsStateWithLifecycle()
+    val activeSubTab by viewModel.savedSubTab.collectAsStateWithLifecycle()
     
-    var activeSubTab by remember { mutableStateOf("Favorites") } // "Favorites" or "My Quotes"
-    var showAddDialog by remember { mutableStateOf(false) }
     var quoteToSubmit by remember { mutableStateOf<QuoteEntity?>(null) }
 
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val fabInteractionSource = remember { MutableInteractionSource() }
-
-    LaunchedEffect(Unit) { viewModel.refreshSubmissionStatuses() }
+    var timestampTick by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(30_000)
+            timestampTick = System.currentTimeMillis()
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -95,31 +95,12 @@ fun SavedScreen(viewModel: QuoteViewModel) {
             Spacer(modifier = Modifier.height(16.dp))
 
             // Sub Tab switcher
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp)
-                    .background(
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        shape = RoundedCornerShape(16.dp)
-                    )
-                    .padding(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                TabSelectorButton(
-                    label = "Favorites (${favorites.size})",
-                    isSelected = activeSubTab == "Favorites",
-                    modifier = Modifier.weight(1f),
-                    onClick = { activeSubTab = "Favorites" }
-                )
-
-                TabSelectorButton(
-                    label = "My Quotes (${userAdded.size})",
-                    isSelected = activeSubTab == "My Quotes",
-                    modifier = Modifier.weight(1f),
-                    onClick = { activeSubTab = "My Quotes" }
-                )
-            }
+            SavedTabSwitcher(
+                activeTab = activeSubTab,
+                favoritesCount = favorites.size,
+                myQuotesCount = userAdded.size,
+                onSelect = viewModel::selectSavedSubTab
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -186,6 +167,7 @@ fun SavedScreen(viewModel: QuoteViewModel) {
                         items(activeList, key = { it.id }) { quote ->
                             PremiumCollectionQuoteCard(
                                 quote = quote,
+                                nowMillis = timestampTick,
                                 onToggleFavorite = { viewModel.toggleFavorite(quote) },
                                 onDelete = { viewModel.deleteQuote(quote.id) },
                                 isSubmitting = quote.id in submittingQuoteIds,
@@ -208,7 +190,7 @@ fun SavedScreen(viewModel: QuoteViewModel) {
         FloatingActionButton(
             onClick = {
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                showAddDialog = true
+                viewModel.openNewQuoteScreen()
             },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
@@ -223,18 +205,6 @@ fun SavedScreen(viewModel: QuoteViewModel) {
                 imageVector = Icons.Default.Add,
                 contentDescription = "Create Quote",
                 modifier = Modifier.size(24.dp)
-            )
-        }
-
-        // Add Custom Quote Dialog Form
-        if (showAddDialog) {
-            AddCustomQuoteDialog(
-                onDismiss = { showAddDialog = false },
-                onAdd = { txt, auth, cat, tags ->
-                    viewModel.addUserQuote(txt, auth, cat, tags)
-                    showAddDialog = false
-                    activeSubTab = "My Quotes" // switch to showing user added list
-                }
             )
         }
 
@@ -328,47 +298,78 @@ fun SavedScreen(viewModel: QuoteViewModel) {
 }
 
 @Composable
-fun TabSelectorButton(
-    label: String,
-    isSelected: Boolean,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
+private fun SavedTabSwitcher(
+    activeTab: String,
+    favoritesCount: Int,
+    myQuotesCount: Int,
+    onSelect: (String) -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
-    val interactionSource = remember { MutableInteractionSource() }
-    val shape = rememberExpressiveShape(interactionSource, 12.dp, 5.dp)
-    Box(
-        modifier = modifier
-            .clip(shape)
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
             .background(
-                if (isSelected) MaterialTheme.colorScheme.primaryContainer
-                else Color.Transparent
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                RoundedCornerShape(16.dp)
             )
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null
-            ) {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                onClick()
-            }
-            .padding(vertical = 10.dp),
-        contentAlignment = Alignment.Center
+            .padding(4.dp)
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelLarge,
-            color = if (isSelected)
-                MaterialTheme.colorScheme.onPrimaryContainer
-            else
-                MaterialTheme.colorScheme.onSurfaceVariant,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+        val segmentWidth = maxWidth / 2
+        val indicatorOffset by androidx.compose.animation.core.animateDpAsState(
+            targetValue = if (activeTab == "Favorites") 0.dp else segmentWidth,
+            animationSpec = spring(dampingRatio = 0.82f, stiffness = 420f),
+            label = "SavedTabIndicator"
         )
+
+        Box(
+            modifier = Modifier
+                .offset { IntOffset(indicatorOffset.roundToPx(), 0) }
+                .width(segmentWidth)
+                .height(40.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.primaryContainer)
+        )
+
+        Row(modifier = Modifier.fillMaxWidth()) {
+            listOf(
+                "Favorites" to "Favorites ($favoritesCount)",
+                "My Quotes" to "My Quotes ($myQuotesCount)"
+            ).forEach { (tab, label) ->
+                val selected = activeTab == tab
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(40.dp)
+                        .clickable(
+                            interactionSource = remember(tab) { MutableInteractionSource() },
+                            indication = null
+                        ) {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onSelect(tab)
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (selected) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                    )
+                }
+            }
+        }
     }
 }
 
 @Composable
 fun PremiumCollectionQuoteCard(
     quote: QuoteEntity,
+    nowMillis: Long,
     onToggleFavorite: () -> Unit,
     onDelete: () -> Unit,
     isSubmitting: Boolean,
@@ -378,14 +379,6 @@ fun PremiumCollectionQuoteCard(
     val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
 
-    // Tick every 30s so relative timestamps stay fresh
-    var tick by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(30_000)
-            tick = System.currentTimeMillis()
-        }
-    }
     // Elegant fly-in enter animation from the side
     val offsetX = remember { androidx.compose.animation.core.Animatable(80f) }
     val alpha = remember { androidx.compose.animation.core.Animatable(0f) }
@@ -456,7 +449,9 @@ fun PremiumCollectionQuoteCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        val tagsSp = quote.tags.split(",").filter { it.isNotBlank() }
+                        val tagsSp = remember(quote.tags) {
+                            quote.tags.split(",").filter { it.isNotBlank() }
+                        }
                         tagsSp.take(2).forEach { tag ->
                             Box(
                                 modifier = Modifier
@@ -476,7 +471,7 @@ fun PremiumCollectionQuoteCard(
                     }
 
                     Text(
-                        text = formatSavedDate(quote.savedDate, tick),
+                        text = formatSavedDate(quote.savedDate, nowMillis),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                     )
@@ -687,216 +682,5 @@ private fun getInitials(name: String): String {
         parts.isEmpty() -> "U"
         parts.size == 1 -> parts[0].take(2).uppercase()
         else -> (parts[0].take(1) + parts[1].take(1)).uppercase()
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun AddCustomQuoteDialog(
-    onDismiss: () -> Unit,
-    onAdd: (text: String, author: String, category: String, tags: String) -> Unit
-) {
-    var text by remember { mutableStateOf("") }
-    var author by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf("Inspirational") }
-    var tags by remember { mutableStateOf("") }
-
-    val categories = listOf(
-        "Inspirational",
-        "Life",
-        "Humor",
-        "Love",
-        "Books",
-        "Truth",
-        "Reading",
-        "Wisdom",
-        "Happiness",
-        "Writing",
-        "Inspiration",
-        "Philosophy",
-        "Death",
-        "Poetry",
-        "Optimism"
-    )
-    val haptic = LocalHapticFeedback.current
-
-    val nestedScrollConnection = remember {
-        object : NestedScrollConnection {
-            override fun onPostScroll(
-                consumed: Offset,
-                available: Offset,
-                source: NestedScrollSource
-            ): Offset {
-                return if (available.y > 0f) {
-                    Offset(0f, available.y)
-                } else {
-                    Offset.Zero
-                }
-            }
-        }
-    }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = MaterialTheme.colorScheme.background,
-        tonalElevation = 8.dp,
-        dragHandle = { BottomSheetDefaults.DragHandle(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)) }
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .nestedScroll(nestedScrollConnection)
-                .padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 24.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "New Custom Quote",
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.primary
-                )
-                ExpressiveIconButton(onClick = onDismiss) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Close",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            // Clean Quote Text
-            OutlinedTextField(
-                value = text,
-                onValueChange = { text = it },
-                label = { Text("Quote / Affirmation") },
-                placeholder = { Text("Write inspiring words...") },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors()
-            )
-
-            // Author Input
-            OutlinedTextField(
-                value = author,
-                onValueChange = { author = it },
-                label = { Text("Author") },
-                placeholder = { Text("e.g. Marcus Aurelius, Self") },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors()
-            )
-
-            // Tags Input
-            OutlinedTextField(
-                value = tags,
-                onValueChange = { tags = it },
-                label = { Text("Tags") },
-                placeholder = { Text("e.g. wisdom, life (comma-separated)") },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors()
-            )
-
-            // Category Selection (Matches Library's grid style!)
-            Text(
-                text = "Select Category",
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(top = 8.dp)
-            )
-
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                categories.chunked(2).forEach { rowCategoryList ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        rowCategoryList.forEach { categoryName ->
-                            val isSelected = (category == categoryName)
-                            val interactionSource = remember(categoryName) { MutableInteractionSource() }
-                            FilterChip(
-                                selected = isSelected,
-                                onClick = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    category = categoryName
-                                },
-                                label = {
-                                    Text(
-                                        text = categoryName,
-                                        style = MaterialTheme.typography.labelMedium.copy(
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                        )
-                                    )
-                                },
-                                modifier = Modifier.weight(1f).height(46.dp),
-                                shape = rememberExpressiveShape(interactionSource, 23.dp, 10.dp),
-                                interactionSource = interactionSource,
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
-                                    selectedLabelColor = MaterialTheme.colorScheme.primary,
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                                ),
-                                border = FilterChipDefaults.filterChipBorder(
-                                    enabled = true,
-                                    selected = isSelected,
-                                    selectedBorderColor = MaterialTheme.colorScheme.primary,
-                                    borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
-                                )
-                            )
-                        }
-                        if (rowCategoryList.size == 1) {
-                            Spacer(modifier = Modifier.weight(1f))
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                ExpressiveTextButton(
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onDismiss()
-                    },
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary),
-                    modifier = Modifier.padding(end = 8.dp)
-                ) {
-                    Text("Cancel")
-                }
-
-                ExpressiveButton(
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        if (text.isNotBlank()) {
-                            onAdd(text, author, category, tags)
-                        }
-                    },
-                    enabled = text.isNotBlank(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    ),
-                    restingCorner = 12.dp
-                ) {
-                    Text("Add Quote")
-                }
-            }
-        }
     }
 }

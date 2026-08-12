@@ -29,6 +29,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.brokoli5191.quote.BuildConfig
 import app.brokoli5191.quote.data.QuoteSourceMode
 import app.brokoli5191.quote.ui.QuoteViewModel
@@ -87,7 +88,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                     modifier = Modifier.align(Alignment.Start)
                 )
 
-                val activeThemeMode by viewModel.themeMode.collectAsState()
+                val activeThemeMode by viewModel.themeMode.collectAsStateWithLifecycle()
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -128,7 +129,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                 }
 
                 if (activeThemeMode != "LIGHT") {
-                    val amoledBlack by viewModel.amoledBlack.collectAsState()
+                    val amoledBlack by viewModel.amoledBlack.collectAsStateWithLifecycle()
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -165,7 +166,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                     modifier = Modifier.align(Alignment.Start)
                 )
 
-                val activeThemeMode by viewModel.themeMode.collectAsState()
+                val activeThemeMode by viewModel.themeMode.collectAsStateWithLifecycle()
                 val isDynamic = activeThemeMode == "DYNAMIC"
 
                 Row(
@@ -173,7 +174,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val activeThemeAccent by viewModel.themeAccent.collectAsState()
+                    val activeThemeAccent by viewModel.themeAccent.collectAsStateWithLifecycle()
                     val colors = listOf("Violet", "Amber", "Green", "Blue", "Rose")
                     colors.forEach { color ->
                         val isSelected = !isDynamic && activeThemeAccent == color
@@ -236,7 +237,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                     color = MaterialTheme.colorScheme.primary
                 )
 
-                val sourceMode by viewModel.quoteSourceMode.collectAsState()
+                val sourceMode by viewModel.quoteSourceMode.collectAsStateWithLifecycle()
                 val options = listOf(
                     QuoteSourceMode.ALL to "All",
                     QuoteSourceMode.CURATED to "Curated",
@@ -289,9 +290,9 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                     modifier = Modifier.align(Alignment.Start)
                 )
 
-                val reminderEnabled by viewModel.dailyReminderEnabled.collectAsState()
-                val reminderHour by viewModel.dailyReminderHour.collectAsState()
-                val reminderMinute by viewModel.dailyReminderMinute.collectAsState()
+                val reminderEnabled by viewModel.dailyReminderEnabled.collectAsStateWithLifecycle()
+                val reminderHour by viewModel.dailyReminderHour.collectAsStateWithLifecycle()
+                val reminderMinute by viewModel.dailyReminderMinute.collectAsStateWithLifecycle()
 
                 // Permission launcher
                 val permissionLauncher = rememberLauncherForActivityResult(
@@ -538,8 +539,8 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                     modifier = Modifier.align(Alignment.Start)
                 )
 
-                val isLowPerf by viewModel.lowPerformanceMode.collectAsState()
-                val blurNavigationSurfaces by viewModel.blurNavigationSurfaces.collectAsState()
+                val isLowPerf by viewModel.lowPerformanceMode.collectAsStateWithLifecycle()
+                val blurNavigationSurfaces by viewModel.blurNavigationSurfaces.collectAsStateWithLifecycle()
 
                 Card(
                     modifier = Modifier
@@ -625,8 +626,8 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                     modifier = Modifier.align(Alignment.Start)
                 )
 
-                val autoUpdateEnabled by viewModel.autoUpdateEnabled.collectAsState()
-                val updateStatus by viewModel.updateStatus.collectAsState()
+                val autoUpdateEnabled by viewModel.autoUpdateEnabled.collectAsStateWithLifecycle()
+                val updateStatus by viewModel.updateStatus.collectAsStateWithLifecycle()
 
                 Card(
                     modifier = Modifier
@@ -666,7 +667,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
 
                         // Status row
                         val statusText = when (val s = updateStatus) {
-                            is UpdateStatus.Idle -> "Tap 'Check' to look for updates."
+                            is UpdateStatus.Idle -> "Check for app and community quote updates."
                             is UpdateStatus.Checking -> "Checking for updates…"
                             is UpdateStatus.UpToDate -> "You're on the latest version."
                             is UpdateStatus.UpdateAvailable -> "Update available: v${s.version}"
@@ -707,7 +708,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                             ExpressiveOutlinedButton(
                                 onClick = {
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    viewModel.checkForUpdates()
+                                    viewModel.checkForUpdatesManually()
                                 },
                                 enabled = !isChecking && !isDownloading,
                                 modifier = Modifier.weight(1f).height(44.dp),
@@ -718,7 +719,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                 )
                             ) {
                                 Text(
-                                    text = if (isChecking) "Checking…" else "Check",
+                                    text = "Check",
                                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
                                 )
                             }
@@ -906,7 +907,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
             Spacer(modifier = Modifier.height(28.dp))
 
             // Version number — tap 5× to unlock Developer Mode
-            val devUnlocked by viewModel.devModeUnlocked.collectAsState()
+            val devUnlocked by viewModel.devModeUnlocked.collectAsStateWithLifecycle()
             var versionTapCount by remember(devUnlocked) { mutableIntStateOf(0) }
 
             Column(

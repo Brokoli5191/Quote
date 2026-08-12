@@ -15,6 +15,7 @@ class QuoteRepositoryTest {
     @Test
     fun normalizeAuthorName_repairsUtf8DecodedAsLatin1() {
         assertEquals("China Miéville", normalizeAuthorName("China MiÃ©ville,"))
+        assertEquals("Søren Kierkegaard", normalizeAuthorName("Søren Kierkegaard"))
     }
 
     @Test
@@ -30,6 +31,22 @@ class QuoteRepositoryTest {
         assertEquals(
             "You’re dangerous,” he says. “Why?” “Because you make me believe in the impossible",
             normalizeQuoteText("Youâ€™re dangerous,â€� he says. â€œWhy?â€� â€œBecause you make me believe in the impossible")
+        )
+    }
+
+    @Test
+    fun normalizeQuoteText_repairsTruncatedDashAndInvalidReplacementCharacter() {
+        assertEquals(
+            "Something— worth remembering",
+            normalizeQuoteText("Somethingâ€\" � worth remembering")
+        )
+    }
+
+    @Test
+    fun normalizeQuoteText_repairsDoubleEncodedPunctuation() {
+        assertEquals(
+            "It’s true…",
+            normalizeQuoteText("ItÃ¢â‚¬â„¢s trueÃ¢â‚¬Â¦")
         )
     }
 

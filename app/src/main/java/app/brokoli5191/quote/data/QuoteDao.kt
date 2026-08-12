@@ -20,6 +20,12 @@ interface QuoteDao {
     @Query("SELECT * FROM quotes WHERE serverId = :serverId LIMIT 1")
     suspend fun getQuoteByServerId(serverId: String): QuoteEntity?
 
+    @Query("SELECT * FROM quotes WHERE serverId IN (:serverIds)")
+    suspend fun getQuotesByServerIds(serverIds: List<String>): List<QuoteEntity>
+
+    @Query("SELECT * FROM quotes WHERE isUserAdded = 1 AND submissionStatus = 'pending' AND submissionId IS NOT NULL")
+    suspend fun getPendingSubmittedQuotes(): List<QuoteEntity>
+
     @Query("SELECT * FROM quotes WHERE category = :category ORDER BY timestamp DESC")
     fun getQuotesByCategory(category: String): Flow<List<QuoteEntity>>
 

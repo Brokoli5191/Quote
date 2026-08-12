@@ -59,21 +59,26 @@ class QuoteWidgetProvider : AppWidgetProvider() {
     }
 
     private fun updateWidgets(context: Context, manager: AppWidgetManager, ids: IntArray) {
+        val pendingResult = goAsync()
         val repository = QuoteRepository(
             AppDatabase.getInstance(context).quoteDao(),
             InstallationSeed.get(context)
         )
         val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
         CoroutineScope(Dispatchers.Default).launch {
-            val sourceMode = context.getSharedPreferences("aura_prefs", Context.MODE_PRIVATE)
-                .getString("quote_source_mode", QuoteSourceMode.ALL) ?: QuoteSourceMode.ALL
-            val quote = runCatching { repository.getDailyQuote(date, sourceMode) }.getOrNull()
-                ?: QuoteEntity(
-                    text = if (sourceMode == QuoteSourceMode.COMMUNITY) "No community quotes available yet." else "Stay hungry. Stay foolish.",
-                    author = if (sourceMode == QuoteSourceMode.COMMUNITY) "Open Quote to sync" else "Steve Jobs",
-                    category = "Life"
-                )
-            ids.forEach { updateAppWidget(context, manager, it, quote) }
+            try {
+                val sourceMode = context.getSharedPreferences("aura_prefs", Context.MODE_PRIVATE)
+                    .getString("quote_source_mode", QuoteSourceMode.ALL) ?: QuoteSourceMode.ALL
+                val quote = runCatching { repository.getDailyQuote(date, sourceMode) }.getOrNull()
+                    ?: QuoteEntity(
+                        text = if (sourceMode == QuoteSourceMode.COMMUNITY) "No community quotes available yet." else "Stay hungry. Stay foolish.",
+                        author = if (sourceMode == QuoteSourceMode.COMMUNITY) "Open Quote to sync" else "Steve Jobs",
+                        category = "Life"
+                    )
+                ids.forEach { updateAppWidget(context, manager, it, quote) }
+            } finally {
+                pendingResult.finish()
+            }
         }
     }
 
