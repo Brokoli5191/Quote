@@ -1,0 +1,92 @@
+[
+  {
+    "quote": "That's one small step for a man, one giant leap for mankind.",
+    "author": "Neil Armstrong",
+    "tags": ["space", "exploration", "achievement"],
+    "source": "https://www.nasa.gov/wp-content/uploads/static/history/alsj/a11/a11.step.html"
+  },
+  {
+    "quote": "Ask not what your country can do for you—ask what you can do for your country.",
+    "author": "John F. Kennedy",
+    "tags": ["service", "leadership", "freedom"],
+    "source": "https://www.jfklibrary.org/node/11526"
+  },
+  {
+    "quote": "The only thing we have to fear is fear itself.",
+    "author": "Franklin D. Roosevelt",
+    "tags": ["fear", "courage", "leadership"],
+    "source": "https://www.fdrlibrary.org/first-inaugural-curriculum-hub"
+  },
+  {
+    "quote": "If there is no struggle, there is no progress.",
+    "author": "Frederick Douglass",
+    "tags": ["progress", "courage", "freedom"],
+    "source": "https://www.loc.gov/item/2023632632/"
+  },
+  {
+    "quote": "Stay hungry. Stay foolish.",
+    "author": "Steve Jobs",
+    "tags": ["curiosity", "courage", "success"],
+    "source": "https://news.stanford.edu/stories/2005/06/youve-got-find-love-jobs-says"
+  },
+  {
+    "quote": "One child, one teacher, one book and one pen can change the world.",
+    "author": "Malala Yousafzai",
+    "tags": ["education", "change", "courage"],
+    "source": "https://www.un.org/webcast/pdfs/YIR2013_English.pdf"
+  },
+  {
+    "quote": "Failure is impossible.",
+    "author": "Susan B. Anthony",
+    "tags": ["courage", "success", "freedom"],
+    "source": "https://www.loc.gov/exhibits/british/brit-4.html"
+  },
+  {
+    "quote": "Optimism is the faith that leads to achievement.",
+    "author": "Helen Keller",
+    "tags": ["optimism", "faith", "achievement"],
+    "source": "https://tile.loc.gov/storage-services/public/gdcmassbookdig/goodcheerbirthda00unse/goodcheerbirthda00unse.pdf"
+  },
+  {
+    "quote": "All adventures, especially into new territory, are scary.",
+    "author": "Sally Ride",
+    "tags": ["adventure", "space", "courage"],
+    "source": "https://www.nasa.gov/wp-content/uploads/2023/01/NewsNotes-33-3-Fall-2016.pdf"
+  },
+  {
+    "quote": "You are as good as anybody in this town, but you're no better.",
+    "author": "Katherine Johnson",
+    "tags": ["equality", "wisdom", "humility"],
+    "source": "https://www.nasa.gov/centers-and-facilities/langley/she-was-a-computer-when-computers-wore-skirts/"
+  },
+  {
+    "quote": "You manage things; you lead people.",
+    "author": "Grace Hopper",
+    "tags": ["leadership", "wisdom", "work"],
+    "source": "https://www.navy.mil/DesktopModules/ArticleCS/Print.aspx?Article=3161625&ModuleId=698&PortalId=1"
+  },
+  {
+    "quote": "We can only see a short distance ahead, but we can see plenty there that needs to be done.",
+    "author": "Alan Turing",
+    "tags": ["future", "science", "work"],
+    "source": "https://archive.computerhistory.org/projects/chess/related_materials/text/2-3.Computer_science_as_empirical_inquiry/2-3.Computer_science_as_empirical_inquiry.newell_simon.1975.ACM.062303007.pdf"
+  },
+  {
+    "quote": "We are the ones we've been waiting for. We are the change that we seek.",
+    "author": "Barack Obama",
+    "tags": ["change", "leadership", "hope"],
+    "source": "https://obamawhitehouse.archives.gov/blog/2012/02/28/how-make-change-idea-action"
+  },
+  {
+    "quote": "Remember to look up at the stars and not down at your feet.",
+    "author": "Stephen Hawking",
+    "tags": ["science", "curiosity", "optimism"],
+    "source": "https://www.cam.ac.uk/news/cambridge-celebrates-stephen-hawkings-75th-birthday"
+  },
+  {
+    "quote": "What you do makes a difference.",
+    "author": "Jane Goodall",
+    "tags": ["change", "nature", "responsibility"],
+    "source": "https://janegoodall.org/wp-content/uploads/2023-JGI-USA-Impact-Highlights-Final.pdf"
+  }
+]
