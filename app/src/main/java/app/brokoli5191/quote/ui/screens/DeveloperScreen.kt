@@ -28,6 +28,8 @@ import app.brokoli5191.quote.BuildConfig
 import app.brokoli5191.quote.data.QuoteOrigin
 import app.brokoli5191.quote.data.QuoteSubmissionStatus
 import app.brokoli5191.quote.ui.QuoteViewModel
+import app.brokoli5191.quote.ui.categoryText
+import app.brokoli5191.quote.ui.uiText
 import app.brokoli5191.quote.ui.components.ExpressiveButton
 import app.brokoli5191.quote.ui.components.ExpressiveOutlinedButton
 
@@ -68,13 +70,13 @@ fun DeveloperScreen(viewModel: QuoteViewModel, modifier: Modifier = Modifier) {
             ) {
                 Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                     Text(
-                        text = "Developer Options",
+                        text = uiText("Developer Options"),
                         style = MaterialTheme.typography.headlineLarge,
                         color = MaterialTheme.colorScheme.onBackground,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Debug & testing tools",
+                        text = uiText("Debug & testing tools"),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
@@ -92,7 +94,7 @@ fun DeveloperScreen(viewModel: QuoteViewModel, modifier: Modifier = Modifier) {
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
-                        contentDescription = "Close Developer Options",
+                        contentDescription = uiText("Close Developer Options"),
                         tint = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.size(20.dp)
                     )
@@ -103,12 +105,15 @@ fun DeveloperScreen(viewModel: QuoteViewModel, modifier: Modifier = Modifier) {
                 DebugRow("Version", "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
                 DebugRow("Build Type", BuildConfig.BUILD_TYPE)
                 DebugRow("DB Quotes", "${allQuotes.size}")
-                DebugRow("Theme", "$themeMode / $themeAccent")
-                DebugRow("Low Perf Mode", if (lowPerf) "On" else "Off")
+                DebugRow(
+                    "Theme",
+                    "${uiText(themeMode.lowercase().replaceFirstChar { it.uppercase() })} / ${uiText(themeAccent)}"
+                )
+                DebugRow("Low Perf Mode", if (lowPerf) uiText("On") else uiText("Off"))
                 DebugRow(
                     "Notification",
-                    if (reminderEnabled) "On • ${String.format("%02d", reminderHour)}:${String.format("%02d", reminderMinute)}"
-                    else "Off"
+                    if (reminderEnabled) "${uiText("On")} • ${String.format("%02d", reminderHour)}:${String.format("%02d", reminderMinute)}"
+                    else uiText("Off")
                 )
             }
 
@@ -116,7 +121,7 @@ fun DeveloperScreen(viewModel: QuoteViewModel, modifier: Modifier = Modifier) {
                 dailyQuote?.let { quote ->
                     DebugRow("ID", "${quote.id}")
                     DebugRow("Author", quote.author)
-                    DebugRow("Category", quote.category)
+                    DebugRow("Category", categoryText(quote.category))
                     Spacer(Modifier.height(4.dp))
                     Text(
                         text = "\"${quote.text.take(160)}${if (quote.text.length > 160) "…" else ""}\"",
@@ -124,7 +129,7 @@ fun DeveloperScreen(viewModel: QuoteViewModel, modifier: Modifier = Modifier) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 } ?: Text(
-                    text = "No daily quote loaded",
+                    text = uiText("No daily quote loaded"),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                 )
@@ -139,11 +144,11 @@ fun DeveloperScreen(viewModel: QuoteViewModel, modifier: Modifier = Modifier) {
                     "Pending reviews",
                     allQuotes.count { it.submissionStatus == QuoteSubmissionStatus.PENDING }.toString()
                 )
-                DebugRow("Source mode", quoteSourceMode)
-                DebugRow("Initial sync", if (communitySyncFinished) "Finished" else "Waiting")
+                DebugRow("Source mode", uiText(quoteSourceMode.replaceFirstChar { it.uppercase() }))
+                DebugRow("Initial sync", if (communitySyncFinished) uiText("Finished") else uiText("Waiting"))
                 verificationResult?.let { result ->
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
-                    DebugRow("Verification", if (result.isValid) "Passed" else "Needs attention")
+                    DebugRow("Verification", if (result.isValid) uiText("Passed") else uiText("Needs attention"))
                     DebugRow("Empty categories", result.emptyCategories.size.toString())
                 }
             }
@@ -163,7 +168,7 @@ fun DeveloperScreen(viewModel: QuoteViewModel, modifier: Modifier = Modifier) {
                 ) {
                     Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Next Quote", fontWeight = FontWeight.Bold)
+                    Text(uiText("Next Quote"), fontWeight = FontWeight.Bold)
                 }
 
                 ExpressiveOutlinedButton(
@@ -176,7 +181,7 @@ fun DeveloperScreen(viewModel: QuoteViewModel, modifier: Modifier = Modifier) {
                 ) {
                     Icon(Icons.Default.Notifications, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Send Test Notification")
+                    Text(uiText("Send Test Notification"))
                 }
 
                 ExpressiveOutlinedButton(
@@ -189,7 +194,7 @@ fun DeveloperScreen(viewModel: QuoteViewModel, modifier: Modifier = Modifier) {
                 ) {
                     Icon(Icons.Default.CloudSync, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Sync Community Quotes")
+                    Text(uiText("Sync Community Quotes"))
                 }
 
                 ExpressiveOutlinedButton(
@@ -202,7 +207,7 @@ fun DeveloperScreen(viewModel: QuoteViewModel, modifier: Modifier = Modifier) {
                 ) {
                     Icon(Icons.Default.Rule, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Refresh Review Statuses")
+                    Text(uiText("Refresh Review Statuses"))
                 }
 
                 ExpressiveOutlinedButton(
@@ -215,7 +220,7 @@ fun DeveloperScreen(viewModel: QuoteViewModel, modifier: Modifier = Modifier) {
                 ) {
                     Icon(Icons.Default.FactCheck, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Verify Quote Database")
+                    Text(uiText("Verify Quote Database"))
                 }
             }
         }
@@ -238,7 +243,7 @@ private fun DebugSection(title: String, content: @Composable () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                text = title,
+                text = uiText(title),
                 style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.primary
             )
@@ -256,7 +261,7 @@ private fun DebugRow(label: String, value: String) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = label,
+            text = uiText(label),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
         )

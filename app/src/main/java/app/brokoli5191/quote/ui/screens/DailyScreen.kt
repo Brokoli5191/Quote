@@ -50,7 +50,11 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import app.brokoli5191.quote.data.QuoteEntity
 import app.brokoli5191.quote.data.QuoteSourceMode
+import app.brokoli5191.quote.data.QuoteLanguage
 import app.brokoli5191.quote.ui.QuoteViewModel
+import app.brokoli5191.quote.ui.LocalAppLanguage
+import app.brokoli5191.quote.ui.formattedQuote
+import app.brokoli5191.quote.ui.uiText
 import app.brokoli5191.quote.ui.components.ExpressiveButton
 import app.brokoli5191.quote.ui.components.ExpressiveTonalButton
 import app.brokoli5191.quote.ui.theme.SerifFontFamily
@@ -66,6 +70,7 @@ fun DailyScreen(viewModel: QuoteViewModel) {
     val communitySyncFinished by viewModel.communitySyncFinished.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
+    val uiLanguage = LocalAppLanguage.current
     val scrollState = rememberScrollState()
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -96,13 +101,13 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                     .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 18.dp)
             ) {
                 Text(
-                    text = "Today",
+                    text = uiText("Today"),
                     style = MaterialTheme.typography.headlineLarge,
                     color = MaterialTheme.colorScheme.onBackground,
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    text = "A thought worth keeping",
+                    text = uiText("A thought worth keeping"),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -164,8 +169,9 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 30.dp)
                                         )
                                     }
-                                    Spacer(Modifier.height(24.dp))
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (quote.author.isNotBlank()) {
+                                      Spacer(Modifier.height(24.dp))
+                                      Row(verticalAlignment = Alignment.CenterVertically) {
                                         Box(
                                             Modifier.size(42.dp).background(
                                                 MaterialTheme.colorScheme.primaryContainer,
@@ -188,41 +194,47 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                                                 color = MaterialTheme.colorScheme.onSurface
                                             )
                                         }
+                                      }
                                     }
                                 }
                             }
 
                             Spacer(Modifier.height(12.dp))
-                            QuoteTags(
-                                tags = quote.tags.split(",")
-                                    .map { it.trim() }
-                                    .filter { it.isNotEmpty() }
-                                    .take(4)
-                            )
+                            if (!quote.isAnonymous && uiLanguage == QuoteLanguage.ENGLISH) {
+                                QuoteTags(
+                                    tags = quote.tags.split(",")
+                                        .map { it.trim() }
+                                        .filter { it.isNotEmpty() }
+                                        .take(4)
+                                )
+                            }
 
                             Spacer(Modifier.height(8.dp))
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 DailyActionButton(
                                     icon = if (quote.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                                    label = if (quote.isFavorite) "Saved" else "Save",
+                                    label = if (quote.isFavorite) uiText("Saved") else uiText("Save"),
                                     onClick = { viewModel.toggleFavorite(quote) }
                                 )
-                                DailyActionButton(Icons.Default.ContentCopy, "Copy") {
+                                DailyActionButton(Icons.Default.ContentCopy, uiText("Copy")) {
                                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                    clipboard.setPrimaryClip(ClipData.newPlainText("quote", "\"${quote.text}\" — ${quote.author}"))
+                                    clipboard.setPrimaryClip(ClipData.newPlainText("quote", formattedQuote(quote.text, quote.author)))
                                 }
-                                DailyActionButton(Icons.Default.Share, "Share") {
+                                DailyActionButton(Icons.Default.Share, uiText("Share")) {
                                     context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
                                         type = "text/plain"
-                                        putExtra(Intent.EXTRA_TEXT, "\"${quote.text}\" — ${quote.author}")
+                                        putExtra(Intent.EXTRA_TEXT, formattedQuote(quote.text, quote.author))
                                     }, null))
                                 }
                             }
-                            Spacer(Modifier.height(10.dp))
-                            ExpressiveButton(
+                            if (quote.author.isNotBlank()) {
+                              Spacer(Modifier.height(10.dp))
+                              ExpressiveButton(
                                 onClick = {
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    val url = "https://en.wikipedia.org/wiki/${quote.author.replace(" ", "_")}"
+                                    val wikipediaLanguage = if (uiLanguage == QuoteLanguage.GERMAN) "de" else "en"
+                                    val url = "https://$wikipediaLanguage.wikipedia.org/wiki/" +
+                                        quote.author.replace(" ", "_")
                                     context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
                                 },
                                 modifier = Modifier.fillMaxWidth().height(52.dp),
@@ -230,7 +242,8 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                             ) {
                                 Icon(Icons.Default.Language, contentDescription = null)
                                 Spacer(Modifier.width(8.dp))
-                                Text("Explore this author")
+                                Text(uiText("Explore this author"))
+                              }
                             }
                         }
                     }
@@ -252,7 +265,7 @@ private fun DailyQuoteEmptyState(
     ) {
         if (loading) {
             CircularProgressIndicator(modifier = Modifier.size(32.dp), strokeWidth = 3.dp)
-            Text("Syncing quotes...", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(uiText("Syncing quotes..."), color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
             Icon(
                 Icons.Default.CloudOff,
@@ -261,20 +274,20 @@ private fun DailyQuoteEmptyState(
                 tint = MaterialTheme.colorScheme.primary
             )
             Text(
-                if (communityOnly) "No community quotes yet" else "No quotes available",
+                if (communityOnly) uiText("No community quotes yet") else uiText("No quotes available"),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                if (communityOnly) "Approved community quotes will appear here after the next sync."
-                else "Try syncing again in a moment.",
+                if (communityOnly) uiText("Approved community quotes will appear here after the next sync.")
+                else uiText("Try syncing again in a moment."),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             ExpressiveTonalButton(onClick = onRetry) {
                 Icon(Icons.Default.Refresh, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text("Try again")
+                Text(uiText("Try again"))
             }
         }
     }

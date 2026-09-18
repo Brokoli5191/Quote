@@ -51,6 +51,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -79,6 +80,10 @@ import app.brokoli5191.quote.data.InstallationSeed
 import app.brokoli5191.quote.data.QuoteEntity
 import app.brokoli5191.quote.data.QuoteRepository
 import app.brokoli5191.quote.data.QuoteSourceMode
+import app.brokoli5191.quote.data.QuoteLanguage
+import app.brokoli5191.quote.ui.LocalAppLanguage
+import app.brokoli5191.quote.ui.uiText
+import app.brokoli5191.quote.ui.localizeUi
 import app.brokoli5191.quote.ui.theme.MyApplicationTheme
 import app.brokoli5191.quote.ui.components.ExpressiveButton
 import app.brokoli5191.quote.ui.components.rememberExpressiveShape
@@ -113,9 +118,10 @@ class WidgetConfigureActivity : ComponentActivity() {
         val mode = prefs.getString("theme_mode", "DARK") ?: "DARK"
         val accent = prefs.getString("theme_accent", "Violet") ?: "Violet"
         val amoled = prefs.getBoolean("amoled_black", false)
+        val language = prefs.getString("app_language", QuoteLanguage.ENGLISH) ?: QuoteLanguage.ENGLISH
         setContent {
             MyApplicationTheme(themeMode = mode, themeAccent = accent, amoledBlack = amoled) {
-                ConfigureScreen()
+                CompositionLocalProvider(LocalAppLanguage provides language) { ConfigureScreen() }
             }
         }
     }
@@ -179,7 +185,7 @@ class WidgetConfigureActivity : ComponentActivity() {
         Scaffold(
             topBar = {
                 CenterAlignedTopAppBar(
-                    title = { Text("Customize Widget", fontWeight = FontWeight.Bold) },
+                    title = { Text(uiText("Customize Widget"), fontWeight = FontWeight.Bold) },
                     colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                         containerColor = MaterialTheme.colorScheme.background
                     )
@@ -196,7 +202,7 @@ class WidgetConfigureActivity : ComponentActivity() {
                             .height(54.dp),
                         restingCorner = 18.dp
                     ) {
-                        Text("Create Widget", fontWeight = FontWeight.Bold)
+                        Text(uiText("Create Widget"), fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -213,7 +219,7 @@ class WidgetConfigureActivity : ComponentActivity() {
                 ) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         SectionTitle("Live Preview")
-                        Text("Drag elements to move", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(uiText("Drag elements to move"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     WidgetPreview(
                         config = config,
@@ -272,7 +278,7 @@ class WidgetConfigureActivity : ComponentActivity() {
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                preset.name,
+                                uiText(preset.name),
                                 color = if (preset.name == "Paper") Color.Black else Color.White,
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold
@@ -295,7 +301,7 @@ class WidgetConfigureActivity : ComponentActivity() {
                         FilterChip(
                             selected = font == option,
                             onClick = { font = option },
-                            label = { Text(option) },
+                            label = { Text(uiText(option)) },
                             shape = rememberExpressiveShape(interactionSource, 20.dp, 9.dp),
                             interactionSource = interactionSource,
                             leadingIcon = if (font == option) {
@@ -320,7 +326,7 @@ class WidgetConfigureActivity : ComponentActivity() {
 
     @Composable
     private fun SectionTitle(text: String) {
-        Text(text, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+        Text(uiText(text), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
     }
 
     @Composable
@@ -335,7 +341,7 @@ class WidgetConfigureActivity : ComponentActivity() {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(label, fontWeight = FontWeight.SemiBold)
+            Text(uiText(label), fontWeight = FontWeight.SemiBold)
             Switch(checked = checked, onCheckedChange = onChecked)
         }
     }
@@ -350,7 +356,7 @@ class WidgetConfigureActivity : ComponentActivity() {
     ) {
         Column {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(label, fontWeight = FontWeight.SemiBold)
+                Text(uiText(label), fontWeight = FontWeight.SemiBold)
                 Text(valueText, color = MaterialTheme.colorScheme.primary)
             }
             Slider(value = value, onValueChange = onValue, valueRange = range)
@@ -361,7 +367,7 @@ class WidgetConfigureActivity : ComponentActivity() {
     private fun ColorPicker(label: String, value: String, onValue: (String) -> Unit) {
         val colors = listOf("#FFFFFF", "#E9DDFF", "#D0BCFF", "#A0D2AD", "#ADC6FF", "#FFB2C5", "#FFDB9C", "#CAC4D0", "#1C1B1F")
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(label, style = MaterialTheme.typography.labelLarge)
+            Text(uiText(label), style = MaterialTheme.typography.labelLarge)
             Row(
                 Modifier.horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -395,7 +401,7 @@ class WidgetConfigureActivity : ComponentActivity() {
             value = value,
             onValueChange = { if (it.length <= 9) onValue(it) },
             modifier = modifier,
-            label = { Text(label) },
+            label = { Text(uiText(label)) },
             singleLine = true,
             shape = RoundedCornerShape(14.dp),
             trailingIcon = { Icon(Icons.Default.Colorize, null, tint = parseColor(value)) }
@@ -454,7 +460,7 @@ class WidgetConfigureActivity : ComponentActivity() {
                 }
                 if (config.showLabel) {
                     DraggablePreviewElement(config.labelX, config.labelY, onLabelPosition) {
-                        Text("QUOTE", color = parseColor(config.labelColor), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                        Text(uiText("QUOTE"), color = parseColor(config.labelColor), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                     }
                 }
                 if (config.showIcon) {
@@ -464,7 +470,7 @@ class WidgetConfigureActivity : ComponentActivity() {
                 }
                 DraggablePreviewElement(config.quoteX, config.quoteY, onQuotePosition) {
                     Text(
-                        "The happiness of your life depends upon the quality of your thoughts.",
+                        uiText("The happiness of your life depends upon the quality of your thoughts."),
                         color = parseColor(config.quoteColor),
                         fontFamily = quoteFont,
                         fontStyle = if (config.font == "Serif") FontStyle.Italic else FontStyle.Normal,
@@ -549,12 +555,15 @@ class WidgetConfigureActivity : ComponentActivity() {
                 InstallationSeed.get(this@WidgetConfigureActivity)
             )
             val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-            val sourceMode = getSharedPreferences("aura_prefs", Context.MODE_PRIVATE)
-                .getString("quote_source_mode", QuoteSourceMode.ALL) ?: QuoteSourceMode.ALL
-            val quote = runCatching { repository.getDailyQuote(date, sourceMode) }.getOrNull()
+            val prefs = getSharedPreferences("aura_prefs", Context.MODE_PRIVATE)
+            val sourceMode = prefs.getString("quote_source_mode", QuoteSourceMode.ALL) ?: QuoteSourceMode.ALL
+            val language = prefs.getString("app_language", QuoteLanguage.ENGLISH) ?: QuoteLanguage.ENGLISH
+            val quote = runCatching {
+                repository.getDailyQuote(date, sourceMode, language, prefs.getBoolean("show_anonymous_quotes", false))
+            }.getOrNull()
                 ?: QuoteEntity(
-                    text = if (sourceMode == QuoteSourceMode.COMMUNITY) "No community quotes available yet." else "Stay hungry. Stay foolish.",
-                    author = if (sourceMode == QuoteSourceMode.COMMUNITY) "Open Quote to sync" else "Steve Jobs",
+                    text = if (language == QuoteLanguage.GERMAN) "Bleib neugierig. Bleib mutig." else if (sourceMode == QuoteSourceMode.COMMUNITY) "No community quotes available yet." else "Stay hungry. Stay foolish.",
+                    author = if (language == QuoteLanguage.GERMAN) "" else if (sourceMode == QuoteSourceMode.COMMUNITY) "Open Quote to sync" else "Steve Jobs",
                     category = "Life"
                 )
             withContext(Dispatchers.Main) {
@@ -563,7 +572,7 @@ class WidgetConfigureActivity : ComponentActivity() {
                     RESULT_OK,
                     Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
                 )
-                Toast.makeText(this@WidgetConfigureActivity, "Widget created", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@WidgetConfigureActivity, localizeUi("Widget created", language), Toast.LENGTH_SHORT).show()
                 finish()
             }
         }

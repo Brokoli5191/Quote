@@ -82,4 +82,31 @@ class QuoteRepositoryTest {
         assertTrue(community.matchesSourceMode(QuoteSourceMode.COMMUNITY))
         assertFalse(bundled.matchesSourceMode(QuoteSourceMode.COMMUNITY))
     }
+
+    @Test
+    fun localizedQuotes_onlyExposeRealTranslations() {
+        val translated = QuoteEntity(
+            text = "Some things bloom only to fade.",
+            textDe = "Manche Dinge blühen nur, um zu verblassen.",
+            author = "",
+            category = "Reflections",
+            isAnonymous = true
+        )
+        val englishOnly = QuoteEntity(text = "English only", author = "Author", category = "Life")
+        val germanPersonal = QuoteEntity(
+            text = "Ein eigener Gedanke",
+            author = "Ich",
+            category = "Life",
+            language = QuoteLanguage.GERMAN,
+            isUserAdded = true,
+            origin = QuoteOrigin.PERSONAL
+        )
+
+        assertTrue(translated.isAvailableIn(QuoteLanguage.ENGLISH))
+        assertTrue(translated.isAvailableIn(QuoteLanguage.GERMAN))
+        assertEquals("Manche Dinge blühen nur, um zu verblassen.", translated.localized(QuoteLanguage.GERMAN).text)
+        assertFalse(englishOnly.isAvailableIn(QuoteLanguage.GERMAN))
+        assertTrue(germanPersonal.isAvailableIn(QuoteLanguage.GERMAN))
+        assertFalse(germanPersonal.isAvailableIn(QuoteLanguage.ENGLISH))
+    }
 }

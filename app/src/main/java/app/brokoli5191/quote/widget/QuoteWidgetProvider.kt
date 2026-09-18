@@ -24,6 +24,7 @@ import app.brokoli5191.quote.data.InstallationSeed
 import app.brokoli5191.quote.data.QuoteEntity
 import app.brokoli5191.quote.data.QuoteRepository
 import app.brokoli5191.quote.data.QuoteSourceMode
+import app.brokoli5191.quote.data.QuoteLanguage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -67,12 +68,14 @@ class QuoteWidgetProvider : AppWidgetProvider() {
         val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
         CoroutineScope(Dispatchers.Default).launch {
             try {
-                val sourceMode = context.getSharedPreferences("aura_prefs", Context.MODE_PRIVATE)
-                    .getString("quote_source_mode", QuoteSourceMode.ALL) ?: QuoteSourceMode.ALL
-                val quote = runCatching { repository.getDailyQuote(date, sourceMode) }.getOrNull()
+                val prefs = context.getSharedPreferences("aura_prefs", Context.MODE_PRIVATE)
+                val sourceMode = prefs.getString("quote_source_mode", QuoteSourceMode.ALL) ?: QuoteSourceMode.ALL
+                val language = prefs.getString("app_language", QuoteLanguage.ENGLISH) ?: QuoteLanguage.ENGLISH
+                val showAnonymous = prefs.getBoolean("show_anonymous_quotes", false)
+                val quote = runCatching { repository.getDailyQuote(date, sourceMode, language, showAnonymous) }.getOrNull()
                     ?: QuoteEntity(
-                        text = if (sourceMode == QuoteSourceMode.COMMUNITY) "No community quotes available yet." else "Stay hungry. Stay foolish.",
-                        author = if (sourceMode == QuoteSourceMode.COMMUNITY) "Open Quote to sync" else "Steve Jobs",
+                        text = if (language == QuoteLanguage.GERMAN) "Bleib neugierig. Bleib mutig." else if (sourceMode == QuoteSourceMode.COMMUNITY) "No community quotes available yet." else "Stay hungry. Stay foolish.",
+                        author = if (language == QuoteLanguage.GERMAN) "" else if (sourceMode == QuoteSourceMode.COMMUNITY) "Open Quote to sync" else "Steve Jobs",
                         category = "Life"
                     )
                 ids.forEach { updateAppWidget(context, manager, it, quote) }
@@ -99,12 +102,16 @@ class QuoteWidgetProvider : AppWidgetProvider() {
             val widthDp = (if (portrait) minWidth else maxWidth).takeIf { it > 0 } ?: 280
             val heightDp = (if (portrait) maxHeight else minHeight).takeIf { it > 0 } ?: 140
             val scale = 3f
+            val language = context.getSharedPreferences("aura_prefs", Context.MODE_PRIVATE)
+                .getString("app_language", QuoteLanguage.ENGLISH)
+                ?: QuoteLanguage.ENGLISH
             val bitmap = drawWidgetBitmap(
                 quote,
                 WidgetConfig.read(context, appWidgetId),
                 (widthDp * scale).toInt().coerceAtLeast(120),
                 (heightDp * scale).toInt().coerceAtLeast(100),
-                scale
+                scale,
+                label = if (language == QuoteLanguage.GERMAN) "ZITAT" else "QUOTE"
             )
             views.setImageViewBitmap(R.id.widget_image, bitmap)
             val intent = Intent(context, MainActivity::class.java).apply {
@@ -127,7 +134,8 @@ class QuoteWidgetProvider : AppWidgetProvider() {
             config: WidgetConfig,
             width: Int,
             height: Int,
-            density: Float
+            density: Float,
+            label: String
         ): Bitmap {
             val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(bitmap)
@@ -206,7 +214,7 @@ class QuoteWidgetProvider : AppWidgetProvider() {
                 paint.color = parseColor(config.labelColor, "#D0BCFF")
                 paint.textSize = labelSize
                 paint.typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
-                canvas.drawText("QUOTE", labelX, labelY, paint)
+                canvas.drawText(label, labelX, labelY, paint)
             }
             if (canShowIcon) {
                 paint.color = parseColor(config.labelColor, "#D0BCFF")
@@ -222,7 +230,7 @@ class QuoteWidgetProvider : AppWidgetProvider() {
             paint.typeface = quoteTypeface
             drawWrappedText(canvas, quote.text, quoteX, quoteY + quoteSize, availableWidth, paint, lineHeight, maxHeight)
 
-            if (canShowAuthor) {
+            if (canShowAuthor && quote.author.isNotBlank()) {
                 paint.color = parseColor(config.authorColor, "#A0D2AD")
                 paint.textSize = authorSize
                 paint.typeface = authorTypeface

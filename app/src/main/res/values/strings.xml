@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Quote</string>
+    <string name="widget_name">Quote Widget</string>
 </resources>

@@ -31,6 +31,7 @@ class QuoteRepository(
             val jsonString = inputStream.bufferedReader().use { it.readText() }
             val jsonArray = org.json.JSONArray(jsonString)
             val quoteEntities = mutableListOf<QuoteEntity>()
+            val germanTranslations = loadGermanTranslations(context)
             
             for (i in 0 until jsonArray.length()) {
                 val item = jsonArray.getJSONObject(i)
@@ -56,7 +57,25 @@ class QuoteRepository(
                         aboutAuthor = "",
                         tags = tagsStr,
                         isFavorite = false,
-                        timestamp = System.currentTimeMillis()
+                        timestamp = System.currentTimeMillis(),
+                        textDe = germanTranslations[cleanText]
+                    )
+                )
+            }
+
+            val anonymousInput = context.resources.openRawResource(app.brokoli5191.quote.R.raw.anonymous_quotes)
+            val anonymousJson = org.json.JSONArray(anonymousInput.bufferedReader().use { it.readText() })
+            for (i in 0 until anonymousJson.length()) {
+                val item = anonymousJson.getJSONObject(i)
+                quoteEntities.add(
+                    QuoteEntity(
+                        text = normalizeQuoteText(item.getString("quote")),
+                        textDe = normalizeQuoteText(item.getString("quote_de")),
+                        author = "",
+                        category = "Reflections",
+                        tags = "reflection, anonymous, original",
+                        isAnonymous = true,
+                        timestamp = System.currentTimeMillis() + i
                     )
                 )
             }
@@ -67,6 +86,17 @@ class QuoteRepository(
             quoteDao.insertQuotes(quoteEntities)
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+    }
+
+    private fun loadGermanTranslations(context: Context): Map<String, String> {
+        val input = context.resources.openRawResource(app.brokoli5191.quote.R.raw.quotes_de)
+        val json = org.json.JSONArray(input.bufferedReader().use { it.readText() })
+        return buildMap {
+            for (i in 0 until json.length()) {
+                val item = json.getJSONObject(i)
+                put(normalizeQuoteText(item.getString("quote")), normalizeQuoteText(item.getString("quote_de")))
+            }
         }
     }
 
@@ -167,16 +197,26 @@ class QuoteRepository(
     }
 
     // Daily quote selector
-    suspend fun getDailyQuote(date: String, sourceMode: String = QuoteSourceMode.ALL): QuoteEntity? {
+    suspend fun getDailyQuote(
+        date: String,
+        sourceMode: String = QuoteSourceMode.ALL,
+        language: String = QuoteLanguage.ENGLISH,
+        showAnonymous: Boolean = false
+    ): QuoteEntity? {
+        val selectionKey = "${date}_${language}_${if (showAnonymous) 1 else 0}_${sourceMode}"
         // Check if there is already a selection for today
-        val selection = quoteDao.getDailySelection(date)
+        val selection = quoteDao.getDailySelection(selectionKey)
         if (selection != null) {
             val q = quoteDao.getQuoteById(selection.quoteId)
-            if (q != null && q.matchesSourceMode(sourceMode)) return q
+            if (q != null && q.matchesSourceMode(sourceMode) && q.isAvailableIn(language) && (showAnonymous || !q.isAnonymous)) {
+                return q.localized(language)
+            }
         }
 
         // Otherwise select a random quote
-        val all = quoteDao.getAllQuotesSync().filter { it.matchesSourceMode(sourceMode) }
+        val all = quoteDao.getAllQuotesSync().filter {
+            it.matchesSourceMode(sourceMode) && it.isAvailableIn(language) && (showAnonymous || !it.isAnonymous)
+        }
         if (all.isEmpty()) {
             return null
         }
@@ -190,17 +230,25 @@ class QuoteRepository(
         val selectedQuote = pool[selectedIdx]
 
         // Save selection for today
-        quoteDao.insertDailySelection(DailySelectionEntity(date, selectedQuote.id))
-        return selectedQuote
+        quoteDao.insertDailySelection(DailySelectionEntity(selectionKey, selectedQuote.id))
+        return selectedQuote.localized(language)
     }
 
-    suspend fun cycleDailyQuote(date: String, sourceMode: String = QuoteSourceMode.ALL): QuoteEntity? {
-        val all = quoteDao.getAllQuotesSync().filter { it.matchesSourceMode(sourceMode) }
+    suspend fun cycleDailyQuote(
+        date: String,
+        sourceMode: String = QuoteSourceMode.ALL,
+        language: String = QuoteLanguage.ENGLISH,
+        showAnonymous: Boolean = false
+    ): QuoteEntity? {
+        val selectionKey = "${date}_${language}_${if (showAnonymous) 1 else 0}_${sourceMode}"
+        val all = quoteDao.getAllQuotesSync().filter {
+            it.matchesSourceMode(sourceMode) && it.isAvailableIn(language) && (showAnonymous || !it.isAnonymous)
+        }
         if (all.isEmpty()) {
             return null
         }
 
-        val selection = quoteDao.getDailySelection(date)
+        val selection = quoteDao.getDailySelection(selectionKey)
         val currentQuoteId = selection?.quoteId ?: -1
 
         // Filter out the current one so it rotates to another
@@ -210,8 +258,8 @@ class QuoteRepository(
         // Choose a random quote from finalChoices
         val nextQuote = finalChoices.shuffled().first()
 
-        quoteDao.insertDailySelection(DailySelectionEntity(date, nextQuote.id))
-        return nextQuote
+        quoteDao.insertDailySelection(DailySelectionEntity(selectionKey, nextQuote.id))
+        return nextQuote.localized(language)
     }
 
 }

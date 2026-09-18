@@ -43,7 +43,7 @@
         <receiver
             android:name="app.brokoli5191.quote.widget.QuoteWidgetProvider"
             android:exported="true"
-            android:label="quote Widget">
+            android:label="@string/widget_name">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="app.brokoli5191.quote.UPDATE_WIDGET" />

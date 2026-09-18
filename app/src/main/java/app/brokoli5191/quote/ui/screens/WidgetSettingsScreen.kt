@@ -32,7 +32,11 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.brokoli5191.quote.BuildConfig
 import app.brokoli5191.quote.data.QuoteSourceMode
+import app.brokoli5191.quote.data.QuoteLanguage
 import app.brokoli5191.quote.ui.QuoteViewModel
+import app.brokoli5191.quote.ui.LocalAppLanguage
+import app.brokoli5191.quote.ui.localizeUi
+import app.brokoli5191.quote.ui.uiText
 import app.brokoli5191.quote.ui.components.ExpressiveButton
 import app.brokoli5191.quote.ui.components.ExpressiveOutlinedButton
 import app.brokoli5191.quote.ui.components.ExpressiveTextButton
@@ -43,6 +47,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
     val haptic = LocalHapticFeedback.current
+    val uiLanguage = LocalAppLanguage.current
 
     Box(
         modifier = Modifier
@@ -65,7 +70,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
-                    text = "Settings",
+                    text = uiText("Settings"),
                     style = MaterialTheme.typography.headlineLarge,
                     color = MaterialTheme.colorScheme.onBackground,
                     fontWeight = FontWeight.Bold
@@ -82,7 +87,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = "App Theme",
+                    text = uiText("App Theme"),
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.align(Alignment.Start)
@@ -121,7 +126,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                             contentPadding = PaddingValues(0.dp)
                         ) {
                             Text(
-                                text = label,
+                                text = uiText(label),
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
                             )
                         }
@@ -137,7 +142,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                     ) {
                         Column(Modifier.weight(1f)) {
                             Text(
-                                text = "AMOLED Pure Black",
+                                text = uiText("AMOLED Pure Black"),
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
@@ -160,7 +165,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = "Accent Palette",
+                    text = uiText("Accent Palette"),
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.align(Alignment.Start)
@@ -232,7 +237,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = "Quote Sources",
+                    text = uiText("Quote Sources"),
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -268,9 +273,71 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                             ) else null,
                             contentPadding = PaddingValues(horizontal = 2.dp)
                         ) {
-                            Text(title, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                            Text(uiText(title), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                         }
                     }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = uiText("Language"),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.primary
+                )
+                val appLanguage by viewModel.appLanguage.collectAsStateWithLifecycle()
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf(
+                        QuoteLanguage.ENGLISH to "English",
+                        QuoteLanguage.GERMAN to "German"
+                    ).forEach { (language, title) ->
+                        val selected = appLanguage == language
+                        ExpressiveButton(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                viewModel.setAppLanguage(language)
+                            },
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            restingCorner = 12.dp,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer
+                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
+                                else MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
+                            border = if (selected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)) else null
+                        ) {
+                            Text(localizeUi(title, appLanguage), fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                val showAnonymous by viewModel.showAnonymousQuotes.collectAsStateWithLifecycle()
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                        Text(uiText("Anonymous reflections"), fontWeight = FontWeight.SemiBold)
+                        Text(
+                            uiText("Show original poetic quotes without an author"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = showAnonymous,
+                        onCheckedChange = viewModel::setShowAnonymousQuotes
+                    )
                 }
             }
 
@@ -284,7 +351,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = "Daily Reflection Reminders",
+                    text = uiText("Daily Reflection Reminders"),
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.align(Alignment.Start)
@@ -300,9 +367,9 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                     onResult = { isGranted ->
                         if (isGranted) {
                             viewModel.setDailyReminderEnabled(true)
-                            Toast.makeText(context, "Daily Reminder scheduled! ✦", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, localizeUi("Daily Reminder scheduled! ✦", uiLanguage), Toast.LENGTH_SHORT).show()
                         } else {
-                            Toast.makeText(context, "Notifications permission is required to receive daily quotes.", Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, localizeUi("Notifications permission is required to receive daily quotes.", uiLanguage), Toast.LENGTH_LONG).show()
                         }
                     }
                 )
@@ -340,14 +407,14 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.NotificationsActive,
-                                        contentDescription = "Daily Reminders",
+                                        contentDescription = uiText("Daily Reminders"),
                                         tint = MaterialTheme.colorScheme.primary,
                                         modifier = Modifier.size(20.dp)
                                     )
                                 }
                                 Column(modifier = Modifier.padding(end = 8.dp)) {
                                     Text(
-                                        text = "Inspirational Mornings",
+                                        text = uiText("Inspirational Mornings"),
                                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
@@ -367,17 +434,17 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
 
                                             if (hasPermission) {
                                                 viewModel.setDailyReminderEnabled(true)
-                                                Toast.makeText(context, "Daily Reminder scheduled! ✦", Toast.LENGTH_SHORT).show()
+                                                Toast.makeText(context, localizeUi("Daily Reminder scheduled! ✦", uiLanguage), Toast.LENGTH_SHORT).show()
                                             } else {
                                                 permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                                             }
                                         } else {
                                             viewModel.setDailyReminderEnabled(true)
-                                            Toast.makeText(context, "Daily Reminder scheduled! ✦", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, localizeUi("Daily Reminder scheduled! ✦", uiLanguage), Toast.LENGTH_SHORT).show()
                                         }
                                     } else {
                                         viewModel.setDailyReminderEnabled(false)
-                                        Toast.makeText(context, "Daily Reminder disabled", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, localizeUi("Daily Reminder disabled", uiLanguage), Toast.LENGTH_SHORT).show()
                                     }
                                 }
                             )
@@ -397,7 +464,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                 verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 Text(
-                                    text = "Choose Notification Time",
+                                    text = uiText("Choose Notification Time"),
                                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
                                     color = MaterialTheme.colorScheme.primary
                                 )
@@ -513,7 +580,11 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                 }
 
                                 Text(
-                                    text = "Scheduled daily at ${if (reminderHour == 0) 12 else if (reminderHour > 12) reminderHour - 12 else reminderHour}:${String.format("%02d", reminderMinute)} ${if (reminderHour < 12) "AM" else "PM"}",
+                                    text = if (uiLanguage == QuoteLanguage.GERMAN) {
+                                        "Täglich um ${String.format("%02d:%02d", reminderHour, reminderMinute)} Uhr"
+                                    } else {
+                                        "Scheduled daily at ${if (reminderHour == 0) 12 else if (reminderHour > 12) reminderHour - 12 else reminderHour}:${String.format("%02d", reminderMinute)} ${if (reminderHour < 12) "AM" else "PM"}"
+                                    },
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                                 )
@@ -533,7 +604,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = "Performance",
+                    text = uiText("Performance"),
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.align(Alignment.Start)
@@ -558,7 +629,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                     ) {
                         Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                             Text(
-                                text = "Blur Navigation Surfaces",
+                                text = uiText("Blur Navigation Surfaces"),
                                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                                 color = MaterialTheme.colorScheme.onSurface
                             )
@@ -588,7 +659,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                     ) {
                         Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                             Text(
-                                text = "Low Performance Mode",
+                                text = uiText("Low Performance Mode"),
                                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                                 color = MaterialTheme.colorScheme.onSurface
                             )
@@ -601,7 +672,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                 viewModel.setLowPerformanceMode(isChecked)
                                 Toast.makeText(
                                     context,
-                                    if (isChecked) "Low Performance Mode enabled" else "Standard performance mode active",
+                                    localizeUi(if (isChecked) "Low Performance Mode enabled" else "Standard performance mode active", uiLanguage),
                                     Toast.LENGTH_SHORT
                                 ).show()
                             }
@@ -620,7 +691,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = "Updates",
+                    text = uiText("Updates"),
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.align(Alignment.Start)
@@ -651,7 +722,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                         ) {
                             Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                                 Text(
-                                    text = "Automatic Updates",
+                                    text = uiText("Automatic Updates"),
                                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
@@ -667,13 +738,13 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
 
                         // Status row
                         val statusText = when (val s = updateStatus) {
-                            is UpdateStatus.Idle -> "Check for app and community quote updates."
-                            is UpdateStatus.Checking -> "Checking for updates…"
-                            is UpdateStatus.UpToDate -> "You're on the latest version."
-                            is UpdateStatus.UpdateAvailable -> "Update available: v${s.version}"
-                            is UpdateStatus.Downloading -> "Downloading… ${s.progress}%"
-                            is UpdateStatus.ReadyToInstall -> "v${s.version} ready to install."
-                            is UpdateStatus.Error -> s.message
+                            is UpdateStatus.Idle -> uiText("Check for app and community quote updates.")
+                            is UpdateStatus.Checking -> uiText("Checking for updates…")
+                            is UpdateStatus.UpToDate -> uiText("You're on the latest version.")
+                            is UpdateStatus.UpdateAvailable -> if (uiLanguage == "de") "Update verfügbar: v${s.version}" else "Update available: v${s.version}"
+                            is UpdateStatus.Downloading -> if (uiLanguage == "de") "Wird heruntergeladen … ${s.progress}%" else "Downloading… ${s.progress}%"
+                            is UpdateStatus.ReadyToInstall -> if (uiLanguage == "de") "v${s.version} ist installationsbereit." else "v${s.version} ready to install."
+                            is UpdateStatus.Error -> localizeUi(s.message, uiLanguage)
                         }
                         val statusColor = when (updateStatus) {
                             is UpdateStatus.UpdateAvailable, is UpdateStatus.ReadyToInstall ->
@@ -719,7 +790,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                 )
                             ) {
                                 Text(
-                                    text = "Check",
+                                    text = uiText("Check"),
                                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
                                 )
                             }
@@ -739,7 +810,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                         )
                                     ) {
                                         Text(
-                                            text = "Download",
+                                            text = uiText("Download"),
                                             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
                                         )
                                     }
@@ -758,7 +829,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                         )
                                     ) {
                                         Text(
-                                            text = "Install",
+                                            text = uiText("Install"),
                                             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
                                         )
                                     }
@@ -780,7 +851,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = "Backup & Restore",
+                    text = uiText("Backup & Restore"),
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.align(Alignment.Start)
@@ -793,10 +864,10 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                             viewModel.exportBackup(
                                 uri = uri,
                                 onSuccess = {
-                                    Toast.makeText(context, "Backup exported successfully! ✦", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(context, localizeUi("Backup exported successfully! ✦", uiLanguage), Toast.LENGTH_LONG).show()
                                 },
                                 onError = { error ->
-                                    Toast.makeText(context, "Export failed: $error", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(context, if (uiLanguage == "de") "Export fehlgeschlagen: $error" else "Export failed: $error", Toast.LENGTH_LONG).show()
                                 }
                             )
                         }
@@ -812,14 +883,14 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                 onSuccess = { customCount, favCount ->
                                     Toast.makeText(
                                         context,
-                                        "Restore complete! Imported $customCount custom quotes & updated $favCount favorites.",
+                                        if (uiLanguage == "de") "Wiederherstellung abgeschlossen: $customCount eigene Quotes importiert und $favCount Favoriten aktualisiert." else "Restore complete! Imported $customCount custom quotes & updated $favCount favorites.",
                                         Toast.LENGTH_LONG
                                     ).show()
                                     viewModel.loadDailyQuote()
                                     viewModel.runVerification()
                                 },
                                 onError = { error ->
-                                    Toast.makeText(context, "Restore failed: $error", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(context, if (uiLanguage == "de") "Wiederherstellung fehlgeschlagen: $error" else "Restore failed: $error", Toast.LENGTH_LONG).show()
                                 }
                             )
                         }
@@ -863,12 +934,12 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Share,
-                                    contentDescription = "Export Backup",
+                                    contentDescription = uiText("Export Backup"),
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "Export",
+                                    text = uiText("Export"),
                                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
                                 )
                             }
@@ -890,12 +961,12 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Add,
-                                    contentDescription = "Import Backup",
+                                    contentDescription = uiText("Import Backup"),
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "Restore",
+                                    text = uiText("Restore"),
                                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
                                 )
                             }
@@ -918,7 +989,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    text = "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                    text = "${uiText("Version")} ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (devUnlocked) 0.6f else 0.35f),
                     modifier = Modifier.clickable(
@@ -930,7 +1001,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                             if (versionTapCount >= 5) {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 viewModel.unlockDevMode()
-                                Toast.makeText(context, "Developer mode enabled", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, localizeUi("Developer mode enabled", uiLanguage), Toast.LENGTH_SHORT).show()
                             } else {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             }
@@ -949,7 +1020,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                         )
                     ) {
                         Text(
-                            text = "Developer Options",
+                            text = uiText("Developer Options"),
                             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
                         )
                     }

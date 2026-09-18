@@ -16,6 +16,9 @@ import app.brokoli5191.quote.data.QuoteSubmissionStatus
 import app.brokoli5191.quote.data.QuoteOrigin
 import app.brokoli5191.quote.data.CommunitySyncManager
 import app.brokoli5191.quote.data.QuoteSourceMode
+import app.brokoli5191.quote.data.QuoteLanguage
+import app.brokoli5191.quote.data.isAvailableIn
+import app.brokoli5191.quote.data.localized
 import app.brokoli5191.quote.data.matchesSourceMode
 import app.brokoli5191.quote.utils.NotificationHelper
 import app.brokoli5191.quote.utils.NotificationScheduler
@@ -66,6 +69,12 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
     private val _quoteSourceMode = MutableStateFlow(QuoteSourceMode.ALL)
     val quoteSourceMode: StateFlow<String> = _quoteSourceMode.asStateFlow()
 
+    private val _appLanguage = MutableStateFlow(QuoteLanguage.ENGLISH)
+    val appLanguage: StateFlow<String> = _appLanguage.asStateFlow()
+
+    private val _showAnonymousQuotes = MutableStateFlow(false)
+    val showAnonymousQuotes: StateFlow<Boolean> = _showAnonymousQuotes.asStateFlow()
+
     private val _communitySyncFinished = MutableStateFlow(false)
     val communitySyncFinished: StateFlow<Boolean> = _communitySyncFinished.asStateFlow()
 
@@ -111,14 +120,30 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
     private var lastLoadedDate = ""
     private var submissionStatusRefreshRunning = false
 
-    val allQuotes: StateFlow<List<QuoteEntity>> = repository.allQuotes
+    private val rawAllQuotes = repository.allQuotes
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val favorites: StateFlow<List<QuoteEntity>> = repository.favorites
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val allQuotes: StateFlow<List<QuoteEntity>> = combine(
+        rawAllQuotes, appLanguage, showAnonymousQuotes
+    ) { quotes, language, showAnonymous ->
+        quotes.asSequence()
+            .filter { it.isAvailableIn(language) && (showAnonymous || !it.isAnonymous) }
+            .map { it.localized(language) }
+            .toList()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val userAdded: StateFlow<List<QuoteEntity>> = repository.userAdded
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val favorites: StateFlow<List<QuoteEntity>> = combine(
+        repository.favorites, appLanguage, showAnonymousQuotes
+    ) { quotes, language, showAnonymous ->
+        quotes.filter { it.isAvailableIn(language) && (showAnonymous || !it.isAnonymous) }
+            .map { it.localized(language) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val userAdded: StateFlow<List<QuoteEntity>> = combine(
+        repository.userAdded, appLanguage
+    ) { quotes, language ->
+        quotes.filter { it.isAvailableIn(language) }.map { it.localized(language) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val hasBackStack: StateFlow<Boolean> = combine(
         _showDevScreen, _showNewQuoteScreen, _selectedTab, _selectedCategories, _searchQuery
@@ -198,13 +223,13 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
 
     fun checkAndSeedDatabase() {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            val isSeeded = prefs.getBoolean("database_json_seeded_v10", false)
+            val isSeeded = prefs.getBoolean("database_json_seeded_v11", false)
             val count = repository.getQuotesCount()
             if (!isSeeded || count < 30) {
                 // Favorite-preserving re-seed: keeps user-added quotes and restores
                 // favorites by (text, author) so the bigger DB costs no user data.
                 repository.reseedPreservingFavorites(app)
-                prefs.edit().putBoolean("database_json_seeded_v10", true).apply()
+                prefs.edit().putBoolean("database_json_seeded_v11", true).apply()
                 loadDailyQuote()
             }
             if (!prefs.getBoolean("stored_quote_text_repaired_v1", false)) {
@@ -234,6 +259,10 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
         _quoteSourceMode.value = prefs.getString("quote_source_mode", QuoteSourceMode.ALL)
             ?.takeIf { it in setOf(QuoteSourceMode.ALL, QuoteSourceMode.CURATED, QuoteSourceMode.COMMUNITY) }
             ?: QuoteSourceMode.ALL
+        _appLanguage.value = prefs.getString("app_language", QuoteLanguage.ENGLISH)
+            ?.takeIf { it == QuoteLanguage.ENGLISH || it == QuoteLanguage.GERMAN }
+            ?: QuoteLanguage.ENGLISH
+        _showAnonymousQuotes.value = prefs.getBoolean("show_anonymous_quotes", false)
         _widgetStyle.value = prefs.getString("widget_style", "Quote") ?: "Quote"
         _dailyReminderEnabled.value = prefs.getBoolean("daily_reminder_enabled", false)
         _dailyReminderHour.value = prefs.getInt("daily_reminder_hour", 8)
@@ -344,11 +373,38 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
         })
     }
 
+    fun setAppLanguage(language: String) {
+        if (language != QuoteLanguage.ENGLISH && language != QuoteLanguage.GERMAN) return
+        _appLanguage.value = language
+        prefs.edit().putString("app_language", language).apply()
+        clearCategorySelection()
+        _searchQuery.value = ""
+        loadDailyQuote()
+        app.sendBroadcast(Intent("app.brokoli5191.quote.UPDATE_WIDGET").apply {
+            component = ComponentName(app, "app.brokoli5191.quote.widget.QuoteWidgetProvider")
+        })
+    }
+
+    fun setShowAnonymousQuotes(enabled: Boolean) {
+        _showAnonymousQuotes.value = enabled
+        prefs.edit().putBoolean("show_anonymous_quotes", enabled).apply()
+        if (!enabled) _selectedCategories.value = _selectedCategories.value - "Reflections"
+        loadDailyQuote()
+        app.sendBroadcast(Intent("app.brokoli5191.quote.UPDATE_WIDGET").apply {
+            component = ComponentName(app, "app.brokoli5191.quote.widget.QuoteWidgetProvider")
+        })
+    }
+
     fun loadDailyQuote() {
         val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
         lastLoadedDate = todayStr
         viewModelScope.launch {
-            val quote = repository.getDailyQuote(todayStr, _quoteSourceMode.value)
+            val quote = repository.getDailyQuote(
+                todayStr,
+                _quoteSourceMode.value,
+                _appLanguage.value,
+                _showAnonymousQuotes.value
+            )
             _dailyQuote.value = quote
         }
     }
@@ -363,7 +419,12 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
     fun cycleDailyQuote() {
         val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
         viewModelScope.launch {
-            val quote = repository.cycleDailyQuote(todayStr, _quoteSourceMode.value)
+            val quote = repository.cycleDailyQuote(
+                todayStr,
+                _quoteSourceMode.value,
+                _appLanguage.value,
+                _showAnonymousQuotes.value
+            )
             _dailyQuote.value = quote
 
             val updateIntent = Intent("app.brokoli5191.quote.UPDATE_WIDGET").apply {
@@ -377,7 +438,12 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-                val quote = repository.getDailyQuote(todayStr, _quoteSourceMode.value)
+                val quote = repository.getDailyQuote(
+                    todayStr,
+                    _quoteSourceMode.value,
+                    _appLanguage.value,
+                    _showAnonymousQuotes.value
+                )
                 if (quote != null) {
                     NotificationHelper.showQuoteNotification(app, quote.text, quote.author, notificationId = 1002)
                 }
@@ -474,6 +540,7 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
                 tags = tags,
                 isUserAdded = true,
                 origin = QuoteOrigin.PERSONAL,
+                language = _appLanguage.value,
                 timestamp = System.currentTimeMillis()
             )
             repository.insertQuote(q)
@@ -567,6 +634,9 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
                         put("aboutAuthor", quote.aboutAuthor)
                         put("tags", quote.tags)
                         put("savedDate", quote.savedDate ?: "")
+                        put("language", quote.language)
+                        put("textDe", quote.textDe ?: "")
+                        put("isAnonymous", quote.isAnonymous)
                     })
                 }
 
@@ -622,7 +692,10 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
                                 timestamp = obj.optLong("timestamp", System.currentTimeMillis()),
                                 aboutAuthor = obj.optString("aboutAuthor", ""),
                                 tags = obj.optString("tags", ""),
-                                savedDate = obj.optString("savedDate", null).let { if (it.isNullOrEmpty()) null else it }
+                                savedDate = obj.optString("savedDate", null).let { if (it.isNullOrEmpty()) null else it },
+                                language = obj.optString("language", QuoteLanguage.ENGLISH),
+                                textDe = obj.optString("textDe", "").ifBlank { null },
+                                isAnonymous = obj.optBoolean("isAnonymous", false)
                             ))
                             insertedCustom++
                         }

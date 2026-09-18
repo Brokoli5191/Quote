@@ -6,6 +6,7 @@ import android.content.Intent
 import app.brokoli5191.quote.data.AppDatabase
 import app.brokoli5191.quote.data.QuoteRepository
 import app.brokoli5191.quote.data.QuoteSourceMode
+import app.brokoli5191.quote.data.QuoteLanguage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -31,14 +32,20 @@ class NotificationReceiver : BroadcastReceiver() {
                 val repository = QuoteRepository(db.quoteDao(), app.brokoli5191.quote.data.InstallationSeed.get(context))
                 val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
                 val sourceMode = prefs.getString("quote_source_mode", QuoteSourceMode.ALL) ?: QuoteSourceMode.ALL
-                val quote = repository.getDailyQuote(todayStr, sourceMode)
+                val language = prefs.getString("app_language", QuoteLanguage.ENGLISH) ?: QuoteLanguage.ENGLISH
+                val quote = repository.getDailyQuote(
+                    todayStr,
+                    sourceMode,
+                    language,
+                    prefs.getBoolean("show_anonymous_quotes", false)
+                )
                 if (quote != null) NotificationHelper.showQuoteNotification(context, quote.text, quote.author)
             } catch (e: Exception) {
                 e.printStackTrace()
                 NotificationHelper.showQuoteNotification(
                     context,
-                    "You have power over your mind, not outside events. Realize this, and you will find strength.",
-                    "Marcus Aurelius"
+                    if (prefs.getString("app_language", "en") == "de") "Du hast Macht über deinen Geist, nicht über äußere Ereignisse." else "You have power over your mind, not outside events. Realize this, and you will find strength.",
+                    if (prefs.getString("app_language", "en") == "de") "" else "Marcus Aurelius"
                 )
             } finally {
                 pendingResult.finish()

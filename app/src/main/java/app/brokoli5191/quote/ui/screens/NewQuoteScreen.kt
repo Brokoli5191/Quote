@@ -58,6 +58,8 @@ import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.brokoli5191.quote.ui.QuoteViewModel
+import app.brokoli5191.quote.ui.categoryText
+import app.brokoli5191.quote.ui.uiText
 import app.brokoli5191.quote.ui.components.ExpressiveButton
 import app.brokoli5191.quote.ui.components.ExpressiveIconButton
 import app.brokoli5191.quote.ui.components.rememberExpressiveShape
@@ -105,18 +107,18 @@ fun NewQuoteScreen(
                 ExpressiveIconButton(onClick = onBack) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back"
+                        contentDescription = uiText("Back")
                     )
                 }
                 Spacer(Modifier.width(8.dp))
                 Column {
                     Text(
-                        text = "New quote",
+                        text = uiText("New quote"),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Saved privately on this device",
+                        text = uiText("Saved privately on this device"),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -134,8 +136,8 @@ fun NewQuoteScreen(
                     OutlinedTextField(
                         value = text,
                         onValueChange = { text = it },
-                        label = { Text("Quote or affirmation") },
-                        placeholder = { Text("Write a quote…") },
+                        label = { Text(uiText("Quote or affirmation")) },
+                        placeholder = { Text(uiText("Write a quote…")) },
                         textStyle = MaterialTheme.typography.bodyLarge.copy(
                             fontFamily = SerifFontFamily,
                             lineHeight = 27.sp
@@ -155,8 +157,8 @@ fun NewQuoteScreen(
                     OutlinedTextField(
                         value = author,
                         onValueChange = { author = it },
-                        label = { Text("Author") },
-                        placeholder = { Text("Unknown") },
+                        label = { Text(uiText("Author")) },
+                        placeholder = { Text(uiText("Unknown")) },
                         singleLine = true,
                         modifier = Modifier
                             .weight(1f)
@@ -184,7 +186,7 @@ fun NewQuoteScreen(
 
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "Shelf",
+                        text = uiText("Shelf"),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold
                     )
@@ -203,7 +205,7 @@ fun NewQuoteScreen(
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     category = categoryName
                                 },
-                                label = { Text(categoryName) },
+                                label = { Text(categoryText(categoryName)) },
                                 shape = rememberExpressiveShape(interactionSource, 18.dp, 8.dp),
                                 interactionSource = interactionSource,
                                 colors = FilterChipDefaults.filterChipColors(
@@ -219,9 +221,9 @@ fun NewQuoteScreen(
                 OutlinedTextField(
                     value = tags,
                     onValueChange = { tags = it },
-                    label = { Text("Tags") },
-                    supportingText = { Text("Separate tags with commas") },
-                    placeholder = { Text("wisdom, courage, morning") },
+                    label = { Text(uiText("Tags")) },
+                    supportingText = { Text(uiText("Separate tags with commas")) },
+                    placeholder = { Text(uiText("wisdom, courage, morning")) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .bringIntoViewRequester(tagsBringIntoViewRequester)
@@ -260,7 +262,7 @@ fun NewQuoteScreen(
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Add to My Quotes", fontWeight = FontWeight.Bold)
+                    Text(uiText("Add to My Quotes"), fontWeight = FontWeight.Bold)
                 }
                 Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.ime))
             }

@@ -40,6 +40,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.brokoli5191.quote.data.QuoteEntity
 import app.brokoli5191.quote.data.QuoteSubmissionStatus
 import app.brokoli5191.quote.ui.QuoteViewModel
+import app.brokoli5191.quote.ui.LocalAppLanguage
+import app.brokoli5191.quote.ui.formattedQuote
+import app.brokoli5191.quote.ui.localizeUi
+import app.brokoli5191.quote.ui.uiText
 import app.brokoli5191.quote.ui.components.ExpressiveIconButton
 import app.brokoli5191.quote.ui.components.rememberExpressiveShape
 import app.brokoli5191.quote.ui.theme.SerifFontFamily
@@ -57,6 +61,8 @@ fun SavedScreen(viewModel: QuoteViewModel) {
     var quoteToSubmit by remember { mutableStateOf<QuoteEntity?>(null) }
 
     val context = LocalContext.current
+    val shareTitle = uiText("Share Wisdom")
+    val uiLanguage = LocalAppLanguage.current
     val haptic = LocalHapticFeedback.current
     val fabInteractionSource = remember { MutableInteractionSource() }
     var timestampTick by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -85,7 +91,7 @@ fun SavedScreen(viewModel: QuoteViewModel) {
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
-                    text = "Your Collection",
+                    text = uiText("Your Collection"),
                     style = MaterialTheme.typography.headlineLarge,
                     color = MaterialTheme.colorScheme.onBackground,
                     fontWeight = FontWeight.Bold
@@ -147,12 +153,12 @@ fun SavedScreen(viewModel: QuoteViewModel) {
                         ) {
                             Icon(
                                 imageVector = if (subTab == "Favorites") Icons.Default.FavoriteBorder else Icons.Default.NoteAlt,
-                                contentDescription = "Empty",
+                                contentDescription = uiText("Empty"),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
                                 modifier = Modifier.size(64.dp)
                             )
                             Text(
-                                text = if (subTab == "Favorites") "No favorites yet" else "No custom quotes yet",
+                                text = if (subTab == "Favorites") uiText("No favorites yet") else uiText("No custom quotes yet"),
                                 style = MaterialTheme.typography.headlineMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -175,9 +181,9 @@ fun SavedScreen(viewModel: QuoteViewModel) {
                                 onShare = {
                                     val intent = Intent(Intent.ACTION_SEND).apply {
                                         type = "text/plain"
-                                        putExtra(Intent.EXTRA_TEXT, "\"${quote.text}\" — ${quote.author}")
+                                        putExtra(Intent.EXTRA_TEXT, formattedQuote(quote.text, quote.author))
                                     }
-                                    context.startActivity(Intent.createChooser(intent, "Share Wisdom"))
+                                    context.startActivity(Intent.createChooser(intent, shareTitle))
                                 }
                             )
                         }
@@ -203,7 +209,7 @@ fun SavedScreen(viewModel: QuoteViewModel) {
         ) {
             Icon(
                 imageVector = Icons.Default.Add,
-                contentDescription = "Create Quote",
+                contentDescription = uiText("Create Quote"),
                 modifier = Modifier.size(24.dp)
             )
         }
@@ -243,13 +249,12 @@ fun SavedScreen(viewModel: QuoteViewModel) {
                             )
                         }
                         Text(
-                            "Submit for review?",
+                            uiText("Submit for review?"),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            "This quote, its author, category, and tags will be sent to Quote for review. " +
-                                "If approved, it may be included in the public quote collection.",
+                            uiText("This quote, its author, category, and tags will be sent to Quote for review. If approved, it may be included in the public quote collection."),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -261,7 +266,7 @@ fun SavedScreen(viewModel: QuoteViewModel) {
                             },
                             contentPadding = PaddingValues(0.dp)
                         ) {
-                            Text("Privacy & submission policy")
+                            Text(uiText("Privacy & submission policy"))
                             Spacer(Modifier.width(6.dp))
                             Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
                         }
@@ -271,7 +276,7 @@ fun SavedScreen(viewModel: QuoteViewModel) {
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             TextButton(onClick = { quoteToSubmit = null }) {
-                                Text("Cancel")
+                                Text(uiText("Cancel"))
                             }
                             TextButton(
                                 onClick = {
@@ -279,7 +284,7 @@ fun SavedScreen(viewModel: QuoteViewModel) {
                                     viewModel.submitQuoteForReview(
                                         quote = quote,
                                         onSuccess = {
-                                            Toast.makeText(context, "Submitted for review", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, localizeUi("Submitted for review", uiLanguage), Toast.LENGTH_SHORT).show()
                                         },
                                         onError = { message ->
                                             Toast.makeText(context, message, Toast.LENGTH_LONG).show()
@@ -287,7 +292,7 @@ fun SavedScreen(viewModel: QuoteViewModel) {
                                     )
                                 }
                             ) {
-                                Text("Submit")
+                                Text(uiText("Submit"))
                             }
                         }
                     }
@@ -333,8 +338,8 @@ private fun SavedTabSwitcher(
 
         Row(modifier = Modifier.fillMaxWidth()) {
             listOf(
-                "Favorites" to "Favorites ($favoritesCount)",
-                "My Quotes" to "My Quotes ($myQuotesCount)"
+                "Favorites" to "${uiText("Favorites")} ($favoritesCount)",
+                "My Quotes" to "${uiText("My Quotes")} ($myQuotesCount)"
             ).forEach { (tab, label) ->
                 val selected = activeTab == tab
                 Box(
@@ -376,6 +381,7 @@ fun PremiumCollectionQuoteCard(
     onSubmit: () -> Unit,
     onShare: () -> Unit
 ) {
+    val language = LocalAppLanguage.current
     val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
 
@@ -449,8 +455,9 @@ fun PremiumCollectionQuoteCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        val tagsSp = remember(quote.tags) {
-                            quote.tags.split(",").filter { it.isNotBlank() }
+                        val tagsSp = remember(quote.tags, quote.isAnonymous, language) {
+                            if (quote.isAnonymous || language == "de") emptyList()
+                            else quote.tags.split(",").filter { it.isNotBlank() }
                         }
                         tagsSp.take(2).forEach { tag ->
                             Box(
@@ -471,7 +478,7 @@ fun PremiumCollectionQuoteCard(
                     }
 
                     Text(
-                        text = formatSavedDate(quote.savedDate, nowMillis),
+                        text = formatSavedDate(quote.savedDate, nowMillis, language),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                     )
@@ -494,7 +501,7 @@ fun PremiumCollectionQuoteCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
+                    if (quote.author.isNotBlank()) Row(
                         modifier = Modifier
                             .weight(1f)
                             .padding(end = 8.dp),
@@ -545,11 +552,11 @@ fun PremiumCollectionQuoteCard(
                         ExpressiveIconButton(onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            clipboard.setPrimaryClip(ClipData.newPlainText("quote", "\"${quote.text}\" — ${quote.author}"))
+                            clipboard.setPrimaryClip(ClipData.newPlainText("quote", formattedQuote(quote.text, quote.author)))
                         }) {
                             Icon(
                                 imageVector = Icons.Default.ContentCopy,
-                                contentDescription = "Copy",
+                                contentDescription = uiText("Copy"),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -560,7 +567,7 @@ fun PremiumCollectionQuoteCard(
                         }) {
                             Icon(
                                 imageVector = Icons.Default.Share,
-                                contentDescription = "Share",
+                                contentDescription = uiText("Share"),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -572,7 +579,7 @@ fun PremiumCollectionQuoteCard(
                             }) {
                                 Icon(
                                     imageVector = Icons.Default.Delete,
-                                    contentDescription = "Delete",
+                                    contentDescription = uiText("Delete"),
                                     tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
                                 )
                             }
@@ -583,7 +590,7 @@ fun PremiumCollectionQuoteCard(
                             }) {
                                 Icon(
                                     imageVector = if (quote.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                                    contentDescription = "Favorite",
+                                    contentDescription = uiText("Favorite"),
                                     tint = if (quote.isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -594,19 +601,19 @@ fun PremiumCollectionQuoteCard(
                 if (quote.isUserAdded) {
                     when (quote.submissionStatus) {
                         QuoteSubmissionStatus.PENDING -> QuoteReviewStatus(
-                            label = "Pending review",
+                            label = uiText("Pending review"),
                             icon = Icons.Default.Schedule,
                             containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                             contentColor = MaterialTheme.colorScheme.onTertiaryContainer
                         )
                         QuoteSubmissionStatus.APPROVED -> QuoteReviewStatus(
-                            label = "Approved for community",
+                            label = uiText("Approved for community"),
                             icon = Icons.Default.CheckCircle,
                             containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                             contentColor = MaterialTheme.colorScheme.onTertiaryContainer
                         )
                         QuoteSubmissionStatus.REJECTED -> QuoteReviewStatus(
-                            label = "Not approved",
+                            label = uiText("Not approved"),
                             icon = Icons.Default.Cancel,
                             containerColor = MaterialTheme.colorScheme.errorContainer,
                             contentColor = MaterialTheme.colorScheme.onErrorContainer
@@ -627,7 +634,7 @@ fun PremiumCollectionQuoteCard(
                                     Icon(Icons.Default.CloudUpload, contentDescription = null)
                                 }
                                 Spacer(Modifier.width(8.dp))
-                                Text(if (isSubmitting) "Submitting..." else "Submit for review")
+                                Text(if (isSubmitting) uiText("Submitting...") else uiText("Submit for review"))
                             }
                         }
                     }
@@ -660,18 +667,21 @@ private fun QuoteReviewStatus(
     }
 }
 
-private fun formatSavedDate(savedDate: String?, now: Long = System.currentTimeMillis()): String {
+private fun formatSavedDate(savedDate: String?, now: Long = System.currentTimeMillis(), language: String = "en"): String {
     if (savedDate == null) return ""
     val millis = savedDate.toLongOrNull()
         ?: return savedDate  // backwards compat: old "dd MMM yyyy" strings shown as-is
     val diff = now - millis
     return when {
-        diff < 60_000L -> "just now"
-        diff < 3_600_000L -> "${diff / 60_000} min ago"
-        diff < 86_400_000L -> "${diff / 3_600_000} h ago"
-        diff < 172_800_000L -> "yesterday"
-        diff < 2_592_000_000L -> "${diff / 86_400_000} days ago"
-        else -> SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(Date(millis))
+        diff < 60_000L -> if (language == "de") "gerade eben" else "just now"
+        diff < 3_600_000L -> if (language == "de") "vor ${diff / 60_000} Min." else "${diff / 60_000} min ago"
+        diff < 86_400_000L -> if (language == "de") "vor ${diff / 3_600_000} Std." else "${diff / 3_600_000} h ago"
+        diff < 172_800_000L -> if (language == "de") "gestern" else "yesterday"
+        diff < 2_592_000_000L -> if (language == "de") "vor ${diff / 86_400_000} Tagen" else "${diff / 86_400_000} days ago"
+        else -> SimpleDateFormat(
+            "d MMM yyyy",
+            if (language == "de") Locale.GERMAN else Locale.ENGLISH
+        ).format(Date(millis))
     }
 }
 

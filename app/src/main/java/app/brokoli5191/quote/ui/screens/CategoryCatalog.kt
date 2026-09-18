@@ -29,9 +29,9 @@ import androidx.compose.ui.graphics.Color
 
 /**
  * Single source of truth for the Library category tiles. Kept in sync with
- * [app.brokoli5191.quote.data.CategoryMapper.categories] — the same names the
- * seeder assigns. Both the bento grid and the filter sheet read from here, so
- * adding a category is one edit.
+ * [app.brokoli5191.quote.data.CategoryMapper.categories] plus the special
+ * source-based categories (Community, Local, and Reflections). Both the bento
+ * grid and the filter sheet read from here.
  */
 data class CategoryTileData(
     val name: String,
@@ -51,6 +51,7 @@ val categoryCatalog: List<CategoryTileData> = listOf(
     CategoryTileData("Inspirational", Icons.Default.EmojiObjects, Cream, isFullWidth = true),
     CategoryTileData("Community", Icons.Default.Public, Green),
     CategoryTileData("Local", Icons.Default.PhoneAndroid, Neutral),
+    CategoryTileData("Reflections", Icons.Default.Spa, Rose),
     CategoryTileData("Life", Icons.Default.Spa, Green),
     CategoryTileData("Love", Icons.Default.Favorite, Rose),
     CategoryTileData("Wisdom", Icons.Default.SelfImprovement, Amber),

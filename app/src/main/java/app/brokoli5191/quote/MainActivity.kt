@@ -56,6 +56,8 @@ import app.brokoli5191.quote.data.QuoteRepository
 import app.brokoli5191.quote.data.InstallationSeed
 import app.brokoli5191.quote.ui.QuoteViewModel
 import app.brokoli5191.quote.ui.QuoteViewModelFactory
+import app.brokoli5191.quote.ui.LocalAppLanguage
+import app.brokoli5191.quote.ui.uiText
 import app.brokoli5191.quote.ui.screens.DailyScreen
 import app.brokoli5191.quote.ui.screens.DeveloperScreen
 import app.brokoli5191.quote.ui.screens.LibraryScreen
@@ -107,8 +109,10 @@ class MainActivity : ComponentActivity() {
             val blurNavigationSurfaces by viewModel.blurNavigationSurfaces.collectAsStateWithLifecycle()
             val showDevScreen by viewModel.showDevScreen.collectAsStateWithLifecycle()
             val showNewQuoteScreen by viewModel.showNewQuoteScreen.collectAsStateWithLifecycle()
+            val appLanguage by viewModel.appLanguage.collectAsStateWithLifecycle()
 
             MyApplicationTheme(themeMode = themeMode, themeAccent = themeAccent, amoledBlack = amoledBlack) {
+              CompositionLocalProvider(LocalAppLanguage provides appLanguage) {
                 val activeTab by viewModel.selectedTab.collectAsStateWithLifecycle()
                 val blurActive = blurNavigationSurfaces && !lowPerformanceMode
                 val navigationHazeState = rememberHazeState(blurEnabled = blurActive)
@@ -304,7 +308,7 @@ class MainActivity : ComponentActivity() {
                                     // DailyScreen on every predictive-back gesture frame.
                                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                                         Text(
-                                            text = "Daily Quote",
+                                            text = uiText("Daily Quote"),
                                             style = MaterialTheme.typography.headlineLarge,
                                             color = MaterialTheme.colorScheme.onBackground,
                                             fontWeight = FontWeight.Bold,
@@ -412,6 +416,7 @@ class MainActivity : ComponentActivity() {
                     }
 
                 }
+              }
             }
         }
     }
@@ -547,14 +552,14 @@ fun BottomNavigationBar(
                         outline = iconPair.first,
                         filled = iconPair.second,
                         selected = isSelected,
-                        label = label,
+                        label = uiText(label),
                         lowPerformanceMode = lowPerformanceMode
                     )
 
                     Spacer(modifier = Modifier.height(6.dp))
 
                     Text(
-                        text = label,
+                        text = uiText(label),
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                             fontSize = 11.sp,

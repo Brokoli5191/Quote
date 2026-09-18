@@ -38,6 +38,10 @@ import coil.compose.AsyncImage
 import app.brokoli5191.quote.data.QuoteEntity
 import app.brokoli5191.quote.data.QuoteSourceMode
 import app.brokoli5191.quote.ui.QuoteViewModel
+import app.brokoli5191.quote.ui.LocalAppLanguage
+import app.brokoli5191.quote.ui.categoryText
+import app.brokoli5191.quote.ui.formattedQuote
+import app.brokoli5191.quote.ui.uiText
 import app.brokoli5191.quote.ui.components.ExpressiveButton
 import app.brokoli5191.quote.ui.components.ExpressiveIconButton
 import app.brokoli5191.quote.ui.components.ExpressiveTextButton
@@ -61,14 +65,22 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
     val filteredQuotes by viewModel.filteredQuotes.collectAsStateWithLifecycle()
     val sourceMode by viewModel.quoteSourceMode.collectAsStateWithLifecycle()
     val communitySyncFinished by viewModel.communitySyncFinished.collectAsStateWithLifecycle()
+    val showAnonymousQuotes by viewModel.showAnonymousQuotes.collectAsStateWithLifecycle()
+    val language = LocalAppLanguage.current
+    val visibleCategoryCatalog = remember(showAnonymousQuotes) {
+        categoryCatalog.filter { showAnonymousQuotes || it.name != "Reflections" }
+    }
+    val visibleFilterCategories = remember(showAnonymousQuotes) {
+        filterCategoryNames.filter { showAnonymousQuotes || it != "Reflections" }
+    }
 
     val selectedCategories by viewModel.selectedCategories.collectAsStateWithLifecycle()
     val lowPerformanceMode by viewModel.lowPerformanceMode.collectAsStateWithLifecycle()
     val blurNavigationSurfaces by viewModel.blurNavigationSurfaces.collectAsStateWithLifecycle()
     val isBrowsing = selectedCategories.isNotEmpty() || searchQuery.isNotBlank()
     val categoryLabel = when {
-        selectedCategories.size > 1 -> "${selectedCategories.size} categories"
-        selectedCategories.size == 1 -> selectedCategories.first()
+        selectedCategories.size > 1 -> if (language == "de") "${selectedCategories.size} Kategorien" else "${selectedCategories.size} categories"
+        selectedCategories.size == 1 -> categoryText(selectedCategories.first())
         else -> null
     }
     
@@ -170,7 +182,7 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             // Single source of truth: see CategoryCatalog.kt
-                            val bentoCategories = categoryCatalog
+                            val bentoCategories = visibleCategoryCatalog
 
                             // Render Inspirational (first large card)
                             val inspirational = bentoCategories[0]
@@ -271,7 +283,7 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "Library",
+                            text = uiText("Library"),
                             style = MaterialTheme.typography.headlineLarge,
                             color = MaterialTheme.colorScheme.onBackground,
                             fontWeight = FontWeight.Bold
@@ -286,7 +298,7 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                         ) {
                             Icon(
                                 imageVector = Icons.Default.FilterList,
-                                contentDescription = "Filter Categories",
+                                contentDescription = uiText("Filter Categories"),
                                 tint = MaterialTheme.colorScheme.primary
                             )
                         }
@@ -299,7 +311,7 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                     onValueChange = viewModel::setSearchQuery,
                     placeholder = {
                         Text(
-                            "Search wisdom...",
+                            if (language == "de") "Quotes durchsuchen …" else "Search wisdom...",
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         )
                     },
@@ -317,12 +329,12 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                         unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                     ),
                     leadingIcon = {
-                        Icon(Icons.Default.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.Default.Search, contentDescription = uiText("Search"), tint = MaterialTheme.colorScheme.primary)
                     },
                     trailingIcon = {
                         if (searchQuery.isNotEmpty()) {
                             ExpressiveIconButton(onClick = { viewModel.setSearchQuery("") }) {
-                                Icon(Icons.Default.Clear, contentDescription = "Clear Search")
+                                Icon(Icons.Default.Clear, contentDescription = uiText("Clear Search"))
                             }
                         }
                     },
@@ -418,7 +430,7 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                             }
 
                             Text(
-                                text = "Select Categories",
+                                text = uiText("Select Categories"),
                                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.padding(horizontal = 24.dp)
@@ -433,7 +445,7 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                                 .padding(horizontal = 24.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            filterCategoryNames.chunked(2).forEach { rowCategoryList ->
+                            visibleFilterCategories.chunked(2).forEach { rowCategoryList ->
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -449,7 +461,7 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                                             },
                                             label = {
                                                 Text(
-                                                    text = categoryName,
+                                                    text = categoryText(categoryName),
                                                     style = MaterialTheme.typography.labelMedium.copy(
                                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                                     )
@@ -497,7 +509,7 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                                 ),
                                 modifier = Modifier.padding(end = 8.dp)
                             ) {
-                                Text("Clear All")
+                                Text(uiText("Clear All"))
                             }
 
                             ExpressiveButton(
@@ -508,7 +520,7 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                                 ),
                                 restingCorner = 12.dp
                             ) {
-                                Text("Apply Filter")
+                                Text(uiText("Apply Filter"))
                             }
                         }
                     }
@@ -531,6 +543,7 @@ fun CategoryBrowseViewInPlace(
     topContentPadding: androidx.compose.ui.unit.Dp = 0.dp
 ) {
     val context = LocalContext.current
+    val shareTitle = uiText("Share Wisdom")
     val haptic = LocalHapticFeedback.current
     val onBackWithHaptic = {
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -646,7 +659,7 @@ fun CategoryBrowseViewInPlace(
                     // Main illustration icon
                     Icon(
                         imageVector = Icons.Default.SearchOff,
-                        contentDescription = "Search Off Icon",
+                        contentDescription = uiText("Search Off Icon"),
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(56.dp)
                     )
@@ -669,7 +682,7 @@ fun CategoryBrowseViewInPlace(
                 Spacer(modifier = Modifier.height(24.dp))
                 
                 Text(
-                    text = if (communityOnly) "No Community Quotes Yet" else "No Wisdom Matches",
+                    text = if (communityOnly) uiText("No Community Quotes Yet") else uiText("No Wisdom Matches"),
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontWeight = FontWeight.Bold,
                         fontFamily = SerifFontFamily
@@ -682,8 +695,8 @@ fun CategoryBrowseViewInPlace(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text =
-                        if (communitySyncFinished) "Approved community quotes will appear here after the next sync."
-                        else "Checking for newly approved community quotes...",
+                        if (communitySyncFinished) uiText("Approved community quotes will appear here after the next sync.")
+                        else uiText("Checking for newly approved community quotes..."),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                         textAlign = TextAlign.Center,
@@ -712,7 +725,7 @@ fun CategoryBrowseViewInPlace(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (communityOnly) "Sync again" else "Reset All Filters",
+                        text = if (communityOnly) uiText("Sync again") else uiText("Reset All Filters"),
                         style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
                     )
                 }
@@ -731,9 +744,9 @@ fun CategoryBrowseViewInPlace(
                         onShare = {
                             val intent = Intent(Intent.ACTION_SEND).apply {
                                 type = "text/plain"
-                                putExtra(Intent.EXTRA_TEXT, "\"${quote.text}\" — ${quote.author}")
+                                putExtra(Intent.EXTRA_TEXT, formattedQuote(quote.text, quote.author))
                             }
-                            context.startActivity(Intent.createChooser(intent, "Share Wisdom"))
+                            context.startActivity(Intent.createChooser(intent, shareTitle))
                         }
                     )
                 }
@@ -765,7 +778,7 @@ private fun LibraryFilterRow(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = category ?: "Search results",
+                text = category?.let { categoryText(it) } ?: uiText("Search results"),
                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.onPrimary
             )
@@ -782,7 +795,7 @@ private fun LibraryFilterRow(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp)
         ) {
             Text(
-                text = "Clear Filter",
+                text = uiText("Clear Filter"),
                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
             )
         }
@@ -847,7 +860,7 @@ fun QuoteBrowseItemCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
+                if (quote.author.isNotBlank()) Text(
                     text = "— ${quote.author}",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary,
@@ -867,11 +880,11 @@ fun QuoteBrowseItemCard(
                     ExpressiveIconButton(onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        clipboard.setPrimaryClip(ClipData.newPlainText("quote", "\"${quote.text}\" — ${quote.author}"))
+                        clipboard.setPrimaryClip(ClipData.newPlainText("quote", formattedQuote(quote.text, quote.author)))
                     }) {
                         Icon(
                             imageVector = Icons.Default.ContentCopy,
-                            contentDescription = "Copy",
+                            contentDescription = uiText("Copy"),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -882,7 +895,7 @@ fun QuoteBrowseItemCard(
                     }) {
                         Icon(
                             imageVector = Icons.Default.Share,
-                            contentDescription = "Share",
+                            contentDescription = uiText("Share"),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -901,7 +914,7 @@ fun QuoteBrowseItemCard(
                     }) {
                         Icon(
                             imageVector = if (quote.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                            contentDescription = "Favorite",
+                            contentDescription = uiText("Favorite"),
                             tint = if (quote.isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -992,7 +1005,7 @@ fun CategoryBentoCard(
                     .fillMaxWidth()
             ) {
                 Text(
-                    text = name,
+                    text = categoryText(name),
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.onSurface
                 )

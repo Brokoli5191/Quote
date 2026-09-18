@@ -14,14 +14,16 @@ object NotificationHelper {
 
     fun showQuoteNotification(context: Context, text: String, author: String, notificationId: Int = 1001) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val german = context.getSharedPreferences("aura_prefs", Context.MODE_PRIVATE)
+            .getString("app_language", "en") == "de"
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Daily Quote of the Day",
+                if (german) "Tägliches Quote" else "Daily Quote of the Day",
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
-                description = "Sends daily quotes of wisdom at your preferred time"
+                description = if (german) "Sendet täglich ein Quote zu deiner gewählten Zeit" else "Sends daily quotes of wisdom at your preferred time"
                 enableLights(true)
                 lightColor = android.graphics.Color.BLUE
             }
@@ -41,9 +43,9 @@ object NotificationHelper {
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(app.brokoli5191.quote.R.drawable.ic_notification_quote)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .setContentTitle("Your Daily Quote")
-            .setContentText("\"$text\" — $author")
-            .setStyle(NotificationCompat.BigTextStyle().bigText("\"$text\"\n\n— $author"))
+            .setContentTitle(if (german) "Dein tägliches Quote" else "Your Daily Quote")
+            .setContentText(if (author.isBlank()) "\"$text\"" else "\"$text\" — $author")
+            .setStyle(NotificationCompat.BigTextStyle().bigText(if (author.isBlank()) "\"$text\"" else "\"$text\"\n\n— $author"))
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)

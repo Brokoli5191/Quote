@@ -24,7 +24,10 @@ data class QuoteEntity(
     val submittedAt: Long? = null,
     val origin: String = QuoteOrigin.BUNDLED,
     val serverId: String? = null,
-    val serverRevision: Long? = null
+    val serverRevision: Long? = null,
+    val textDe: String? = null,
+    val language: String = QuoteLanguage.ENGLISH,
+    val isAnonymous: Boolean = false
 )
 
 object QuoteSubmissionStatus {
@@ -44,6 +47,24 @@ object QuoteSourceMode {
     const val ALL = "all"
     const val CURATED = "curated"
     const val COMMUNITY = "community"
+}
+
+object QuoteLanguage {
+    const val ENGLISH = "en"
+    const val GERMAN = "de"
+}
+
+fun QuoteEntity.isAvailableIn(language: String): Boolean = when (language) {
+    QuoteLanguage.GERMAN -> this.language == QuoteLanguage.GERMAN || !textDe.isNullOrBlank()
+    else -> this.language != QuoteLanguage.GERMAN
+}
+
+fun QuoteEntity.localized(language: String): QuoteEntity {
+    if (language != QuoteLanguage.GERMAN) return this
+    return copy(
+        text = textDe?.takeIf { it.isNotBlank() } ?: text,
+        author = if (author == "Unknown") "Unbekannt" else author
+    )
 }
 
 fun QuoteEntity.matchesSourceMode(mode: String): Boolean = when (mode) {
