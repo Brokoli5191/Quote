@@ -54,6 +54,25 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
     val scrollState = rememberScrollState()
     val haptic = LocalHapticFeedback.current
     val uiLanguage = LocalAppLanguage.current
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+        onResult = { isGranted ->
+            if (isGranted) {
+                viewModel.setDailyReminderEnabled(true)
+                Toast.makeText(
+                    context,
+                    localizeUi("Daily Reminder scheduled! ✦", uiLanguage),
+                    Toast.LENGTH_SHORT
+                ).show()
+            } else {
+                Toast.makeText(
+                    context,
+                    localizeUi("Notifications permission is required to receive daily quotes.", uiLanguage),
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    )
 
     Box(
         modifier = Modifier
@@ -378,19 +397,6 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                 val reminderEnabled by viewModel.dailyReminderEnabled.collectAsStateWithLifecycle()
                 val reminderHour by viewModel.dailyReminderHour.collectAsStateWithLifecycle()
                 val reminderMinute by viewModel.dailyReminderMinute.collectAsStateWithLifecycle()
-
-                // Permission launcher
-                val permissionLauncher = rememberLauncherForActivityResult(
-                    contract = ActivityResultContracts.RequestPermission(),
-                    onResult = { isGranted ->
-                        if (isGranted) {
-                            viewModel.setDailyReminderEnabled(true)
-                            Toast.makeText(context, localizeUi("Daily Reminder scheduled! ✦", uiLanguage), Toast.LENGTH_SHORT).show()
-                        } else {
-                            Toast.makeText(context, localizeUi("Notifications permission is required to receive daily quotes.", uiLanguage), Toast.LENGTH_LONG).show()
-                        }
-                    }
-                )
 
                 Card(
                     modifier = Modifier
