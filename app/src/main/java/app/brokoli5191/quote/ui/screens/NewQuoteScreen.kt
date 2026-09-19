@@ -1,5 +1,6 @@
 package app.brokoli5191.quote.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.horizontalScroll
@@ -30,6 +31,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -37,6 +39,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -64,14 +67,11 @@ import app.brokoli5191.quote.ui.components.ExpressiveButton
 import app.brokoli5191.quote.ui.components.ExpressiveIconButton
 import app.brokoli5191.quote.ui.components.rememberExpressiveShape
 import app.brokoli5191.quote.ui.theme.SerifFontFamily
+import app.brokoli5191.quote.data.CategoryMapper
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-private val customQuoteCategories = listOf(
-    "Inspirational", "Life", "Humor", "Love", "Books", "Truth", "Reading",
-    "Wisdom", "Happiness", "Writing", "Inspiration", "Philosophy", "Death",
-    "Poetry", "Optimism"
-)
+private val customQuoteCategories = CategoryMapper.categories
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
@@ -84,12 +84,23 @@ fun NewQuoteScreen(
     var author by rememberSaveable { mutableStateOf("") }
     var category by rememberSaveable { mutableStateOf("Inspirational") }
     var tags by rememberSaveable { mutableStateOf("") }
+    var showDiscardDialog by rememberSaveable { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
     val tagsBringIntoViewRequester = remember { BringIntoViewRequester() }
     val coroutineScope = rememberCoroutineScope()
     val formScrollState = rememberScrollState()
     val density = LocalDensity.current
     val saveButtonScrollOffsetPx = with(density) { 72.dp.roundToPx() }
+    val trimmedTextLength = text.trim().length
+    val quoteInvalid = text.isNotEmpty() && trimmedTextLength < 3
+    val parsedTags = tags.split(',').map(String::trim).filter(String::isNotEmpty)
+    val tagsInvalid = parsedTags.size > 8 || parsedTags.any { it.length > 30 }
+    val hasDraft = text.isNotBlank() || author.isNotBlank() || tags.isNotBlank() || category != "Inspirational"
+    val requestBack = {
+        if (hasDraft) showDiscardDialog = true else onBack()
+    }
+
+    BackHandler(enabled = hasDraft) { showDiscardDialog = true }
 
     Surface(
         modifier = modifier,
@@ -104,7 +115,7 @@ fun NewQuoteScreen(
                     .padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                ExpressiveIconButton(onClick = onBack) {
+                ExpressiveIconButton(onClick = requestBack) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = uiText("Back")
@@ -118,7 +129,7 @@ fun NewQuoteScreen(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = uiText("Saved privately on this device"),
+                        text = uiText("Stored locally; only sent when you submit it"),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -135,7 +146,7 @@ fun NewQuoteScreen(
                 Box {
                     OutlinedTextField(
                         value = text,
-                        onValueChange = { text = it },
+                        onValueChange = { if (it.length <= 500) text = it },
                         label = { Text(uiText("Quote or affirmation")) },
                         placeholder = { Text(uiText("Write a quote…")) },
                         textStyle = MaterialTheme.typography.bodyLarge.copy(
@@ -144,6 +155,13 @@ fun NewQuoteScreen(
                         ),
                         minLines = 1,
                         maxLines = 6,
+                        isError = quoteInvalid,
+                        supportingText = {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(if (quoteInvalid) uiText("Enter at least 3 characters.") else "")
+                                Text("${text.length}/500")
+                            }
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(24.dp)
                     )
@@ -156,9 +174,10 @@ fun NewQuoteScreen(
                 ) {
                     OutlinedTextField(
                         value = author,
-                        onValueChange = { author = it },
+                        onValueChange = { if (it.length <= 100) author = it },
                         label = { Text(uiText("Author")) },
                         placeholder = { Text(uiText("Unknown")) },
+                        supportingText = { Text("${author.length}/100") },
                         singleLine = true,
                         modifier = Modifier
                             .weight(1f)
@@ -202,7 +221,7 @@ fun NewQuoteScreen(
                             FilterChip(
                                 selected = selected,
                                 onClick = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     category = categoryName
                                 },
                                 label = { Text(categoryText(categoryName)) },
@@ -222,7 +241,13 @@ fun NewQuoteScreen(
                     value = tags,
                     onValueChange = { tags = it },
                     label = { Text(uiText("Tags")) },
-                    supportingText = { Text(uiText("Separate tags with commas")) },
+                    supportingText = {
+                        Text(
+                            if (tagsInvalid) uiText("Maximum 8 tags, 30 characters each.")
+                            else uiText("Separate tags with commas")
+                        )
+                    },
+                    isError = tagsInvalid,
                     placeholder = { Text(uiText("wisdom, courage, morning")) },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -242,12 +267,12 @@ fun NewQuoteScreen(
                 )
                 ExpressiveButton(
                     onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         viewModel.addUserQuote(text.trim(), author.trim(), category, tags.trim())
                         viewModel.selectSavedSubTab("My Quotes")
                         onBack()
                     },
-                    enabled = text.isNotBlank(),
+                    enabled = trimmedTextLength in 3..500 && !tagsInvalid,
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 54.dp),
@@ -267,5 +292,26 @@ fun NewQuoteScreen(
                 Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.ime))
             }
         }
+    }
+
+    if (showDiscardDialog) {
+        AlertDialog(
+            onDismissRequest = { showDiscardDialog = false },
+            title = { Text(uiText("Discard draft?")) },
+            text = { Text(uiText("Your unsaved quote will be lost.")) },
+            dismissButton = {
+                TextButton(onClick = { showDiscardDialog = false }) {
+                    Text(uiText("Keep editing"))
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDiscardDialog = false
+                    onBack()
+                }) {
+                    Text(uiText("Discard"), color = MaterialTheme.colorScheme.error)
+                }
+            }
+        )
     }
 }

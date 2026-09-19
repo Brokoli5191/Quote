@@ -57,6 +57,7 @@ import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -94,7 +95,7 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
 
     val haptic = LocalHapticFeedback.current
     val selectCategoryWithHaptic: (String?) -> Unit = { category ->
-        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
         viewModel.selectCategory(category)
     }
 
@@ -290,10 +291,10 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                         )
                         ExpressiveIconButton(
                             onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 showCategoryFilterDialog = true
                             },
-                            modifier = Modifier.size(40.dp),
+                            modifier = Modifier.size(48.dp),
                             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                         ) {
                             Icon(
@@ -363,6 +364,7 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
     // Category Filter Picker Sheet (allows selecting multiple categories at once)
     if (showCategoryFilterDialog) {
         var sheetDragOffset by remember { mutableFloatStateOf(0f) }
+        var pendingCategories by remember { mutableStateOf(selectedCategories) }
         Dialog(
             onDismissRequest = { showCategoryFilterDialog = false },
             properties = DialogProperties(
@@ -451,13 +453,17 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     rowCategoryList.forEach { categoryName ->
-                                        val isSelected = selectedCategories.contains(categoryName)
+                                        val isSelected = pendingCategories.contains(categoryName)
                                         val interactionSource = remember(categoryName) { MutableInteractionSource() }
                                         FilterChip(
                                             selected = isSelected,
                                             onClick = {
-                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                viewModel.toggleCategorySelected(categoryName)
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                pendingCategories = if (isSelected) {
+                                                    pendingCategories - categoryName
+                                                } else {
+                                                    pendingCategories + categoryName
+                                                }
                                             },
                                             label = {
                                                 Text(
@@ -467,7 +473,7 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                                                     )
                                                 )
                                             },
-                                            modifier = Modifier.weight(1f).height(46.dp),
+                                            modifier = Modifier.weight(1f).height(48.dp),
                                             shape = rememberExpressiveShape(interactionSource, 23.dp, 10.dp),
                                             interactionSource = interactionSource,
                                             colors = FilterChipDefaults.filterChipColors(
@@ -500,9 +506,8 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                         ) {
                             ExpressiveTextButton(
                                 onClick = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    viewModel.clearCategorySelection()
-                                    showCategoryFilterDialog = false
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    pendingCategories = emptySet()
                                 },
                                 colors = ButtonDefaults.textButtonColors(
                                     contentColor = MaterialTheme.colorScheme.primary
@@ -513,7 +518,10 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                             }
 
                             ExpressiveButton(
-                                onClick = { showCategoryFilterDialog = false },
+                                onClick = {
+                                    viewModel.setSelectedCategories(pendingCategories)
+                                    showCategoryFilterDialog = false
+                                },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = MaterialTheme.colorScheme.primary,
                                     contentColor = MaterialTheme.colorScheme.onPrimary
@@ -546,7 +554,7 @@ fun CategoryBrowseViewInPlace(
     val shareTitle = uiText("Share Wisdom")
     val haptic = LocalHapticFeedback.current
     val onBackWithHaptic = {
-        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
         onBack()
     }
 
@@ -773,7 +781,7 @@ private fun LibraryFilterRow(
             modifier = Modifier
                 .clip(FilterPillShape)
                 .background(MaterialTheme.colorScheme.primary)
-                .height(40.dp)
+                .height(48.dp)
                 .padding(horizontal = 16.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -786,11 +794,11 @@ private fun LibraryFilterRow(
 
         ExpressiveTextButton(
             onClick = onBack,
-            modifier = Modifier.height(40.dp),
+            modifier = Modifier.height(48.dp),
             restingCorner = 32.dp,
             colors = ButtonDefaults.textButtonColors(
-                containerColor = Color.White,
-                contentColor = Color(0xFF1C1B1F)
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                contentColor = MaterialTheme.colorScheme.onSurface
             ),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp)
         ) {
@@ -812,6 +820,8 @@ fun QuoteBrowseItemCard(
 ) {
     val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
+    val cardScope = rememberCoroutineScope()
+    var copyConfirmed by remember { mutableStateOf(false) }
     val offsetX = remember { Animatable(if (lowPerformanceMode) 0f else 80f) }
     val alphaAnim = remember { Animatable(if (lowPerformanceMode) 1f else 0f) }
 
@@ -878,19 +888,24 @@ fun QuoteBrowseItemCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     ExpressiveIconButton(onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                         clipboard.setPrimaryClip(ClipData.newPlainText("quote", formattedQuote(quote.text, quote.author)))
+                        copyConfirmed = true
+                        cardScope.launch {
+                            delay(1200)
+                            copyConfirmed = false
+                        }
                     }) {
                         Icon(
-                            imageVector = Icons.Default.ContentCopy,
-                            contentDescription = uiText("Copy"),
+                            imageVector = if (copyConfirmed) Icons.Default.Check else Icons.Default.ContentCopy,
+                            contentDescription = uiText(if (copyConfirmed) "Copied" else "Copy"),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
                     ExpressiveIconButton(onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         onShare()
                     }) {
                         Icon(
@@ -902,20 +917,24 @@ fun QuoteBrowseItemCard(
 
                     var isLikedAnim by remember { mutableStateOf(false) }
                     val heartScale by animateFloatAsState(
-                        targetValue = if (isLikedAnim) 1.35f else 1.0f,
+                        targetValue = if (!lowPerformanceMode && isLikedAnim) 1.35f else 1.0f,
                         animationSpec = spring(stiffness = 500f, dampingRatio = 0.5f),
                         finishedListener = { isLikedAnim = false }
                     )
 
                     ExpressiveIconButton(onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         isLikedAnim = true
                         onToggleFavorite()
                     }) {
                         Icon(
                             imageVector = if (quote.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                             contentDescription = uiText("Favorite"),
-                            tint = if (quote.isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = if (quote.isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.graphicsLayer {
+                                scaleX = heartScale
+                                scaleY = heartScale
+                            }
                         )
                     }
                 }

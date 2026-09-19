@@ -10,7 +10,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-@Database(entities = [QuoteEntity::class, DailySelectionEntity::class], version = 5, exportSchema = false)
+@Database(entities = [QuoteEntity::class, DailySelectionEntity::class], version = 6, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun quoteDao(): QuoteDao
 
@@ -25,7 +25,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "aura_database"
                 )
-                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance
@@ -56,6 +56,12 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE quotes ADD COLUMN textDe TEXT")
                 db.execSQL("ALTER TABLE quotes ADD COLUMN language TEXT NOT NULL DEFAULT 'en'")
                 db.execSQL("ALTER TABLE quotes ADD COLUMN isAnonymous INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("UPDATE quotes SET category = 'Inspirational' WHERE lower(category) = 'inspiration'")
             }
         }
     }

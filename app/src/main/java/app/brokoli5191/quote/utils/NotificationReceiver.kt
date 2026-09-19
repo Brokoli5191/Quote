@@ -23,6 +23,7 @@ class NotificationReceiver : BroadcastReceiver() {
             val minute = prefs.getInt("daily_reminder_minute", 0)
             NotificationScheduler.scheduleDailyNotification(context, hour, minute)
         }
+        if (!enabled) return
 
         // goAsync() tells Android we're still working after onReceive returns
         val pendingResult = goAsync()

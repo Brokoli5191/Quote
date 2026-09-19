@@ -11,10 +11,13 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
@@ -26,6 +29,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -94,65 +100,57 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                 )
 
                 val activeThemeMode by viewModel.themeMode.collectAsStateWithLifecycle()
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    val modes = listOf("LIGHT", "DARK", "DYNAMIC")
-                    modes.forEach { mode ->
-                        val isSelected = activeThemeMode == mode
-                        val label = when (mode) {
-                            "DYNAMIC" -> "System"
-                            else -> mode.lowercase().replaceFirstChar { it.uppercase() }
-                        }
-                        ExpressiveButton(
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                viewModel.setThemeMode(mode)
-                            },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(44.dp),
-                            restingCorner = 12.dp,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isSelected)
-                                    MaterialTheme.colorScheme.primaryContainer
-                                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                                contentColor = if (isSelected)
-                                    MaterialTheme.colorScheme.onPrimaryContainer
-                                    else MaterialTheme.colorScheme.onSurfaceVariant
-                            ),
-                            border = if (isSelected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)) else null,
-                            contentPadding = PaddingValues(0.dp)
+                val modes = listOf("LIGHT", "DARK", "AMOLED", "DYNAMIC")
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    modes.chunked(2).forEach { rowModes ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text(
-                                text = uiText(label),
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
-                            )
+                            rowModes.forEach { mode ->
+                                val isSelected = activeThemeMode == mode
+                                val label = when (mode) {
+                                    "DYNAMIC" -> "System"
+                                    "AMOLED" -> "AMOLED"
+                                    else -> mode.lowercase().replaceFirstChar { it.uppercase() }
+                                }
+                                ExpressiveButton(
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        viewModel.setThemeMode(mode)
+                                    },
+                                    modifier = Modifier.weight(1f).height(48.dp),
+                                    restingCorner = 12.dp,
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (isSelected)
+                                            MaterialTheme.colorScheme.primaryContainer
+                                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                        contentColor = if (isSelected)
+                                            MaterialTheme.colorScheme.onPrimaryContainer
+                                            else MaterialTheme.colorScheme.onSurfaceVariant
+                                    ),
+                                    border = if (isSelected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)) else null,
+                                    contentPadding = PaddingValues(0.dp)
+                                ) {
+                                    Text(
+                                        text = uiText(label),
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                                    )
+                                }
+                            }
                         }
                     }
                 }
-
-                if (activeThemeMode != "LIGHT") {
-                    val amoledBlack by viewModel.amoledBlack.collectAsStateWithLifecycle()
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                text = uiText("AMOLED Pure Black"),
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                        Switch(
-                            checked = amoledBlack,
-                            onCheckedChange = { viewModel.setAmoledBlack(it) }
-                        )
-                    }
-                }
+                Text(
+                    text = when (activeThemeMode) {
+                        "LIGHT" -> uiText("Light surfaces for bright environments.")
+                        "DARK" -> uiText("Comfortable dark gray surfaces with clear elevation.")
+                        "AMOLED" -> uiText("True-black backgrounds for OLED displays.")
+                        else -> uiText("Follows the system appearance and uses system colors when available.")
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
             Spacer(modifier = Modifier.height(28.dp))
@@ -172,7 +170,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                 )
 
                 val activeThemeMode by viewModel.themeMode.collectAsStateWithLifecycle()
-                val isDynamic = activeThemeMode == "DYNAMIC"
+                val isDynamic = activeThemeMode == "DYNAMIC" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -183,6 +181,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                     val colors = listOf("Violet", "Amber", "Green", "Blue", "Rose")
                     colors.forEach { color ->
                         val isSelected = !isDynamic && activeThemeAccent == color
+                        val colorLabel = uiText(color)
                         val displayColor = when (color) {
                             "Violet" -> Color(0xFFD0BCFF)
                             "Amber" -> Color(0xFFFFDB9C)
@@ -193,7 +192,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(46.dp)
+                                .height(48.dp)
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(
                                     if (isDynamic) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f)
@@ -204,8 +203,15 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                     color = if (isSelected) displayColor else MaterialTheme.colorScheme.outline.copy(alpha = 0.1f),
                                     shape = RoundedCornerShape(12.dp)
                                 )
-                                .clickable(enabled = !isDynamic) { 
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                .semantics {
+                                    contentDescription = colorLabel
+                                }
+                                .selectable(
+                                    selected = isSelected,
+                                    enabled = !isDynamic,
+                                    role = Role.RadioButton
+                                ) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     viewModel.setThemeAccent(color)
                                 },
                             contentAlignment = Alignment.Center
@@ -228,6 +234,13 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                     }
                 }
 
+                if (isDynamic) {
+                    Text(
+                        text = uiText("Accent colors come from your system in System mode."),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(28.dp))
@@ -256,10 +269,10 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                         val selected = sourceMode == mode
                         ExpressiveButton(
                             onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 viewModel.setQuoteSourceMode(mode)
                             },
-                            modifier = Modifier.weight(1f).height(44.dp),
+                                modifier = Modifier.weight(1f).height(48.dp),
                             restingCorner = 12.dp,
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer
@@ -277,6 +290,11 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                         }
                     }
                 }
+                Text(
+                    text = uiText("All combines curated and community quotes. Personal quotes stay in My Quotes."),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
             Spacer(modifier = Modifier.height(28.dp))
@@ -302,10 +320,10 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                         val selected = appLanguage == language
                         ExpressiveButton(
                             onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 viewModel.setAppLanguage(language)
                             },
-                            modifier = Modifier.weight(1f).height(44.dp),
+                            modifier = Modifier.weight(1f).height(48.dp),
                             restingCorner = 12.dp,
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer
@@ -351,7 +369,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = uiText("Daily Reflection Reminders"),
+                    text = uiText("Daily quote reminder"),
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.align(Alignment.Start)
@@ -407,14 +425,14 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.NotificationsActive,
-                                        contentDescription = uiText("Daily Reminders"),
+                                        contentDescription = null,
                                         tint = MaterialTheme.colorScheme.primary,
                                         modifier = Modifier.size(20.dp)
                                     )
                                 }
                                 Column(modifier = Modifier.padding(end = 8.dp)) {
                                     Text(
-                                        text = uiText("Inspirational Mornings"),
+                                        text = uiText("Receive one quote at your chosen time."),
                                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
@@ -424,7 +442,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                             Switch(
                                 checked = reminderEnabled,
                                 onCheckedChange = { isChecked ->
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     if (isChecked) {
                                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                             val hasPermission = ContextCompat.checkSelfPermission(
@@ -479,18 +497,13 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                         horizontalAlignment = Alignment.CenterHorizontally,
                                         modifier = Modifier.width(60.dp)
                                     ) {
-                                        Text(
-                                            text = "▲",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier
-                                                .clickable {
-                                                    val h = (reminderHour + 1) % 24
-                                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                    viewModel.updateDailyReminderTime(h, reminderMinute)
-                                                }
-                                                .padding(6.dp)
-                                        )
+                                        IconButton(onClick = {
+                                            val h = (reminderHour + 1) % 24
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            viewModel.updateDailyReminderTime(h, reminderMinute)
+                                        }) {
+                                            Icon(Icons.Default.KeyboardArrowUp, uiText("Increase hour"))
+                                        }
 
                                         Text(
                                             text = String.format("%02d", reminderHour),
@@ -498,19 +511,14 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                             color = MaterialTheme.colorScheme.onSurface
                                         )
 
-                                        Text(
-                                            text = "▼",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier
-                                                .clickable {
-                                                    var h = reminderHour - 1
-                                                    if (h < 0) h = 23
-                                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                    viewModel.updateDailyReminderTime(h, reminderMinute)
-                                                }
-                                                .padding(6.dp)
-                                        )
+                                        IconButton(onClick = {
+                                            var h = reminderHour - 1
+                                            if (h < 0) h = 23
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            viewModel.updateDailyReminderTime(h, reminderMinute)
+                                        }) {
+                                            Icon(Icons.Default.KeyboardArrowDown, uiText("Decrease hour"))
+                                        }
                                     }
 
                                     Text(
@@ -525,18 +533,13 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                         horizontalAlignment = Alignment.CenterHorizontally,
                                         modifier = Modifier.width(60.dp)
                                     ) {
-                                        Text(
-                                            text = "▲",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier
-                                                .clickable {
-                                                    val m = (reminderMinute + 5) % 60
-                                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                    viewModel.updateDailyReminderTime(reminderHour, m)
-                                                }
-                                                .padding(6.dp)
-                                        )
+                                        IconButton(onClick = {
+                                            val m = (reminderMinute + 5) % 60
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            viewModel.updateDailyReminderTime(reminderHour, m)
+                                        }) {
+                                            Icon(Icons.Default.KeyboardArrowUp, uiText("Increase minute"))
+                                        }
 
                                         Text(
                                             text = String.format("%02d", reminderMinute),
@@ -544,39 +547,16 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                             color = MaterialTheme.colorScheme.onSurface
                                         )
 
-                                        Text(
-                                            text = "▼",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier
-                                                .clickable {
-                                                    var m = reminderMinute - 5
-                                                    if (m < 0) m = 55
-                                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                    viewModel.updateDailyReminderTime(reminderHour, m)
-                                                }
-                                                .padding(6.dp)
-                                        )
+                                        IconButton(onClick = {
+                                            var m = reminderMinute - 5
+                                            if (m < 0) m = 55
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            viewModel.updateDailyReminderTime(reminderHour, m)
+                                        }) {
+                                            Icon(Icons.Default.KeyboardArrowDown, uiText("Decrease minute"))
+                                        }
                                     }
 
-                                    Spacer(modifier = Modifier.width(16.dp))
-
-                                    // AM/PM Display Badge
-                                    val isAm = reminderHour < 12
-                                    val amPmLabel = if (isAm) "AM" else "PM"
-
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
-                                            .padding(horizontal = 10.dp, vertical = 6.dp)
-                                    ) {
-                                        Text(
-                                            text = amPmLabel,
-                                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                    }
                                 }
 
                                 Text(
@@ -633,6 +613,11 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                                 color = MaterialTheme.colorScheme.onSurface
                             )
+                            Text(
+                                text = uiText("Adds a translucent effect to navigation areas. Disable it if scrolling feels slow."),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                         Switch(
                             checked = blurNavigationSurfaces,
@@ -663,12 +648,17 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                                 color = MaterialTheme.colorScheme.onSurface
                             )
+                            Text(
+                                text = uiText("Reduces motion and visual effects to improve performance and battery life."),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
 
                         Switch(
                             checked = isLowPerf,
                             onCheckedChange = { isChecked ->
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 viewModel.setLowPerformanceMode(isChecked)
                                 Toast.makeText(
                                     context,
@@ -722,15 +712,20 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                         ) {
                             Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                                 Text(
-                                    text = uiText("Automatic Updates"),
+                                    text = uiText("Automatically check for updates"),
                                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                                     color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = uiText("Checks once a day. Downloads and installs only start when you choose them."),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                             Switch(
                                 checked = autoUpdateEnabled,
                                 onCheckedChange = { isChecked ->
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     viewModel.setAutoUpdateEnabled(isChecked)
                                 }
                             )
@@ -778,11 +773,11 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
 
                             ExpressiveOutlinedButton(
                                 onClick = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     viewModel.checkForUpdatesManually()
                                 },
                                 enabled = !isChecking && !isDownloading,
-                                modifier = Modifier.weight(1f).height(44.dp),
+                            modifier = Modifier.weight(1f).height(48.dp),
                                 restingCorner = 12.dp,
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
                                 colors = ButtonDefaults.outlinedButtonColors(
@@ -799,10 +794,10 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                 is UpdateStatus.UpdateAvailable -> {
                                     ExpressiveButton(
                                         onClick = {
-                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                             viewModel.downloadUpdate(s.downloadUrl, s.version)
                                         },
-                                        modifier = Modifier.weight(1f).height(44.dp),
+                                modifier = Modifier.weight(1f).height(48.dp),
                                         restingCorner = 12.dp,
                                         colors = ButtonDefaults.buttonColors(
                                             containerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -818,10 +813,10 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                 is UpdateStatus.ReadyToInstall -> {
                                     ExpressiveButton(
                                         onClick = {
-                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                             viewModel.installUpdate(context, s.filePath)
                                         },
-                                        modifier = Modifier.weight(1f).height(44.dp),
+                                        modifier = Modifier.weight(1f).height(48.dp),
                                         restingCorner = 12.dp,
                                         colors = ButtonDefaults.buttonColors(
                                             containerColor = MaterialTheme.colorScheme.primary,
@@ -880,13 +875,32 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                         if (uri != null) {
                             viewModel.importBackup(
                                 uri = uri,
-                                onSuccess = { customCount, favCount ->
+                                onSuccess = { customCount, favCount, settingsRestored ->
                                     Toast.makeText(
                                         context,
-                                        if (uiLanguage == "de") "Wiederherstellung abgeschlossen: $customCount eigene Quotes importiert und $favCount Favoriten aktualisiert." else "Restore complete! Imported $customCount custom quotes & updated $favCount favorites.",
+                                        if (uiLanguage == "de") {
+                                            "Wiederherstellung abgeschlossen: $customCount eigene Quotes importiert, $favCount Favoriten aktualisiert" +
+                                                if (settingsRestored) " und Einstellungen wiederhergestellt." else "."
+                                        } else {
+                                            "Restore complete! Imported $customCount custom quotes, updated $favCount favorites" +
+                                                if (settingsRestored) ", and restored settings." else "."
+                                        },
                                         Toast.LENGTH_LONG
                                     ).show()
-                                    viewModel.loadDailyQuote()
+                                    if (
+                                        settingsRestored &&
+                                        viewModel.dailyReminderEnabled.value &&
+                                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                        ContextCompat.checkSelfPermission(
+                                            context,
+                                            Manifest.permission.POST_NOTIFICATIONS
+                                        ) != PackageManager.PERMISSION_GRANTED
+                                    ) {
+                                        // Runtime permissions are device-specific and cannot be part of a backup.
+                                        viewModel.setDailyReminderEnabled(false)
+                                        permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                    }
+                                    if (!settingsRestored) viewModel.loadDailyQuote()
                                     viewModel.runVerification()
                                 },
                                 onError = { error ->
@@ -912,6 +926,11 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                             .padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
+                        Text(
+                            text = uiText("Backups include favorites, custom quotes, and app settings."),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -920,7 +939,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                             // Export Button
                             ExpressiveButton(
                                 onClick = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     exportLauncher.launch("quote_backup.json")
                                 },
                                 modifier = Modifier
@@ -947,7 +966,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                             // Import Button
                             ExpressiveOutlinedButton(
                                 onClick = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     importLauncher.launch(arrayOf("application/json"))
                                 },
                                 modifier = Modifier
@@ -999,7 +1018,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                         if (!devUnlocked) {
                             versionTapCount++
                             if (versionTapCount >= 5) {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 viewModel.unlockDevMode()
                                 Toast.makeText(context, localizeUi("Developer mode enabled", uiLanguage), Toast.LENGTH_SHORT).show()
                             } else {
@@ -1012,7 +1031,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                 if (devUnlocked) {
                     ExpressiveTextButton(
                         onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             viewModel.openDevScreen()
                         },
                         colors = ButtonDefaults.textButtonColors(

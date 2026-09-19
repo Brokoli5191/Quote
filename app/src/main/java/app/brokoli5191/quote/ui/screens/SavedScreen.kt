@@ -8,11 +8,15 @@ import android.widget.Toast
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.animation.*
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -28,9 +32,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.sp
@@ -57,6 +63,7 @@ fun SavedScreen(viewModel: QuoteViewModel) {
     val userAdded by viewModel.userAdded.collectAsStateWithLifecycle()
     val submittingQuoteIds by viewModel.submittingQuoteIds.collectAsStateWithLifecycle()
     val activeSubTab by viewModel.savedSubTab.collectAsStateWithLifecycle()
+    val lowPerformanceMode by viewModel.lowPerformanceMode.collectAsStateWithLifecycle()
     
     var quoteToSubmit by remember { mutableStateOf<QuoteEntity?>(null) }
 
@@ -65,6 +72,10 @@ fun SavedScreen(viewModel: QuoteViewModel) {
     val uiLanguage = LocalAppLanguage.current
     val haptic = LocalHapticFeedback.current
     val fabInteractionSource = remember { MutableInteractionSource() }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val deletedMessage = uiText("Quote deleted")
+    val undoLabel = uiText("Undo")
     var timestampTick by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -105,6 +116,7 @@ fun SavedScreen(viewModel: QuoteViewModel) {
                 activeTab = activeSubTab,
                 favoritesCount = favorites.size,
                 myQuotesCount = userAdded.size,
+                lowPerformanceMode = lowPerformanceMode,
                 onSelect = viewModel::selectSavedSubTab
             )
 
@@ -114,7 +126,9 @@ fun SavedScreen(viewModel: QuoteViewModel) {
             AnimatedContent(
                 targetState = activeSubTab,
                 transitionSpec = {
-                    if (targetState == "My Quotes") {
+                    if (lowPerformanceMode) {
+                        EnterTransition.None togetherWith ExitTransition.None
+                    } else if (targetState == "My Quotes") {
                         slideInHorizontally(
                             initialOffsetX = { it },
                             animationSpec = spring(stiffness = 300f, dampingRatio = 0.85f)
@@ -153,7 +167,7 @@ fun SavedScreen(viewModel: QuoteViewModel) {
                         ) {
                             Icon(
                                 imageVector = if (subTab == "Favorites") Icons.Default.FavoriteBorder else Icons.Default.NoteAlt,
-                                contentDescription = uiText("Empty"),
+                                contentDescription = null,
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
                                 modifier = Modifier.size(64.dp)
                             )
@@ -161,6 +175,16 @@ fun SavedScreen(viewModel: QuoteViewModel) {
                                 text = if (subTab == "Favorites") uiText("No favorites yet") else uiText("No custom quotes yet"),
                                 style = MaterialTheme.typography.headlineMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = if (subTab == "Favorites") {
+                                    uiText("Tap the heart on a quote to keep it here.")
+                                } else {
+                                    uiText("Create a personal quote from the add button.")
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                                textAlign = TextAlign.Center
                             )
                         }
                     }
@@ -175,8 +199,21 @@ fun SavedScreen(viewModel: QuoteViewModel) {
                                 quote = quote,
                                 nowMillis = timestampTick,
                                 onToggleFavorite = { viewModel.toggleFavorite(quote) },
-                                onDelete = { viewModel.deleteQuote(quote.id) },
+                                onDelete = {
+                                    viewModel.deleteQuote(quote.id)
+                                    scope.launch {
+                                        val result = snackbarHostState.showSnackbar(
+                                            message = deletedMessage,
+                                            actionLabel = undoLabel,
+                                            duration = SnackbarDuration.Short
+                                        )
+                                        if (result == SnackbarResult.ActionPerformed) {
+                                            viewModel.restoreDeletedQuote(quote)
+                                        }
+                                    }
+                                },
                                 isSubmitting = quote.id in submittingQuoteIds,
+                                lowPerformanceMode = lowPerformanceMode,
                                 onSubmit = { quoteToSubmit = quote },
                                 onShare = {
                                     val intent = Intent(Intent.ACTION_SEND).apply {
@@ -195,7 +232,7 @@ fun SavedScreen(viewModel: QuoteViewModel) {
         // Floating creator button
         FloatingActionButton(
             onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 viewModel.openNewQuoteScreen()
             },
             modifier = Modifier
@@ -213,6 +250,13 @@ fun SavedScreen(viewModel: QuoteViewModel) {
                 modifier = Modifier.size(24.dp)
             )
         }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(start = 16.dp, end = 16.dp, bottom = 176.dp)
+        )
 
         quoteToSubmit?.let { quote ->
             Dialog(
@@ -307,6 +351,7 @@ private fun SavedTabSwitcher(
     activeTab: String,
     favoritesCount: Int,
     myQuotesCount: Int,
+    lowPerformanceMode: Boolean,
     onSelect: (String) -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
@@ -323,7 +368,7 @@ private fun SavedTabSwitcher(
         val segmentWidth = maxWidth / 2
         val indicatorOffset by androidx.compose.animation.core.animateDpAsState(
             targetValue = if (activeTab == "Favorites") 0.dp else segmentWidth,
-            animationSpec = spring(dampingRatio = 0.82f, stiffness = 420f),
+            animationSpec = if (lowPerformanceMode) snap() else spring(dampingRatio = 0.82f, stiffness = 420f),
             label = "SavedTabIndicator"
         )
 
@@ -331,7 +376,7 @@ private fun SavedTabSwitcher(
             modifier = Modifier
                 .offset { IntOffset(indicatorOffset.roundToPx(), 0) }
                 .width(segmentWidth)
-                .height(40.dp)
+                .height(48.dp)
                 .clip(RoundedCornerShape(12.dp))
                 .background(MaterialTheme.colorScheme.primaryContainer)
         )
@@ -345,12 +390,14 @@ private fun SavedTabSwitcher(
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .height(40.dp)
-                        .clickable(
+                        .height(48.dp)
+                        .selectable(
+                            selected = selected,
+                            role = Role.Tab,
                             interactionSource = remember(tab) { MutableInteractionSource() },
                             indication = null
                         ) {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             onSelect(tab)
                         },
                     contentAlignment = Alignment.Center
@@ -378,6 +425,7 @@ fun PremiumCollectionQuoteCard(
     onToggleFavorite: () -> Unit,
     onDelete: () -> Unit,
     isSubmitting: Boolean,
+    lowPerformanceMode: Boolean,
     onSubmit: () -> Unit,
     onShare: () -> Unit
 ) {
@@ -386,48 +434,38 @@ fun PremiumCollectionQuoteCard(
     val context = LocalContext.current
 
     // Elegant fly-in enter animation from the side
-    val offsetX = remember { androidx.compose.animation.core.Animatable(80f) }
-    val alpha = remember { androidx.compose.animation.core.Animatable(0f) }
+    val offsetX = remember { androidx.compose.animation.core.Animatable(if (lowPerformanceMode) 0f else 80f) }
+    val alpha = remember { androidx.compose.animation.core.Animatable(if (lowPerformanceMode) 1f else 0f) }
 
     LaunchedEffect(Unit) {
-        offsetX.animateTo(
+        if (!lowPerformanceMode) offsetX.animateTo(
             targetValue = 0f,
             animationSpec = spring(stiffness = 300f, dampingRatio = 0.8f)
         )
     }
     LaunchedEffect(Unit) {
-        alpha.animateTo(
+        if (!lowPerformanceMode) alpha.animateTo(
             targetValue = 1f,
             animationSpec = androidx.compose.animation.core.tween(durationMillis = 250)
         )
     }
 
-    // Generate styled variations based on quote categories or settings
-    val isLightTheme = MaterialTheme.colorScheme.background.red > 0.5f
-    val bgBrush = if (isLightTheme) {
-        when (quote.id % 4) {
-            0 -> Brush.linearGradient(listOf(Color(0xFFF6F2FA), Color(0xFFECE6F0)))
-            1 -> Brush.linearGradient(listOf(Color(0xFFFFF7EB), Color(0xFFFFF1D8)))
-            2 -> Brush.linearGradient(listOf(Color(0xFFE8F5E9), Color(0xFFC8E6C9).copy(alpha = 0.4f)))
-            else -> Brush.linearGradient(listOf(Color(0xFFE8EAF6), Color(0xFFD0D4F5).copy(alpha = 0.5f)))
-        }
-    } else {
-        when (quote.id % 4) {
-            0 -> Brush.linearGradient(listOf(Color(0xFF2B292D), Color(0xFF1C1B1F)))
-            1 -> Brush.linearGradient(listOf(Color(0xFF353438), Color(0xFF201F23)))
-            2 -> Brush.linearGradient(listOf(Color(0xFF2E5B3F).copy(alpha = 0.15f), Color(0xFF141317)))
-            else -> Brush.linearGradient(listOf(Color(0xFF594983).copy(alpha = 0.1f), Color(0xFF1C1B1F)))
-        }
+    val bgBrush = when (quote.id % 4) {
+        0 -> Brush.linearGradient(listOf(MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.colorScheme.surfaceContainer))
+        1 -> Brush.linearGradient(listOf(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.18f), MaterialTheme.colorScheme.surfaceContainer))
+        2 -> Brush.linearGradient(listOf(MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.16f), MaterialTheme.colorScheme.surfaceContainerLow))
+        else -> Brush.linearGradient(listOf(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.14f), MaterialTheme.colorScheme.surfaceContainer))
     }
-
-    // Border color based on categories/styles
-    val strokeColor = if (isLightTheme) {
-        MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
-    } else if (quote.category == "Life") {
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-    } else {
-        Color.White.copy(alpha = 0.04f)
-    }
+    val strokeColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.16f)
+    val cardScope = rememberCoroutineScope()
+    var copyConfirmed by remember { mutableStateOf(false) }
+    var favoritePulse by remember { mutableStateOf(false) }
+    val favoriteScale by animateFloatAsState(
+        targetValue = if (!lowPerformanceMode && favoritePulse) 1.3f else 1f,
+        animationSpec = spring(stiffness = 500f, dampingRatio = 0.52f),
+        finishedListener = { favoritePulse = false },
+        label = "SavedFavoritePulse"
+    )
 
     Card(
         modifier = Modifier
@@ -456,8 +494,8 @@ fun PremiumCollectionQuoteCard(
                 ) {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         val tagsSp = remember(quote.tags, quote.isAnonymous, language) {
-                            if (quote.isAnonymous || language == "de") emptyList()
-                            else quote.tags.split(",").filter { it.isNotBlank() }
+                            if (quote.isAnonymous) emptyList()
+                            else quote.tags.split(",").map { it.trim() }.filter { it.isNotBlank() }
                         }
                         tagsSp.take(2).forEach { tag ->
                             Box(
@@ -550,19 +588,24 @@ fun PremiumCollectionQuoteCard(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         ExpressiveIconButton(onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                             clipboard.setPrimaryClip(ClipData.newPlainText("quote", formattedQuote(quote.text, quote.author)))
+                            copyConfirmed = true
+                            cardScope.launch {
+                                delay(1200)
+                                copyConfirmed = false
+                            }
                         }) {
                             Icon(
-                                imageVector = Icons.Default.ContentCopy,
-                                contentDescription = uiText("Copy"),
+                                imageVector = if (copyConfirmed) Icons.Default.Check else Icons.Default.ContentCopy,
+                                contentDescription = uiText(if (copyConfirmed) "Copied" else "Copy"),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
 
                         ExpressiveIconButton(onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             onShare()
                         }) {
                             Icon(
@@ -574,7 +617,7 @@ fun PremiumCollectionQuoteCard(
 
                         if (quote.isUserAdded) {
                             ExpressiveIconButton(onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 onDelete()
                             }) {
                                 Icon(
@@ -585,13 +628,18 @@ fun PremiumCollectionQuoteCard(
                             }
                         } else {
                             ExpressiveIconButton(onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                favoritePulse = true
                                 onToggleFavorite()
                             }) {
                                 Icon(
                                     imageVector = if (quote.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                                     contentDescription = uiText("Favorite"),
-                                    tint = if (quote.isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                                    tint = if (quote.isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.graphicsLayer {
+                                        scaleX = favoriteScale
+                                        scaleY = favoriteScale
+                                    }
                                 )
                             }
                         }
@@ -686,8 +734,10 @@ private fun formatSavedDate(savedDate: String?, now: Long = System.currentTimeMi
 }
 
 private fun getInitials(name: String): String {
-    val clean = name.trim().replace(Regex("[^a-zA-Z\\s]"), "")
-    val parts = clean.split(" ").filter { it.isNotBlank() }
+    val parts = name.trim()
+        .split(Regex("\\s+"))
+        .map { part -> part.filter(Char::isLetter) }
+        .filter { it.isNotBlank() }
     return when {
         parts.isEmpty() -> "U"
         parts.size == 1 -> parts[0].take(2).uppercase()

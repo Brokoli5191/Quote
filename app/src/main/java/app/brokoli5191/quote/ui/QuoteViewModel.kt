@@ -15,6 +15,7 @@ import app.brokoli5191.quote.data.QuoteSubmissionResult
 import app.brokoli5191.quote.data.QuoteSubmissionStatus
 import app.brokoli5191.quote.data.QuoteOrigin
 import app.brokoli5191.quote.data.CommunitySyncManager
+import app.brokoli5191.quote.data.CategoryMapper
 import app.brokoli5191.quote.data.QuoteSourceMode
 import app.brokoli5191.quote.data.QuoteLanguage
 import app.brokoli5191.quote.data.isAvailableIn
@@ -244,18 +245,22 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
     }
 
     private fun loadThemeSettings() {
-        // Migration: the old single "AMOLED" mode becomes DARK + amoledBlack toggle,
-        // so AMOLED can now combine with Material You (DYNAMIC).
         val storedMode = prefs.getString("theme_mode", "DARK") ?: "DARK"
-        if (storedMode == "AMOLED") {
-            _themeMode.value = "DARK"
-            _amoledBlack.value = true
-            prefs.edit().putString("theme_mode", "DARK").putBoolean("amoled_black", true).apply()
-        } else {
-            _themeMode.value = storedMode
-            _amoledBlack.value = prefs.getBoolean("amoled_black", false)
+        val migratedMode = when {
+            storedMode == "AMOLED" -> "AMOLED"
+            storedMode == "DARK" && prefs.getBoolean("amoled_black", false) -> "AMOLED"
+            storedMode in setOf("LIGHT", "DARK", "DYNAMIC") -> storedMode
+            else -> "DARK"
         }
-        _themeAccent.value = prefs.getString("theme_accent", "Violet") ?: "Violet"
+        _themeMode.value = migratedMode
+        _amoledBlack.value = migratedMode == "AMOLED"
+        prefs.edit()
+            .putString("theme_mode", migratedMode)
+            .putBoolean("amoled_black", migratedMode == "AMOLED")
+            .apply()
+        _themeAccent.value = prefs.getString("theme_accent", "Violet")
+            ?.takeIf { it in setOf("Violet", "Amber", "Green", "Blue", "Rose") }
+            ?: "Violet"
         _quoteSourceMode.value = prefs.getString("quote_source_mode", QuoteSourceMode.ALL)
             ?.takeIf { it in setOf(QuoteSourceMode.ALL, QuoteSourceMode.CURATED, QuoteSourceMode.COMMUNITY) }
             ?: QuoteSourceMode.ALL
@@ -283,7 +288,6 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
         val lastCheck = prefs.getString("last_update_check_date", "") ?: ""
         if (lastCheck == today) return
         checkForUpdates()
-        prefs.edit().putString("last_update_check_date", today).apply()
     }
 
     fun checkForUpdates() {
@@ -305,6 +309,8 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
                 } else {
                     _updateStatus.value = UpdateStatus.UpToDate
                 }
+                val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+                prefs.edit().putString("last_update_check_date", today).apply()
             } finally {
                 updateCheckRunning.set(false)
             }
@@ -349,16 +355,21 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
     }
 
     fun setThemeMode(mode: String) {
+        if (mode !in setOf("LIGHT", "DARK", "AMOLED", "DYNAMIC")) return
         _themeMode.value = mode
-        prefs.edit().putString("theme_mode", mode).apply()
+        _amoledBlack.value = mode == "AMOLED"
+        prefs.edit()
+            .putString("theme_mode", mode)
+            .putBoolean("amoled_black", mode == "AMOLED")
+            .apply()
     }
 
     fun setAmoledBlack(enabled: Boolean) {
-        _amoledBlack.value = enabled
-        prefs.edit().putBoolean("amoled_black", enabled).apply()
+        setThemeMode(if (enabled) "AMOLED" else "DARK")
     }
 
     fun setThemeAccent(accent: String) {
+        if (accent !in setOf("Violet", "Amber", "Green", "Blue", "Rose")) return
         _themeAccent.value = accent
         prefs.edit().putString("theme_accent", accent).apply()
     }
@@ -509,6 +520,12 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
         _selectedCategories.value = newSet
     }
 
+    fun setSelectedCategories(categories: Set<String>) {
+        val allowed = CategoryMapper.categories.toSet() +
+            setOf("Community", "Local", "Reflections")
+        _selectedCategories.value = categories.intersect(allowed)
+    }
+
     fun clearCategorySelection() {
         _selectedCategories.value = emptySet()
     }
@@ -532,12 +549,18 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
     }
 
     fun addUserQuote(text: String, author: String, category: String, tags: String) {
+        val normalizedText = text.trim()
+        val normalizedAuthor = author.trim()
+        val normalizedTags = tags.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+        if (normalizedText.length !in 3..500 || normalizedAuthor.length > 100) return
+        if (normalizedTags.size > 8 || normalizedTags.any { it.length > 30 }) return
+
         viewModelScope.launch {
             val q = QuoteEntity(
-                text = text,
-                author = if (author.isBlank()) "Unknown" else author,
-                category = if (category.isBlank()) "Love" else category,
-                tags = tags,
+                text = normalizedText,
+                author = normalizedAuthor.ifBlank { "Unknown" },
+                category = category.takeIf { it in CategoryMapper.categories } ?: "Uncategorized",
+                tags = normalizedTags.distinctBy { it.lowercase() }.joinToString(", "),
                 isUserAdded = true,
                 origin = QuoteOrigin.PERSONAL,
                 language = _appLanguage.value,
@@ -550,6 +573,12 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
     fun deleteQuote(id: Int) {
         viewModelScope.launch {
             repository.deleteQuote(id)
+        }
+    }
+
+    fun restoreDeletedQuote(quote: QuoteEntity) {
+        viewModelScope.launch {
+            repository.insertQuote(quote)
         }
     }
 
@@ -640,8 +669,17 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
                     })
                 }
 
-                app.contentResolver.openOutputStream(uri)?.use { os ->
-                    os.write(jsonArray.toString(4).toByteArray())
+                val backup = org.json.JSONObject().apply {
+                    put("formatVersion", 2)
+                    put("exportedAt", System.currentTimeMillis())
+                    put("settings", createSettingsBackup())
+                    put("quotes", jsonArray)
+                }
+
+                val output = app.contentResolver.openOutputStream(uri)
+                    ?: throw java.io.IOException("Could not open the selected backup file")
+                output.use { os ->
+                    os.write(backup.toString(4).toByteArray(Charsets.UTF_8))
                 }
 
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
@@ -656,13 +694,24 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
         }
     }
 
-    fun importBackup(uri: android.net.Uri, onSuccess: (insertedCustom: Int, updatedFavs: Int) -> Unit, onError: (String) -> Unit) {
+    fun importBackup(
+        uri: android.net.Uri,
+        onSuccess: (insertedCustom: Int, updatedFavs: Int, settingsRestored: Boolean) -> Unit,
+        onError: (String) -> Unit
+    ) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val content = app.contentResolver.openInputStream(uri)?.use { it.bufferedReader().readText() }
                     ?: throw Exception("Could not open file")
 
-                val jsonArray = org.json.JSONArray(content)
+                val backupRoot = org.json.JSONTokener(content).nextValue()
+                val settings = (backupRoot as? org.json.JSONObject)?.optJSONObject("settings")
+                val jsonArray = when (backupRoot) {
+                    is org.json.JSONArray -> backupRoot // Legacy backups (format version 1)
+                    is org.json.JSONObject -> backupRoot.optJSONArray("quotes")
+                        ?: throw Exception("Backup does not contain a quotes list")
+                    else -> throw Exception("Unknown backup format")
+                }
                 val dbQuotes = repository.getAllQuotesSync()
                 val existingCustomKeys = dbQuotes
                     .filter { it.isUserAdded }
@@ -685,7 +734,10 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
                             repository.insertQuote(QuoteEntity(
                                 text = text,
                                 author = author,
-                                category = obj.optString("category", "Stoicism"),
+                                category = obj.optString("category", "Uncategorized")
+                                    .let { if (it.equals("Inspiration", ignoreCase = true)) "Inspirational" else it }
+                                    .takeIf { it in CategoryMapper.categories }
+                                    ?: "Uncategorized",
                                 isFavorite = isFavorite,
                                 isUserAdded = true,
                                 origin = QuoteOrigin.PERSONAL,
@@ -693,7 +745,9 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
                                 aboutAuthor = obj.optString("aboutAuthor", ""),
                                 tags = obj.optString("tags", ""),
                                 savedDate = obj.optString("savedDate", null).let { if (it.isNullOrEmpty()) null else it },
-                                language = obj.optString("language", QuoteLanguage.ENGLISH),
+                                language = obj.optString("language", QuoteLanguage.ENGLISH)
+                                    .takeIf { it in setOf(QuoteLanguage.ENGLISH, QuoteLanguage.GERMAN) }
+                                    ?: QuoteLanguage.ENGLISH,
                                 textDe = obj.optString("textDe", "").ifBlank { null },
                                 isAnonymous = obj.optBoolean("isAnonymous", false)
                             ))
@@ -708,8 +762,10 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
                     }
                 }
 
+                val settingsRestored = settings?.let(::restoreSettingsBackup) ?: false
+
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    onSuccess(insertedCustom, updatedFavs)
+                    onSuccess(insertedCustom, updatedFavs, settingsRestored)
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -718,6 +774,84 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
                 }
             }
         }
+    }
+
+    private fun createSettingsBackup(): org.json.JSONObject = org.json.JSONObject().apply {
+        put("themeMode", _themeMode.value)
+        put("themeAccent", _themeAccent.value)
+        put("amoledBlack", _amoledBlack.value)
+        put("quoteSourceMode", _quoteSourceMode.value)
+        put("appLanguage", _appLanguage.value)
+        put("showAnonymousQuotes", _showAnonymousQuotes.value)
+        put("widgetStyle", _widgetStyle.value)
+        put("dailyReminderEnabled", _dailyReminderEnabled.value)
+        put("dailyReminderHour", _dailyReminderHour.value)
+        put("dailyReminderMinute", _dailyReminderMinute.value)
+        put("lowPerformanceMode", _lowPerformanceMode.value)
+        put("blurNavigationSurfaces", _blurNavigationSurfaces.value)
+        put("autoUpdateEnabled", _autoUpdateEnabled.value)
+    }
+
+    private fun restoreSettingsBackup(settings: org.json.JSONObject): Boolean {
+        val editor = prefs.edit()
+        var restored = false
+
+        fun restoreString(jsonKey: String, prefKey: String, allowed: Set<String>) {
+            if (!settings.has(jsonKey)) return
+            val value = settings.optString(jsonKey)
+            if (value in allowed) {
+                editor.putString(prefKey, value)
+                restored = true
+            }
+        }
+
+        fun restoreBoolean(jsonKey: String, prefKey: String) {
+            if (!settings.has(jsonKey)) return
+            editor.putBoolean(prefKey, settings.optBoolean(jsonKey))
+            restored = true
+        }
+
+        restoreString("themeMode", "theme_mode", setOf("LIGHT", "DARK", "AMOLED", "DYNAMIC"))
+        restoreString("themeAccent", "theme_accent", setOf("Violet", "Amber", "Green", "Blue", "Rose"))
+        restoreBoolean("amoledBlack", "amoled_black")
+        restoreString(
+            "quoteSourceMode",
+            "quote_source_mode",
+            setOf(QuoteSourceMode.ALL, QuoteSourceMode.CURATED, QuoteSourceMode.COMMUNITY)
+        )
+        restoreString("appLanguage", "app_language", setOf(QuoteLanguage.ENGLISH, QuoteLanguage.GERMAN))
+        restoreBoolean("showAnonymousQuotes", "show_anonymous_quotes")
+        if (settings.has("widgetStyle")) {
+            editor.putString("widget_style", settings.optString("widgetStyle", "Quote").take(50))
+            restored = true
+        }
+        restoreBoolean("dailyReminderEnabled", "daily_reminder_enabled")
+        if (settings.has("dailyReminderHour")) {
+            editor.putInt("daily_reminder_hour", settings.optInt("dailyReminderHour", 8).coerceIn(0, 23))
+            restored = true
+        }
+        if (settings.has("dailyReminderMinute")) {
+            editor.putInt("daily_reminder_minute", settings.optInt("dailyReminderMinute", 0).coerceIn(0, 59))
+            restored = true
+        }
+        restoreBoolean("lowPerformanceMode", "low_performance_mode")
+        restoreBoolean("blurNavigationSurfaces", "blur_navigation_surfaces")
+        restoreBoolean("autoUpdateEnabled", "auto_update_enabled")
+
+        if (!restored) return false
+        if (!editor.commit()) throw java.io.IOException("Could not save restored settings")
+
+        loadThemeSettings()
+        if (_dailyReminderEnabled.value) {
+            NotificationScheduler.scheduleDailyNotification(app, _dailyReminderHour.value, _dailyReminderMinute.value)
+        } else {
+            NotificationScheduler.cancelDailyNotification(app)
+        }
+        loadDailyQuote()
+        app.sendBroadcast(Intent("app.brokoli5191.quote.UPDATE_WIDGET").apply {
+            component = ComponentName(app, "app.brokoli5191.quote.widget.QuoteWidgetProvider")
+        })
+        return true
     }
 }
 

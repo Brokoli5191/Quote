@@ -83,11 +83,11 @@ fun DeveloperScreen(viewModel: QuoteViewModel, modifier: Modifier = Modifier) {
                 }
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(48.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                         .clickable {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             viewModel.closeDevScreen()
                         },
                     contentAlignment = Alignment.Center
@@ -156,7 +156,7 @@ fun DeveloperScreen(viewModel: QuoteViewModel, modifier: Modifier = Modifier) {
             DebugSection(title = "Actions") {
                 ExpressiveButton(
                     onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         viewModel.cycleDailyQuote()
                     },
                     modifier = Modifier.fillMaxWidth(),
@@ -173,7 +173,7 @@ fun DeveloperScreen(viewModel: QuoteViewModel, modifier: Modifier = Modifier) {
 
                 ExpressiveOutlinedButton(
                     onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         viewModel.triggerTestNotification()
                     },
                     modifier = Modifier.fillMaxWidth(),
@@ -186,7 +186,7 @@ fun DeveloperScreen(viewModel: QuoteViewModel, modifier: Modifier = Modifier) {
 
                 ExpressiveOutlinedButton(
                     onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         viewModel.syncCommunityQuotes()
                     },
                     modifier = Modifier.fillMaxWidth(),
@@ -199,7 +199,7 @@ fun DeveloperScreen(viewModel: QuoteViewModel, modifier: Modifier = Modifier) {
 
                 ExpressiveOutlinedButton(
                     onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         viewModel.refreshSubmissionStatuses()
                     },
                     modifier = Modifier.fillMaxWidth(),
@@ -212,7 +212,7 @@ fun DeveloperScreen(viewModel: QuoteViewModel, modifier: Modifier = Modifier) {
 
                 ExpressiveOutlinedButton(
                     onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         viewModel.runVerification()
                     },
                     modifier = Modifier.fillMaxWidth(),

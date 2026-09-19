@@ -12,15 +12,18 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -72,6 +75,7 @@ fun DailyScreen(viewModel: QuoteViewModel) {
     val haptic = LocalHapticFeedback.current
     val uiLanguage = LocalAppLanguage.current
     val scrollState = rememberScrollState()
+    val feedbackScope = rememberCoroutineScope()
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -128,6 +132,14 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                     modifier = Modifier.fillMaxWidth()
                 ) { quoteId ->
                     quoteState?.takeIf { it.id == quoteId }?.let { quote ->
+                        var copyConfirmed by remember(quote.id) { mutableStateOf(false) }
+                        var favoritePulse by remember(quote.id) { mutableStateOf(false) }
+                        val favoriteScale by animateFloatAsState(
+                            targetValue = if (!lowPerformanceMode && favoritePulse) 1.3f else 1f,
+                            animationSpec = spring(stiffness = 500f, dampingRatio = 0.52f),
+                            finishedListener = { favoritePulse = false },
+                            label = "DailyFavoritePulse"
+                        )
                         Column(
                             modifier = Modifier.padding(horizontal = 20.dp)
                         ) {
@@ -214,11 +226,23 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                                 DailyActionButton(
                                     icon = if (quote.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                                     label = if (quote.isFavorite) uiText("Saved") else uiText("Save"),
-                                    onClick = { viewModel.toggleFavorite(quote) }
+                                    iconScale = favoriteScale,
+                                    onClick = {
+                                        favoritePulse = true
+                                        viewModel.toggleFavorite(quote)
+                                    }
                                 )
-                                DailyActionButton(Icons.Default.ContentCopy, uiText("Copy")) {
+                                DailyActionButton(
+                                    if (copyConfirmed) Icons.Default.Check else Icons.Default.ContentCopy,
+                                    uiText(if (copyConfirmed) "Copied" else "Copy")
+                                ) {
                                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                     clipboard.setPrimaryClip(ClipData.newPlainText("quote", formattedQuote(quote.text, quote.author)))
+                                    copyConfirmed = true
+                                    feedbackScope.launch {
+                                        delay(1200)
+                                        copyConfirmed = false
+                                    }
                                 }
                                 DailyActionButton(Icons.Default.Share, uiText("Share")) {
                                     context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
@@ -231,7 +255,7 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                               Spacer(Modifier.height(10.dp))
                               ExpressiveButton(
                                 onClick = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     val wikipediaLanguage = if (uiLanguage == QuoteLanguage.GERMAN) "de" else "en"
                                     val url = "https://$wikipediaLanguage.wikipedia.org/wiki/" +
                                         quote.author.replace(" ", "_")
@@ -340,12 +364,13 @@ private fun QuoteTags(tags: List<String>) {
 private fun RowScope.DailyActionButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
+    iconScale: Float = 1f,
     onClick: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
     ExpressiveTonalButton(
         onClick = {
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             onClick()
         },
         modifier = Modifier.weight(1f).height(52.dp),
@@ -356,7 +381,14 @@ private fun RowScope.DailyActionButton(
         ),
         contentPadding = PaddingValues(horizontal = 8.dp)
     ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+        Icon(
+            icon,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp).graphicsLayer {
+                scaleX = iconScale
+                scaleY = iconScale
+            }
+        )
         Spacer(Modifier.width(6.dp))
         Text(label, maxLines = 1)
     }

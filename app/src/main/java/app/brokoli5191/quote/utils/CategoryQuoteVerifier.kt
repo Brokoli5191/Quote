@@ -2,6 +2,7 @@ package app.brokoli5191.quote.utils
 
 import app.brokoli5191.quote.data.QuoteEntity
 import app.brokoli5191.quote.data.QuoteRepository
+import app.brokoli5191.quote.data.CategoryMapper
 
 data class CategoryVerificationResult(
     val totalQuotesCount: Int,
@@ -11,10 +12,7 @@ data class CategoryVerificationResult(
 )
 
 object CategoryQuoteVerifier {
-    val categoryList = listOf(
-        "Inspirational", "Life", "Humor", "Love", "Books", "Truth", "Reading", "Wisdom",
-        "Happiness", "Writing", "Inspiration", "Philosophy", "Death", "Poetry", "Optimism"
-    )
+    val categoryList = CategoryMapper.categories
 
     suspend fun verify(repository: QuoteRepository): CategoryVerificationResult {
         // Retrieve all quotes lists directly from DB synchronously to avoid flow subscription latencies

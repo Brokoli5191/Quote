@@ -82,35 +82,31 @@ private data class QuadrupleColors(
 
 @Composable
 fun MyApplicationTheme(
-    themeMode: String = "DARK", // LIGHT, DARK, DYNAMIC
+    themeMode: String = "DARK", // LIGHT, DARK, AMOLED, DYNAMIC
     themeAccent: String = "Violet", // Violet, Amber, Green, Blue, Rose
-    amoledBlack: Boolean = false, // true-black surfaces in any dark scheme (incl. DYNAMIC)
+    amoledBlack: Boolean = false, // legacy compatibility; AMOLED is now an explicit mode
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
-    val useDark = when (themeMode) {
+    val effectiveMode = if (amoledBlack && themeMode == "DARK") "AMOLED" else themeMode
+    val useDark = when (effectiveMode) {
         "LIGHT" -> false
         "DYNAMIC" -> isSystemInDarkTheme()
         else -> true
     }
 
     val colorScheme = when {
-        themeMode == "DYNAMIC" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val dark = isSystemInDarkTheme()
-            val base = if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-            if (amoledBlack && dark) {
-                base.copy(
-                    background = androidx.compose.ui.graphics.Color(0xFF000000),
-                    surface = androidx.compose.ui.graphics.Color(0xFF0B0B0C),
-                    surfaceVariant = androidx.compose.ui.graphics.Color(0xFF1C1C1E)
-                )
-            } else base
+        effectiveMode == "DYNAMIC" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            if (isSystemInDarkTheme()) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
         useDark -> {
-            val isAmoled = amoledBlack
+            val isAmoled = effectiveMode == "AMOLED"
             val bg = if (isAmoled) androidx.compose.ui.graphics.Color(0xFF000000) else androidx.compose.ui.graphics.Color(0xFF141317)
             val surf = if (isAmoled) androidx.compose.ui.graphics.Color(0xFF0B0B0C) else androidx.compose.ui.graphics.Color(0xFF1C1B1F)
+            val surfLowest = if (isAmoled) androidx.compose.ui.graphics.Color(0xFF000000) else androidx.compose.ui.graphics.Color(0xFF0F0E12)
+            val surfLow = if (isAmoled) androidx.compose.ui.graphics.Color(0xFF070708) else androidx.compose.ui.graphics.Color(0xFF19181C)
             val surfContainer = if (isAmoled) androidx.compose.ui.graphics.Color(0xFF111112) else androidx.compose.ui.graphics.Color(0xFF201F23)
+            val surfHigh = if (isAmoled) androidx.compose.ui.graphics.Color(0xFF171719) else androidx.compose.ui.graphics.Color(0xFF2B292D)
             val surfHighest = if (isAmoled) androidx.compose.ui.graphics.Color(0xFF1C1C1E) else androidx.compose.ui.graphics.Color(0xFF353438)
 
             val colors = when (themeAccent) {
@@ -134,10 +130,18 @@ fun MyApplicationTheme(
                 onTertiary = OnTertiaryGreen,
                 background = bg,
                 onBackground = OnSurfaceText,
-                surface = surfContainer,
+                surface = surf,
                 onSurface = OnSurfaceText,
                 surfaceVariant = surfHighest,
                 onSurfaceVariant = OnSurfaceVariantText
+            ).copy(
+                surfaceDim = bg,
+                surfaceBright = surfHighest,
+                surfaceContainerLowest = surfLowest,
+                surfaceContainerLow = surfLow,
+                surfaceContainer = surfContainer,
+                surfaceContainerHigh = surfHigh,
+                surfaceContainerHighest = surfHighest
             )
         }
         else -> { // LIGHT
@@ -173,6 +177,14 @@ fun MyApplicationTheme(
                 onSurface = textLight,
                 surfaceVariant = surfHighest,
                 onSurfaceVariant = textVariantLight
+            ).copy(
+                surfaceDim = androidx.compose.ui.graphics.Color(0xFFDED8E1),
+                surfaceBright = androidx.compose.ui.graphics.Color(0xFFFFF9FF),
+                surfaceContainerLowest = androidx.compose.ui.graphics.Color(0xFFFFFFFF),
+                surfaceContainerLow = androidx.compose.ui.graphics.Color(0xFFF7F2FA),
+                surfaceContainer = surfContainer,
+                surfaceContainerHigh = androidx.compose.ui.graphics.Color(0xFFEAE4ED),
+                surfaceContainerHighest = surfHighest
             )
         }
     }

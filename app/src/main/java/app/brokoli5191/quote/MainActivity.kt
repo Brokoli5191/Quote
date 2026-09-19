@@ -19,10 +19,10 @@ import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -440,7 +441,6 @@ private fun NavBarIcon(
     outline: ImageVector,
     filled: ImageVector,
     selected: Boolean,
-    label: String,
     lowPerformanceMode: Boolean
 ) {
     val progress by animateFloatAsState(
@@ -462,7 +462,7 @@ private fun NavBarIcon(
             // Base outline, always the same size and position as the filled layer.
             Icon(
                 imageVector = outline,
-                contentDescription = label,
+                contentDescription = null,
                 tint = lerp(inactiveTint, activeTint, progress),
                 modifier = Modifier.size(24.dp)
             )
@@ -537,11 +537,13 @@ fun BottomNavigationBar(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .clickable(
+                        .selectable(
+                            selected = isSelected,
+                            role = Role.Tab,
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
                             onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 onTabSelected(tab)
                             }
                         ),
@@ -552,7 +554,6 @@ fun BottomNavigationBar(
                         outline = iconPair.first,
                         filled = iconPair.second,
                         selected = isSelected,
-                        label = uiText(label),
                         lowPerformanceMode = lowPerformanceMode
                     )
 
