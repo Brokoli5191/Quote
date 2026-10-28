@@ -73,6 +73,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
@@ -416,7 +417,7 @@ private fun WelcomePage() {
             )
             Spacer(Modifier.height(12.dp))
             Text(
-                text = uiText("Let's set it up in a minute."),
+                text = uiText("Let’s set it up in a minute."),
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.primary,
@@ -818,7 +819,7 @@ private fun AuthorsPage(viewModel: QuoteViewModel) {
 private fun DonePage() {
     OnboardingPageLayout(
         icon = Icons.Outlined.TaskAlt,
-        title = uiText("You're all set"),
+        title = uiText("You’re all set"),
         body = uiText("Everything you chose can be changed anytime in Settings.")
     )
 }
@@ -843,8 +844,15 @@ private fun OptionSurface(
             .fillMaxWidth()
             .clip(shape)
             .background(
-                if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
-                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                // The dark themes' primaryContainer is a light pastel that turns into a muddy
+                // mid-tone at this alpha, so they get a translucent primary tint instead.
+                if (selected) {
+                    if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+                    } else {
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                    }
+                } else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
             )
             .border(
                 BorderStroke(

@@ -47,6 +47,21 @@ private val Rose = Color(0xFFFFB2C5)
 private val Blue = Color(0xFFADC6FF)
 private val Neutral = Color(0xFFB6B2BE)
 
+// The pastel tints above are made for dark surfaces; on light surfaces (Cream and Amber
+// especially) they almost vanish, so light themes use a deeper tone of the same hue.
+private val lightSurfaceTints: Map<Color, Color> = mapOf(
+    Cream to Color(0xFF8C6A2F),
+    Green to Color(0xFF2E7D4C),
+    Amber to Color(0xFF9A6400),
+    Rose to Color(0xFFB4305C),
+    Blue to Color(0xFF2F5DA8),
+    Neutral to Color(0xFF5F5B68)
+)
+
+/** [tint] adjusted for contrast against a light ([lightSurface]) or dark surface. */
+fun categoryTint(tint: Color, lightSurface: Boolean): Color =
+    if (lightSurface) lightSurfaceTints[tint] ?: tint else tint
+
 val categoryCatalog: List<CategoryTileData> = listOf(
     CategoryTileData("Inspirational", Icons.Default.EmojiObjects, Cream, isFullWidth = true),
     CategoryTileData("Community", Icons.Default.Public, Green),

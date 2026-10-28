@@ -11,7 +11,7 @@ internal val onboardingGermanUi: Map<String, String> = mapOf(
     // Welcome
     "Welcome to Quote" to "Willkommen bei Quote",
     "A calm quote for every day, a library of curated and community wisdom, and a place for your own thoughts." to "Ein ruhiges Quote für jeden Tag, eine Bibliothek mit kuratierten und Community-Quotes und ein Ort für deine eigenen Gedanken.",
-    "Let's set it up in a minute." to "In einer Minute ist alles eingerichtet.",
+    "Let’s set it up in a minute." to "In einer Minute ist alles eingerichtet.",
 
     // Language
     "Choose your language" to "Wähle deine Sprache",
@@ -45,6 +45,6 @@ internal val onboardingGermanUi: Map<String, String> = mapOf(
     "Long-press an empty spot on your home screen, choose Widgets and add Quote." to "Halte eine freie Stelle auf dem Startbildschirm gedrückt, wähle „Widgets“ und füge Quote hinzu.",
 
     // Done
-    "You're all set" to "Alles bereit",
+    "You’re all set" to "Alles bereit",
     "Everything you chose can be changed anytime in Settings." to "Alles, was du gewählt hast, kannst du jederzeit in den Einstellungen ändern."
 )

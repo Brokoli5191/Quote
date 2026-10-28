@@ -6,6 +6,7 @@ import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -43,6 +44,13 @@ fun TranslationToggle(
                 modifier = Modifier.size(FilterChipDefaults.IconSize)
             )
         },
+        // Selected state follows the accent like the app's other selected chips/tabs
+        // (the default secondaryContainer is amber in the dark themes).
+        colors = FilterChipDefaults.filterChipColors(
+            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
+        ),
         modifier = modifier.semantics { contentDescription = description }
     )
 }

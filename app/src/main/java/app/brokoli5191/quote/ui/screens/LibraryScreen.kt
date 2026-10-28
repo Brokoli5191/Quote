@@ -26,6 +26,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.input.pointer.pointerInput
@@ -338,7 +339,7 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                     onValueChange = viewModel::setSearchQuery,
                     placeholder = {
                         Text(
-                            if (language == "de") "Quotes durchsuchen …" else "Search wisdom...",
+                            if (language == "de") "Quotes durchsuchen …" else "Search wisdom…",
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         )
                     },
@@ -901,6 +902,14 @@ fun QuoteBrowseItemCard(
     val alternateLanguage = quote.alternateLanguage()
     var showTranslation by rememberSaveable(quote.id) { mutableStateOf(false) }
     val displayedText = if (showTranslation && alternateText != null) alternateText else quote.text
+    val appLanguage = LocalAppLanguage.current
+    // Quotation marks follow the language of the text on screen, not the app language.
+    val displayedLanguage = when {
+        alternateLanguage == null -> appLanguage
+        showTranslation -> alternateLanguage
+        alternateLanguage == QuoteLanguage.GERMAN -> QuoteLanguage.ENGLISH
+        else -> QuoteLanguage.GERMAN
+    }
     val displayedAuthor = if (quote.hasUnknownAuthor) uiText("Unknown") else quote.author
 
     Card(
@@ -927,7 +936,7 @@ fun QuoteBrowseItemCard(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                text = "\"$displayedText\"",
+                text = if (displayedLanguage == QuoteLanguage.GERMAN) "„$displayedText“" else "“$displayedText”",
                 style = MaterialTheme.typography.bodyLarge.copy(
                     fontFamily = SerifFontFamily,
                     fontStyle = FontStyle.Italic,
@@ -965,14 +974,15 @@ fun QuoteBrowseItemCard(
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier
                         .weight(1f)
-                        .padding(end = 8.dp),
-                    maxLines = 1,
+                        .padding(end = 4.dp),
+                    // Two lines so names like "Marcus Aurelius" stay readable next to the actions.
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
 
                 Row(
                     modifier = Modifier.wrapContentWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(0.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     ExpressiveIconButton(onClick = {
@@ -1055,6 +1065,7 @@ fun CategoryBentoCard(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val expressiveShape = rememberExpressiveShape(interactionSource, 20.dp, 10.dp)
+    val tint = categoryTint(tintColor, lightSurface = MaterialTheme.colorScheme.surface.luminance() > 0.5f)
     Card(
         onClick = onClick,
         // A minimum height instead of a fixed one, so names still fit at large font scales.
@@ -1063,7 +1074,7 @@ fun CategoryBentoCard(
             .heightIn(min = height)
             .border(
                 width = 1.dp,
-                color = tintColor.copy(alpha = 0.15f),
+                color = tint.copy(alpha = 0.15f),
                 shape = expressiveShape
             ),
         shape = expressiveShape,
@@ -1080,7 +1091,7 @@ fun CategoryBentoCard(
                 .background(
                     Brush.verticalGradient(
                         listOf(
-                            tintColor.copy(alpha = 0.08f),
+                            tint.copy(alpha = 0.08f),
                             MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
                         )
                     )
@@ -1096,7 +1107,7 @@ fun CategoryBentoCard(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = tintColor.copy(alpha = 0.12f),
+                    tint = tint.copy(alpha = 0.12f),
                     modifier = Modifier.size(72.dp)
                 )
             }
@@ -1113,7 +1124,7 @@ fun CategoryBentoCard(
                 Box(
                     modifier = Modifier
                         .background(
-                            color = tintColor.copy(alpha = 0.1f),
+                            color = tint.copy(alpha = 0.1f),
                             shape = RoundedCornerShape(12.dp)
                         )
                         .padding(8.dp)
@@ -1121,7 +1132,7 @@ fun CategoryBentoCard(
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
-                        tint = tintColor,
+                        tint = tint,
                         modifier = Modifier.size(24.dp)
                     )
                 }

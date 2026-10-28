@@ -204,7 +204,9 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                                             fontSize = 104.sp,
                                             lineHeight = 104.sp,
                                             color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                                            modifier = Modifier.align(Alignment.BottomEnd)
+                                            // The glyph's ink sits high in its line box; shift it down so it
+                                            // closes the last line instead of overlapping the lines above it.
+                                            modifier = Modifier.align(Alignment.BottomEnd).offset(y = 50.dp)
                                         )
                                         if (lowPerformanceMode) {
                                             DailyQuoteText(displayedText)
@@ -261,7 +263,7 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                                                     authorDescription,
                                                     style = MaterialTheme.typography.bodySmall,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                    maxLines = 2,
+                                                    maxLines = 3,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
                                             }

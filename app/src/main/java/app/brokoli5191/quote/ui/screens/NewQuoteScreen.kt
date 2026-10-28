@@ -52,6 +52,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
@@ -74,6 +75,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private val customQuoteCategories = CategoryMapper.categories
+private val FormHorizontalPadding = 20.dp
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
@@ -152,7 +154,7 @@ fun NewQuoteScreen(
                 modifier = Modifier
                     .weight(1f)
                     .verticalScroll(formScrollState)
-                    .padding(horizontal = 20.dp),
+                    .padding(horizontal = FormHorizontalPadding),
                 verticalArrangement = Arrangement.spacedBy(18.dp)
             ) {
                 Box {
@@ -214,10 +216,25 @@ fun NewQuoteScreen(
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold
                     )
+                    // The chips scroll out to the screen edges instead of being cut off at the
+                    // form padding; the inner padding keeps the first and last chip aligned with it.
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
+                            .layout { measurable, constraints ->
+                                val bleed = FormHorizontalPadding.roundToPx()
+                                val placeable = measurable.measure(
+                                    constraints.copy(
+                                        minWidth = constraints.minWidth + bleed * 2,
+                                        maxWidth = constraints.maxWidth + bleed * 2
+                                    )
+                                )
+                                layout(placeable.width - bleed * 2, placeable.height) {
+                                    placeable.place(-bleed, 0)
+                                }
+                            }
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = FormHorizontalPadding),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         customQuoteCategories.forEach { categoryName ->
