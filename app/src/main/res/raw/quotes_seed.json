@@ -11,6 +11,17 @@
   ]
  },
  {
+  "quote": "Two things are infinite: the universe and human stupidity; and I'm not sure about the universe.",
+  "author": "Albert Einstein",
+  "tags": [
+   "human-nature",
+   "humor",
+   "infinity",
+   "philosophy",
+   "science"
+  ]
+ },
+ {
   "quote": "So many books, so little time.",
   "author": "Frank Zappa",
   "tags": [
@@ -193,6 +204,17 @@
   ]
  },
  {
+  "quote": "Whenever you find yourself on the side of the majority, it is time to reform (or pause and reflect).",
+  "author": "Mark Twain",
+  "tags": [
+   "individuality",
+   "majority",
+   "minority",
+   "pause",
+   "reflect"
+  ]
+ },
+ {
   "quote": "Life is what happens to us while we are making other plans.",
   "author": "Allen Saunders",
   "tags": [
@@ -244,6 +266,14 @@
   ]
  },
  {
+  "quote": "I may not have gone where I intended to go, but I think I have ended up where I needed to be.",
+  "author": "douglas adams",
+  "tags": [
+   "life",
+   "navigation"
+  ]
+ },
+ {
   "quote": "I solemnly swear that I am up to no good.",
   "author": "J.K. Rowling",
   "tags": [
@@ -288,6 +318,16 @@
   ]
  },
  {
+  "quote": "A reader lives a thousand lives before he dies, said Jojen. The man who never reads lives only one.",
+  "author": "George R.R. Martin",
+  "tags": [
+   "read",
+   "readers",
+   "reading",
+   "reading-books"
+  ]
+ },
+ {
   "quote": "Never put off till tomorrow what may be done day after tomorrow just as well.",
   "author": "Mark Twain",
   "tags": [
@@ -301,6 +341,17 @@
   "tags": [
    "paraphrased",
    "strength"
+  ]
+ },
+ {
+  "quote": "Being deeply loved by someone gives you strength, while loving someone deeply gives you courage.",
+  "author": "Lao Tzu",
+  "tags": [
+   "courage",
+   "deeply-loved",
+   "love",
+   "strength",
+   "widely-misattributed"
   ]
  },
  {
@@ -389,6 +440,15 @@
   ]
  },
  {
+  "quote": "Women and cats will do as they please, and men and dogs should relax and get used to the idea.",
+  "author": "Robert A. Heinlein",
+  "tags": [
+   "cats",
+   "humor",
+   "women"
+  ]
+ },
+ {
   "quote": "Sometimes the questions are complicated and the answers are simple.",
   "author": "Dr. Seuss",
   "tags": [
@@ -404,7 +464,7 @@
   ]
  },
  {
-  "quote": "You love me. Real or not real?\"I tell him, \"Real.",
+  "quote": "\"You love me. Real or not real?\" I tell him, \"Real.\"",
   "author": "Suzanne Collins",
   "tags": [
    "katniss",
@@ -480,6 +540,14 @@
   ]
  },
  {
+  "quote": "If one cannot enjoy reading a book over and over again, there is no use in reading it at all.",
+  "author": "Oscar Wilde",
+  "tags": [
+   "books",
+   "reading"
+  ]
+ },
+ {
   "quote": "Logic will get you from A to Z; imagination will get you everywhere.",
   "author": "Albert Einstein",
   "tags": [
@@ -501,6 +569,20 @@
   "tags": [
    "beauty",
    "life"
+  ]
+ },
+ {
+  "quote": "The truth is, everyone is going to hurt you. You just got to find the ones worth suffering for.",
+  "author": "Bob Marley",
+  "tags": [
+   "friendship"
+  ]
+ },
+ {
+  "quote": "Love looks not with the eyes, but with the mind,And therefore is winged Cupid painted blind.",
+  "author": "William Shakespeare",
+  "tags": [
+   "love"
   ]
  },
  {
@@ -575,6 +657,14 @@
   ]
  },
  {
+  "quote": "You don't love someone because they're perfect, you love them in spite of the fact that they're not.",
+  "author": "Jodi Picoult",
+  "tags": [
+   "imperfect",
+   "love"
+  ]
+ },
+ {
   "quote": "Some people never go crazy. What truly horrible lives they must lead.",
   "author": "Charles Bukowski",
   "tags": [
@@ -602,6 +692,13 @@
   ]
  },
  {
+  "quote": "I would venture to guess that Anon, who wrote so many poems without signing them, was often a woman.",
+  "author": "Virginia Woolf",
+  "tags": [
+   "women"
+  ]
+ },
+ {
   "quote": "Some infinities are bigger than other infinities.",
   "author": "John Green",
   "tags": [
@@ -619,6 +716,22 @@
    "attributed",
    "fear",
    "inspiration"
+  ]
+ },
+ {
+  "quote": "It is what you read when you don't have to that determines what you will be when you can't help it.",
+  "author": "Oscar Wilde",
+  "tags": [
+   "books",
+   "reading"
+  ]
+ },
+ {
+  "quote": "If I had a flower for every time I thought of you...I could walk through my garden forever.",
+  "author": "Alfred Tennyson",
+  "tags": [
+   "friendship",
+   "love"
   ]
  },
  {
@@ -659,6 +772,14 @@
   ]
  },
  {
+  "quote": "If there's a book that you want to read, but it hasn't been written yet, then you must write it.",
+  "author": "Toni Morrison",
+  "tags": [
+   "books",
+   "writing"
+  ]
+ },
+ {
   "quote": "The only way out of the labyrinth of suffering is to forgive.",
   "author": "John Green",
   "tags": [
@@ -695,12 +816,28 @@
   ]
  },
  {
+  "quote": "A wise girl kisses but doesn't love, listens but doesn't believe, and leaves before she is left.",
+  "author": "Marilyn Monroe",
+  "tags": []
+ },
+ {
   "quote": "Go to heaven for the climate and hell for the company.",
   "author": "Benjamin Franklin Wade",
   "tags": [
    "humor",
    "philosophy",
    "theology"
+  ]
+ },
+ {
+  "quote": "When someone loves you, the way they talk about you is different. You feel safe and comfortable.",
+  "author": "Jess C. Scott",
+  "tags": [
+   "desire",
+   "emotion",
+   "friendship",
+   "honesty",
+   "imagination"
   ]
  },
  {
@@ -931,6 +1068,14 @@
   ]
  },
  {
+  "quote": "I love you as certain dark things are to be loved, in secret, between the shadow and the soul.",
+  "author": "Pablo Neruda",
+  "tags": [
+   "love",
+   "poetry"
+  ]
+ },
+ {
   "quote": "Only the very weak-minded refuse to be influenced by literature and poetry.",
   "author": "Cassandra Clare",
   "tags": [
@@ -1106,7 +1251,7 @@
   ]
  },
  {
-  "quote": "Do you hate people?” “I don't hate them...I just feel better when they're not around.",
+  "quote": "“Do you hate people?” “I don't hate them...I just feel better when they're not around.”",
   "author": "Charles Bukowski",
   "tags": [
    "humour",
@@ -1124,6 +1269,17 @@
   ]
  },
  {
+  "quote": "How wonderful it is that nobody need wait a single moment before starting to improve the world.",
+  "author": "Anne Frank",
+  "tags": [
+   "activism",
+   "life",
+   "optimism",
+   "philosophy",
+   "world"
+  ]
+ },
+ {
   "quote": "I am no bird; and no net ensnares me: I am a free human being with an independent will.",
   "author": "Charlotte Brontë",
   "tags": [
@@ -1132,6 +1288,14 @@
    "flaws",
    "freedom",
    "gender"
+  ]
+ },
+ {
+  "quote": "If you don't have time to read, you don't have the time (or the tools) to write. Simple as that.",
+  "author": "Stephen King",
+  "tags": [
+   "reading",
+   "writing"
   ]
  },
  {
@@ -1178,6 +1342,13 @@
   "author": "Rick Riordan",
   "tags": [
    "nico"
+  ]
+ },
+ {
+  "quote": "Being a woman is a terribly difficult trade since it consists principally of dealings with men.",
+  "author": "Joseph Conrad",
+  "tags": [
+   "women"
   ]
  },
  {
@@ -1341,6 +1512,13 @@
   ]
  },
  {
+  "quote": "Maybe our favorite quotations say more about us than about the stories and people we're quoting.",
+  "author": "John Green",
+  "tags": [
+   "vlog"
+  ]
+ },
+ {
   "quote": "So, I love you because the entire universe conspired to help me find you.",
   "author": "Paulo Coelho",
   "tags": [
@@ -1352,6 +1530,13 @@
   "author": "J.K. Rowling",
   "tags": [
    "wit"
+  ]
+ },
+ {
+  "quote": "Sometimes you wake up. Sometimes the fall kills you. And sometimes, when you fall, you fly.",
+  "author": "Neil Gaiman",
+  "tags": [
+   "inspiration"
   ]
  },
  {
@@ -1583,6 +1768,14 @@
   ]
  },
  {
+  "quote": "If more of us valued food and cheer and song above hoarded gold, it would be a merrier world.",
+  "author": "J.R.R. Tolkien",
+  "tags": [
+   "food",
+   "happiness"
+  ]
+ },
+ {
   "quote": "A good friend will always stab you in the front.",
   "author": "Oscar Wilde",
   "tags": [
@@ -1655,10 +1848,25 @@
   ]
  },
  {
+  "quote": "And those who were seen dancing were thought to be insane by those who could not hear the music.",
+  "author": "Friedrich Nietzsche",
+  "tags": [
+   "dance",
+   "music"
+  ]
+ },
+ {
   "quote": "Who controls the past controls the future. Who controls the present controls the past.",
   "author": "George Orwell",
   "tags": [
    "inspirational"
+  ]
+ },
+ {
+  "quote": "You will always be fond of me. I represent to you all the sins you never had the courage to commit.",
+  "author": "Oscar Wilde",
+  "tags": [
+   "sin"
   ]
  },
  {
@@ -1678,6 +1886,15 @@
    "anais-nin",
    "qoutes-on-writing",
    "writing"
+  ]
+ },
+ {
+  "quote": "It means 'Shadowhunters: Looking Better in Black Than the Widows of our Enemies Since 1234'.",
+  "author": "Cassandra Clare",
+  "tags": [
+   "humor",
+   "jace-wayland",
+   "sarcasm"
   ]
  },
  {
@@ -1796,6 +2013,14 @@
   ]
  },
  {
+  "quote": "Reader, suppose you were an idiot. And suppose you were a member of Congress. But I repeat myself.",
+  "author": "Mark Twain",
+  "tags": [
+   "humor",
+   "politics"
+  ]
+ },
+ {
   "quote": "All the world is made of faith, and trust, and pixie dust.",
   "author": "J.M. Barrie",
   "tags": [
@@ -1863,6 +2088,15 @@
   ]
  },
  {
+  "quote": "I do not want people to be very agreeable, as it saves me the trouble of liking them a great deal.",
+  "author": "Jane Austen",
+  "tags": [
+   "friends",
+   "humor",
+   "people"
+  ]
+ },
+ {
   "quote": "Let us read, and let us dance; these two amusements will never do any harm to the world.",
   "author": "Voltaire",
   "tags": [
@@ -1885,6 +2119,14 @@
    "chapter-24",
    "life",
    "will-herondale"
+  ]
+ },
+ {
+  "quote": "Some books should be tasted, some devoured, but only a few should be chewed and digested thoroughly.",
+  "author": "Sir Francis Bacon",
+  "tags": [
+   "books",
+   "reading"
   ]
  },
  {
@@ -1961,6 +2203,11 @@
   ]
  },
  {
+  "quote": "How lucky I am to have known somebody and something that saying goodbye to is so damned awful.",
+  "author": "Evans G. Valens",
+  "tags": []
+ },
+ {
   "quote": "Every saint has a past, and every sinner has a future.",
   "author": "Oscar Wilde",
   "tags": [
@@ -1972,6 +2219,13 @@
   "author": "Paulo Coelho",
   "tags": [
    "wisdom"
+  ]
+ },
+ {
+  "quote": "\"I might be in love with you.\" He smiles a little. \"I'm waiting until I'm sure to tell you, though.\"",
+  "author": "Veronica Roth",
+  "tags": [
+   "humorous"
   ]
  },
  {
@@ -1989,6 +2243,16 @@
   "author": "Albert Einstein",
   "tags": [
    "reality"
+  ]
+ },
+ {
+  "quote": "Those who dream by day are cognizant of many things which escape those who dream only by night.",
+  "author": "Edgar Allan Poe",
+  "tags": [
+   "day",
+   "dreaming",
+   "dreams",
+   "night"
   ]
  },
  {
@@ -2024,6 +2288,14 @@
    "anger",
    "funny",
    "sleep"
+  ]
+ },
+ {
+  "quote": "Don’t go around saying the world owes you a living. The world owes you nothing. It was here first.",
+  "author": "Mark Twain",
+  "tags": [
+   "living",
+   "world"
   ]
  },
  {
@@ -2245,6 +2517,16 @@
   ]
  },
  {
+  "quote": "It is so hard to leave—until you leave. And then it is the easiest goddamned thing in the world.",
+  "author": "John Green",
+  "tags": [
+   "inertia",
+   "inspirational",
+   "leaving",
+   "nerdfighter"
+  ]
+ },
+ {
   "quote": "You have enemies? Good. That means you've stood up for something, sometime in your life.",
   "author": "Winston Churchill",
   "tags": [
@@ -2280,6 +2562,17 @@
   "tags": [
    "beauty",
    "happy"
+  ]
+ },
+ {
+  "quote": "Instead of worrying about what you cannot control, shift your energy to what you can create.",
+  "author": "Roy T. Bennett",
+  "tags": [
+   "creation",
+   "creative",
+   "inspiration",
+   "inspirational",
+   "inspirational-attitude"
   ]
  },
  {
@@ -2369,6 +2662,14 @@
   "author": "Thomas Jefferson",
   "tags": [
    "books"
+  ]
+ },
+ {
+  "quote": "If at first you don't succeed, try, try again. Then quit. No use being a damn fool about it.",
+  "author": "W.C. Fields",
+  "tags": [
+   "humor",
+   "success"
   ]
  },
  {
@@ -2604,7 +2905,7 @@
   ]
  },
  {
-  "quote": "You said you were going for a walk!? What kind of walk takes six hours?\"\"A long one?",
+  "quote": "\"You said you were going for a walk!? What kind of walk takes six hours?\" \"A long one?\"",
   "author": "Cassandra Clare",
   "tags": [
    "mortal-instruments"
@@ -2686,6 +2987,15 @@
   "author": "J. D. Salinger",
   "tags": [
    "stories"
+  ]
+ },
+ {
+  "quote": "Respect other people's feelings. It might mean nothing to you, but it could mean everything to them.",
+  "author": "Roy T. Bennett",
+  "tags": [
+   "feelings",
+   "inspiration",
+   "inspirational-quotes"
   ]
  },
  {
@@ -2800,6 +3110,13 @@
   ]
  },
  {
+  "quote": "What matters in life is not what happens to you but what you remember and how you remember it.",
+  "author": "Gabriel Garcia Marquez",
+  "tags": [
+   "life-memories"
+  ]
+ },
+ {
   "quote": "You must stay drunk on writing so reality cannot destroy you.",
   "author": "Ray Bradbury",
   "tags": [
@@ -2818,6 +3135,16 @@
   "author": "David Sedaris",
   "tags": [
    "sympathy"
+  ]
+ },
+ {
+  "quote": "Life is too short to waste your time on people who don’t respect, appreciate, and value you.",
+  "author": "Roy T. Bennett",
+  "tags": [
+   "appreciate",
+   "inspiration",
+   "inspirational",
+   "inspirational-attitude"
   ]
  },
  {
@@ -2873,7 +3200,7 @@
   ]
  },
  {
-  "quote": "What happens when people open their hearts?\"\"They get better.",
+  "quote": "\"What happens when people open their hearts?\" \"They get better.\"",
   "author": "Haruki Murakami",
   "tags": [
    "healing",
@@ -2967,6 +3294,13 @@
   ]
  },
  {
+  "quote": "Percy wouldn't notice a joke if it danced naked in front of him wearing one of Dobby's hats.",
+  "author": "J.K. Rowling",
+  "tags": [
+   "humor"
+  ]
+ },
+ {
   "quote": "Books are like mirrors: if a fool looks in, you cannot expect a genius to look out.",
   "author": "J.K. Rowling",
   "tags": [
@@ -2979,6 +3313,16 @@
   "tags": [
    "identity",
    "originality"
+  ]
+ },
+ {
+  "quote": "I like your Christ, I do not like your Christians. Your Christians are so unlike your Christ.",
+  "author": "Mahatma Gandhi",
+  "tags": [
+   "anti-christian",
+   "christianity",
+   "christians",
+   "jesus-christ"
   ]
  },
  {
@@ -3038,6 +3382,15 @@
    "deadlines",
    "humor",
    "procrastinate"
+  ]
+ },
+ {
+  "quote": "I never travel without my diary. One should always have something sensational to read in the train.",
+  "author": "Oscar Wilde",
+  "tags": [
+   "drama",
+   "humor",
+   "plays"
   ]
  },
  {
@@ -3127,6 +3480,15 @@
   ]
  },
  {
+  "quote": "To be a Christian means to forgive the inexcusable because God has forgiven the inexcusable in you.",
+  "author": "C.S. Lewis",
+  "tags": [
+   "christianity",
+   "forgiveness",
+   "god"
+  ]
+ },
+ {
   "quote": "She is too fond of books, and it has turned her brain.",
   "author": "Louisa May Alcott",
   "tags": [
@@ -3134,7 +3496,7 @@
   ]
  },
  {
-  "quote": "Will looked horrified. \"What kind of monster could possibly hate chocolate?",
+  "quote": "Will looked horrified. \"What kind of monster could possibly hate chocolate?\"",
   "author": "Cassandra Clare",
   "tags": [
    "chocolate",
@@ -3153,6 +3515,17 @@
   "author": "Cassandra Clare",
   "tags": [
    "simon"
+  ]
+ },
+ {
+  "quote": "Don’t waste your time in anger, regrets, worries, and grudges. Life is too short to be unhappy.",
+  "author": "Roy T. Bennett",
+  "tags": [
+   "anger",
+   "grudge",
+   "happiness",
+   "happy",
+   "inspiration"
   ]
  },
  {
@@ -3202,6 +3575,17 @@
   "author": "Stephen King",
   "tags": [
    "writing"
+  ]
+ },
+ {
+  "quote": "\"Wow,\" Thalia muttered. \"Apollo is hot.\" \"He's the sun god,\" I said.\"That's not what I meant.\"",
+  "author": "Rick Riordan",
+  "tags": [
+   "apollo",
+   "gods",
+   "hot",
+   "olympians",
+   "percy-jackson"
   ]
  },
  {
@@ -3299,6 +3683,15 @@
   ]
  },
  {
+  "quote": "Sometimes crying or laughing are the only options left, and laughing feels better right now.",
+  "author": "Veronica Roth",
+  "tags": [
+   "crying",
+   "laughter",
+   "options"
+  ]
+ },
+ {
   "quote": "What you seek is seeking you.",
   "author": "Mawlana Jalal-al-Din Rumi",
   "tags": [
@@ -3314,10 +3707,31 @@
   ]
  },
  {
+  "quote": "You probably wouldn’t worry about what people think of you if you could know how seldom they do.",
+  "author": "Olin Miller",
+  "tags": [
+   "confidence",
+   "others",
+   "think",
+   "worry"
+  ]
+ },
+ {
   "quote": "Wrinkles should merely indicate where the smiles have been.",
   "author": "Mark Twain",
   "tags": [
    "age"
+  ]
+ },
+ {
+  "quote": "Yesterday I was clever, so I wanted to change the world. Today I am wise, so I am changing myself.",
+  "author": "Rumi",
+  "tags": [
+   "change",
+   "cleverness",
+   "self",
+   "wisdom",
+   "world"
   ]
  },
  {
@@ -3348,6 +3762,16 @@
   "author": "Leo Tolstoy",
   "tags": [
    "perfection"
+  ]
+ },
+ {
+  "quote": "\"I've got a stele we can use. Who wants to do me?\" \"A regrettable choice of words,\" muttered Magnus.",
+  "author": "Cassandra Clare",
+  "tags": [
+   "jace-wayland",
+   "magnus-bane",
+   "regret",
+   "stele"
   ]
  },
  {
@@ -3413,6 +3837,15 @@
   ]
  },
  {
+  "quote": "Music was my refuge. I could crawl into the space between the notes and curl my back to loneliness.",
+  "author": "Maya Angelou",
+  "tags": [
+   "loneliness",
+   "music",
+   "refuge"
+  ]
+ },
+ {
   "quote": "Fear cuts deeper than swords.",
   "author": "George R.R. Martin",
   "tags": [
@@ -3433,6 +3866,17 @@
   "author": "Taylor Swift",
   "tags": [
    "music"
+  ]
+ },
+ {
+  "quote": "You cannot control the behavior of others, but you can always choose how you respond to it.",
+  "author": "Roy T. Bennett",
+  "tags": [
+   "choices",
+   "choose",
+   "inspiration",
+   "inspirational",
+   "inspirational-attitude"
   ]
  },
  {
@@ -3638,6 +4082,13 @@
   ]
  },
  {
+  "quote": "If you like her, if she makes you happy, and if you feel like you know her---then don't let her go.",
+  "author": "Nicholas Sparks",
+  "tags": [
+   "love"
+  ]
+ },
+ {
   "quote": "Rather than love, than money, than fame, give me truth.",
   "author": "Henry David Thoreau",
   "tags": [
@@ -3719,6 +4170,15 @@
   ]
  },
  {
+  "quote": "Life is for the living.Death is for the dead.Let life be like music. And death a note unsaid.",
+  "author": "Langston Hughes",
+  "tags": [
+   "death",
+   "life",
+   "music"
+  ]
+ },
+ {
   "quote": "Only a true best friend can protect you from your immortal enemies.",
   "author": "Richelle Mead",
   "tags": [
@@ -3734,6 +4194,14 @@
    "chance",
    "happiness",
    "risk"
+  ]
+ },
+ {
+  "quote": "You may not control all the events that happen to you, but you can decide not to be reduced by them.",
+  "author": "Maya Angelou",
+  "tags": [
+   "be-yourself",
+   "self-determination"
   ]
  },
  {
@@ -3813,6 +4281,13 @@
   ]
  },
  {
+  "quote": "Dumbledore says people find it far easier to forgive others for being wrong than being right.",
+  "author": "J.K. Rowling",
+  "tags": [
+   "forgiveness"
+  ]
+ },
+ {
   "quote": "In heaven, all the interesting people are missing.",
   "author": "Friedrich Nietzsche",
   "tags": [
@@ -3832,6 +4307,14 @@
   "author": "Walt Disney",
   "tags": [
    "inspirational"
+  ]
+ },
+ {
+  "quote": "Do you think I'm pretty?I think you're beautifulBeautiful?You are so beautiful, it hurts sometimes.",
+  "author": "Richelle Mead",
+  "tags": [
+   "beauty",
+   "love"
   ]
  },
  {
@@ -3868,6 +4351,17 @@
   "tags": [
    "dandy",
    "lord-henry-wotton"
+  ]
+ },
+ {
+  "quote": "You have power over your mind - not outside events. Realize this, and you will find strength.",
+  "author": "Marcus Aurelius",
+  "tags": [
+   "ataraxy",
+   "inner-strength",
+   "inspiration",
+   "self-control",
+   "strength"
   ]
  },
  {
@@ -3971,11 +4465,31 @@
   ]
  },
  {
+  "quote": "Success is not how high you have climbed, but how you make a positive difference to the world.",
+  "author": "Roy T. Bennett",
+  "tags": [
+   "inspiration",
+   "inspirational",
+   "inspirational-attitude",
+   "inspirational-life",
+   "inspirational-quotes"
+  ]
+ },
+ {
   "quote": "Even the darkest night will end and the sun will rise.",
   "author": "Victor Hugo",
   "tags": [
    "apothegm",
    "optimism"
+  ]
+ },
+ {
+  "quote": "If writers wrote as carelessly as some people talk, then adhasdh asdglaseuyt[bn[ pasdlgkhasdfasdf.",
+  "author": "Lemony Snicket",
+  "tags": [
+   "humor",
+   "talking",
+   "writers"
   ]
  },
  {
@@ -4071,6 +4585,23 @@
   ]
  },
  {
+  "quote": "Everyone has talent. What's rare is the courage to follow it to the dark places where it leads.",
+  "author": "Erica Jong",
+  "tags": [
+   "courage",
+   "talent"
+  ]
+ },
+ {
+  "quote": "Right now I’m having amnesia and déjà vu at the same time. I think I’ve forgotten this before.",
+  "author": "Steven Wright",
+  "tags": [
+   "amnesia",
+   "humor",
+   "memory"
+  ]
+ },
+ {
   "quote": "The more I see, the less I know for sure.",
   "author": "John Lennon",
   "tags": [
@@ -4138,6 +4669,13 @@
   "author": "Suzanne Collins",
   "tags": [
    "the-hunger-games"
+  ]
+ },
+ {
+  "quote": "You’re wishin’ too much, baby. You gotta stop wearing your wishbone where your backbone oughtta be.",
+  "author": "Elizabeth Gilbert",
+  "tags": [
+   "wish"
   ]
  },
  {
@@ -4266,6 +4804,17 @@
   ]
  },
  {
+  "quote": "After nourishment, shelter and companionship, stories are the thing we need most in the world.",
+  "author": "Philip Pullman",
+  "tags": [
+   "books",
+   "needs",
+   "stories",
+   "storytelling",
+   "writing"
+  ]
+ },
+ {
   "quote": "Find what you love and let it kill you.",
   "author": "Charles Bukowski",
   "tags": [
@@ -4338,12 +4887,23 @@
   ]
  },
  {
-  "quote": "You can't be happy unless you're unhappy sometimes\".",
+  "quote": "\"You can't be happy unless you're unhappy sometimes\".",
   "author": "Lauren Oliver",
   "tags": [
    "contrast",
    "happiness",
    "unhappiness"
+  ]
+ },
+ {
+  "quote": "The man of knowledge must be able not only to love his enemies but also to hate his friends.",
+  "author": "Friedrich Nietzsche",
+  "tags": [
+   "enemies",
+   "friends",
+   "friendship",
+   "hatred",
+   "intelligence"
   ]
  },
  {
@@ -4377,6 +4937,13 @@
   "author": "Henry David Thoreau",
   "tags": [
    "writing"
+  ]
+ },
+ {
+  "quote": "You're off to Great Places!Today is your day!Your mountain is waiting,So... get on your way!",
+  "author": "Dr. Seuss",
+  "tags": [
+   "inspirational"
   ]
  },
  {
@@ -4421,6 +4988,15 @@
   "author": "J.K. Rowling",
   "tags": [
    "humor"
+  ]
+ },
+ {
+  "quote": "And that's the thing about people who mean everything they say. They think everyone else does too.",
+  "author": "Khaled Hosseini",
+  "tags": [
+   "earnestness",
+   "gullibility",
+   "honesty"
   ]
  },
  {
@@ -4475,10 +5051,29 @@
   ]
  },
  {
+  "quote": "No matter how much suffering you went through, you never wanted to let go of those memories.",
+  "author": "haruki murakami",
+  "tags": [
+   "letting-go",
+   "life",
+   "life-lessons",
+   "memories"
+  ]
+ },
+ {
   "quote": "Many people lose the small joys in the hope for the big happiness.",
   "author": "Pearl S. Buck",
   "tags": [
    "contentment"
+  ]
+ },
+ {
+  "quote": "To burn with desire and keep quiet about it is the greatest punishment we can bring on ourselves.",
+  "author": "Federico García Lorca",
+  "tags": [
+   "desire",
+   "punishment",
+   "unrequited-love"
   ]
  },
  {
@@ -4533,6 +5128,33 @@
   "author": "Chuck Palahniuk",
   "tags": [
    "life"
+  ]
+ },
+ {
+  "quote": "Treat everyone with politeness and kindness, not because they are nice, but because you are.",
+  "author": "Roy T. Bennett",
+  "tags": [
+   "inspiration",
+   "inspirational",
+   "inspirational-quotes",
+   "kind",
+   "kindness"
+  ]
+ },
+ {
+  "quote": "Things we lose have a way of coming back to us in the end, if not always in the way we expect.",
+  "author": "JK Rowling",
+  "tags": [
+   "death",
+   "love"
+  ]
+ },
+ {
+  "quote": "Books have a unique way of stopping time in a particular moment and saying: Let’s not forget this.",
+  "author": "Dave Eggers",
+  "tags": [
+   "books",
+   "time"
   ]
  },
  {
@@ -4594,6 +5216,14 @@
   ]
  },
  {
+  "quote": "There are no faster or firmer friendships than those formed between people who love the same books.",
+  "author": "Irving Stone",
+  "tags": [
+   "books",
+   "friendship"
+  ]
+ },
+ {
   "quote": "Don't take life too seriously. Punch it in the face when it needs a good hit. Laugh at it.",
   "author": "Colleen Hoover",
   "tags": [
@@ -4615,6 +5245,17 @@
   "tags": [
    "flaws",
    "individuality"
+  ]
+ },
+ {
+  "quote": "No amount of regretting can change the past, and no amount of worrying can change the future.",
+  "author": "Roy T. Bennett",
+  "tags": [
+   "inspiration",
+   "inspirational",
+   "inspirational-quotes",
+   "life",
+   "life-and-living"
   ]
  },
  {
@@ -4664,7 +5305,7 @@
   ]
  },
  {
-  "quote": "I do things like get in a taxi and say, \"The library, and step on it.",
+  "quote": "I do things like get in a taxi and say, \"The library, and step on it.\"",
   "author": "David Foster Wallace",
   "tags": [
    "books",
@@ -4721,6 +5362,14 @@
   ]
  },
  {
+  "quote": "It is a great thing to start life with a small number of really good books which are your very own.",
+  "author": "Arthur Conan Doyle",
+  "tags": [
+   "books",
+   "humor"
+  ]
+ },
+ {
   "quote": "Follow your heart, listen to your inner voice, stop caring about what others think.",
   "author": "Roy T. Bennett",
   "tags": [
@@ -4765,6 +5414,14 @@
   ]
  },
  {
+  "quote": "Sometimes it seems safer to hold it all in, where the only person who can judge is yourself.",
+  "author": "Sarah Dessen",
+  "tags": [
+   "self-denial",
+   "self-disclosure"
+  ]
+ },
+ {
   "quote": "If you are irritated by every rub, how will your mirror be polished?",
   "author": "Rumi",
   "tags": [
@@ -4772,10 +5429,38 @@
   ]
  },
  {
+  "quote": "For last year's words belong to last year's language And next year's words await another voice.",
+  "author": "T.S. Eliot",
+  "tags": [
+   "language",
+   "new-year",
+   "voice",
+   "words"
+  ]
+ },
+ {
   "quote": "After silence, that which comes nearest to expressing the inexpressible is music.",
   "author": "Aldous Huxley",
   "tags": [
    "music"
+  ]
+ },
+ {
+  "quote": "Understanding is the first step to acceptance, and only with acceptance can there be recovery.",
+  "author": "J.K. Rowling",
+  "tags": [
+   "acceptance",
+   "inspiration",
+   "inspirational",
+   "smart",
+   "understanding"
+  ]
+ },
+ {
+  "quote": "At some point, you just pull off the Band-Aid, and it hurts, but then it's over and you're relieved.",
+  "author": "John Green",
+  "tags": [
+   "looking-for-alaska"
   ]
  },
  {
@@ -4836,11 +5521,26 @@
   ]
  },
  {
+  "quote": "What makes the desert beautiful,' said the little prince, 'is that somewhere it hides a well...",
+  "author": "Antoine de Saint-Exupéry",
+  "tags": [
+   "inspirational"
+  ]
+ },
+ {
   "quote": "Perhaps it's impossible to wear an identity without becoming what you pretend to be.",
   "author": "Orson Scott Card",
   "tags": [
    "identity",
    "pretend"
+  ]
+ },
+ {
+  "quote": "Oh well... I'd just been thinking, if you had died, you'd have been welcome to share my toilet.",
+  "author": "J.K. Rowling",
+  "tags": [
+   "flirting",
+   "humor"
   ]
  },
  {
@@ -5070,6 +5770,21 @@
   ]
  },
  {
+  "quote": "Don't part with your illusions. When they are gone you may still exist, but you have ceased to live.",
+  "author": "Mark Twain",
+  "tags": [
+   "illusions",
+   "life"
+  ]
+ },
+ {
+  "quote": "You know what charm is: a way of getting the answer yes without having asked any clear question.",
+  "author": "Albert Camus",
+  "tags": [
+   "romance"
+  ]
+ },
+ {
   "quote": "You see things; you say, 'Why?' But I dream things that never were; and I say 'Why not?",
   "author": "George Bernard Shaw",
   "tags": [
@@ -5082,6 +5797,14 @@
   "tags": [
    "life",
    "reading"
+  ]
+ },
+ {
+  "quote": "‎Though nobody can go back and make a new beginning... Anyone can start over and make a new ending.",
+  "author": "Chico Xavier",
+  "tags": [
+   "inspirational",
+   "life-lessons"
   ]
  },
  {
@@ -5118,6 +5841,13 @@
    "dance",
    "dancing",
    "music"
+  ]
+ },
+ {
+  "quote": "An expert is a person who has made all the mistakes that can be made in a very narrow field.",
+  "author": "Niels Bohr",
+  "tags": [
+   "science"
   ]
  },
  {
@@ -5171,6 +5901,16 @@
   ]
  },
  {
+  "quote": "Whatever the cost of our libraries, the price is cheap compared to that of an ignorant nation.",
+  "author": "Walter Cronkite",
+  "tags": [
+   "education",
+   "ignorance",
+   "intelligence",
+   "libraries"
+  ]
+ },
+ {
   "quote": "Don't feel bad, I'm usually about to die.",
   "author": "Rick Riordan",
   "tags": [
@@ -5179,6 +5919,17 @@
    "humor",
    "mythology",
    "percy-jackson"
+  ]
+ },
+ {
+  "quote": "I'm sure the universe is full of intelligent life. It's just been too intelligent to come here.",
+  "author": "Arthur C. Clarke",
+  "tags": [
+   "extraterrestrials",
+   "humor",
+   "intelligent-life",
+   "life",
+   "science"
   ]
  },
  {
@@ -5240,6 +5991,13 @@
   ]
  },
  {
+  "quote": "If you want to be a writer, you must do two things above all others: read a lot and write a lot.",
+  "author": "Stephen King",
+  "tags": [
+   "writing"
+  ]
+ },
+ {
   "quote": "I can shake off everything as I write; my sorrows disappear, my courage is reborn.",
   "author": "Anne Frank",
   "tags": [
@@ -5261,6 +6019,13 @@
    "books",
    "castle",
    "self"
+  ]
+ },
+ {
+  "quote": "The most beautiful things in the world cannot be seen or touched, they are felt with the heart.",
+  "author": "Antoine de Saint-Exupéry",
+  "tags": [
+   "inspirational"
   ]
  },
  {
@@ -5289,6 +6054,14 @@
   "tags": [
    "past",
    "philosophy"
+  ]
+ },
+ {
+  "quote": "So it's you and a syringe against the Capitol? See, this is why no one lets you make the plans.",
+  "author": "Suzanne Collins",
+  "tags": [
+   "awesome-quote",
+   "haymitch"
   ]
  },
  {
@@ -5327,7 +6100,7 @@
   ]
  },
  {
-  "quote": "How do you spell 'love'?\" - Piglet\"You don't spell it...you feel it.\" - Pooh",
+  "quote": "\"How do you spell 'love'?\" - Piglet\"You don't spell it...you feel it.\" - Pooh",
   "author": "A.A. Milne",
   "tags": [
    "love",
@@ -5346,7 +6119,14 @@
   ]
  },
  {
-  "quote": "—ŽLife is a shipwreck, but we must not forget to sing in the lifeboats.",
+  "quote": "You can't measure the mutual affection of two human beings by the number of words they exchange.",
+  "author": "Milan Kundera",
+  "tags": [
+   "love"
+  ]
+ },
+ {
+  "quote": "‎Life is a shipwreck, but we must not forget to sing in the lifeboats.",
   "author": "Voltaire",
   "tags": [
    "inspirational"
@@ -5375,6 +6155,17 @@
   "author": "Emily Dickinson",
   "tags": [
    "life"
+  ]
+ },
+ {
+  "quote": "People demand freedom of speech as a compensation for the freedom of thought which they seldom use.",
+  "author": "Søren Kierkegaard",
+  "tags": [
+   "civil-rights",
+   "free-speech",
+   "free-will",
+   "freedom",
+   "intelligence"
   ]
  },
  {
@@ -5618,6 +6409,13 @@
   ]
  },
  {
+  "quote": "We must be willing to let go of the life we planned so as to have the life that is waiting for us.",
+  "author": "Joseph Campbell",
+  "tags": [
+   "wisdom"
+  ]
+ },
+ {
   "quote": "It is my belief... that the truth is generally preferable to lies.",
   "author": "J.K. Rowling",
   "tags": [
@@ -5708,7 +6506,7 @@
   ]
  },
  {
-  "quote": "Was it hard?\" I ask.Letting go?\"Not as hard as holding on to something that wasn't real.",
+  "quote": "\"Was it hard?\" I ask.Letting go?\"Not as hard as holding on to something that wasn't real.\"",
   "author": "Lisa Schroeder",
   "tags": [
    "heartbreak",
@@ -5723,6 +6521,17 @@
    "book-lovers",
    "libraries",
    "reading"
+  ]
+ },
+ {
+  "quote": "Great things happen to those who don't stop believing, trying, learning, and being grateful.",
+  "author": "Roy T. Bennett",
+  "tags": [
+   "being-positive",
+   "believe",
+   "gratitude",
+   "inspiration",
+   "inspirational"
   ]
  },
  {
@@ -5782,6 +6591,13 @@
   ]
  },
  {
+  "quote": "The one thing we can never get enough of is love. And the one thing we never give enough of is love.",
+  "author": "Henry Miller",
+  "tags": [
+   "henry-miller"
+  ]
+ },
+ {
   "quote": "Maybe everyone can live beyond what they're capable of.",
   "author": "Markus Zusak",
   "tags": [
@@ -5803,7 +6619,7 @@
   ]
  },
  {
-  "quote": "Stay gold, Ponyboy. Stay gold . . .” The pillow seemed to sink a little, and Johnny died.",
+  "quote": "“Stay gold, Ponyboy. Stay gold . . .” The pillow seemed to sink a little, and Johnny died.",
   "author": "S.E. Hinton",
   "tags": [
    "benediction",
@@ -5943,6 +6759,13 @@
   ]
  },
  {
+  "quote": "I loved you like a man loves a woman he never touches, only writes to, keeps little photographs of.",
+  "author": "Charles Bukowski",
+  "tags": [
+   "love"
+  ]
+ },
+ {
   "quote": "Three may keep a secret, if two of them are dead.",
   "author": "Benjamin Franklin",
   "tags": [
@@ -5975,6 +6798,16 @@
   ]
  },
  {
+  "quote": "It's funny how humans can wrap their mind around things and fit them into their version of reality.",
+  "author": "Rick Riordan",
+  "tags": [
+   "humanity",
+   "humans",
+   "mankind",
+   "reality"
+  ]
+ },
+ {
   "quote": "Knowledge speaks, but wisdom listens",
   "author": "Jimi Hendrix",
   "tags": [
@@ -5998,6 +6831,14 @@
    "james-carstairs",
    "life",
    "magnus-bane"
+  ]
+ },
+ {
+  "quote": "The best portion of a good man's life: his little, nameless unremembered acts of kindness and love.",
+  "author": "William Wordsworth",
+  "tags": [
+   "finale-of-middlemarch",
+   "tintern-abbey"
   ]
  },
  {
@@ -6069,6 +6910,15 @@
    "classic-insult",
    "humor",
    "ugly"
+  ]
+ },
+ {
+  "quote": "Art and love are the same thing: It’s the process of seeing yourself in things that are not you.",
+  "author": "Chuck Klosterman",
+  "tags": [
+   "art",
+   "love",
+   "profound"
   ]
  },
  {
@@ -6152,6 +7002,13 @@
   ]
  },
  {
+  "quote": "What you do makes a difference, and you have to decide what kind of difference you want to make.",
+  "author": "Jane Goodall",
+  "tags": [
+   "inspiration"
+  ]
+ },
+ {
   "quote": "Today was good. Today was fun. Tomorrow is another one.",
   "author": "Dr. Seuss",
   "tags": [
@@ -6169,10 +7026,24 @@
   ]
  },
  {
+  "quote": "Do I contradict myself?Very well then I contradict myself,(I am large, I contain multitudes.)",
+  "author": "Walt Whitman",
+  "tags": [
+   "change"
+  ]
+ },
+ {
   "quote": "The only way to get rid of temptation is to yield to it.",
   "author": "Oscar Wilde",
   "tags": [
    "temptation"
+  ]
+ },
+ {
+  "quote": "If you don't read the newspaper, you're uninformed. If you read the newspaper, you're mis-informed.",
+  "author": "Mark Twain",
+  "tags": [
+   "newspapers"
   ]
  },
  {
@@ -6227,6 +7098,14 @@
   "tags": [
    "loneliness",
    "solitude"
+  ]
+ },
+ {
+  "quote": "A purpose of human life, no matter who is controlling it, is to love whoever is around to be loved.",
+  "author": "Kurt Vonnegut",
+  "tags": [
+   "life",
+   "love"
   ]
  },
  {
@@ -6439,6 +7318,22 @@
   ]
  },
  {
+  "quote": "Every time you smile at someone, it is an action of love, a gift to that person, a beautiful thing.",
+  "author": "Mother Teresa",
+  "tags": [
+   "paraphrased"
+  ]
+ },
+ {
+  "quote": "People shouldn't be afraid of their government. Governments should be afraid of their people.",
+  "author": "Alan Moore",
+  "tags": [
+   "democracy",
+   "equality",
+   "government"
+  ]
+ },
+ {
   "quote": "It is absurd to divide people into good and bad. People are either charming or tedious.",
   "author": "Oscar Wilde",
   "tags": [
@@ -6456,6 +7351,13 @@
    "metaphysics",
    "physics",
    "science"
+  ]
+ },
+ {
+  "quote": "And I asked myself about the present: how wide it was, how deep it was, how much was mine to keep.",
+  "author": "Kurt Vonnegut",
+  "tags": [
+   "slaughterhouse-five"
   ]
  },
  {
@@ -6557,6 +7459,16 @@
   "tags": [
    "heart",
    "mind"
+  ]
+ },
+ {
+  "quote": "Confidence is ignorance. If you're feeling cocky, it's because there's something you don't know.",
+  "author": "Eoin Colfer",
+  "tags": [
+   "confidence",
+   "humor",
+   "ignorance",
+   "knowledge"
   ]
  },
  {
@@ -6675,6 +7587,13 @@
   "tags": [
    "comedy",
    "horror"
+  ]
+ },
+ {
+  "quote": "Have a heart that never hardens, and a temper that never tires, and a touch that never hurts.",
+  "author": "Charles Dickens",
+  "tags": [
+   "literature"
   ]
  },
  {
@@ -6831,6 +7750,13 @@
   ]
  },
  {
+  "quote": "Open your heart. Someone will come. Someone will come for you. But first you must open your heart.",
+  "author": "Kate DiCamillo",
+  "tags": [
+   "edward"
+  ]
+ },
+ {
   "quote": "Our mothers always remain the strangest, craziest people we've ever met.",
   "author": "Marguerite Duras",
   "tags": [
@@ -6939,6 +7865,14 @@
   ]
  },
  {
+  "quote": "DON'T THINK OF IT AS DYING, said Death. JUST THINK OF IT AS LEAVING EARLY TO AVOID THE RUSH.",
+  "author": "Terry Pratchett",
+  "tags": [
+   "death",
+   "humor"
+  ]
+ },
+ {
   "quote": "silence is the language of god, all else is poor translation.",
   "author": "Rumi",
   "tags": [
@@ -6968,6 +7902,15 @@
    "bravery",
    "courage",
    "fear"
+  ]
+ },
+ {
+  "quote": "One of the advantages of being disorganized is that one is always having surprising discoveries.",
+  "author": "A.A. Milne",
+  "tags": [
+   "discovery",
+   "eccentric",
+   "life"
   ]
  },
  {
@@ -7124,6 +8067,13 @@
   ]
  },
  {
+  "quote": "Everything we hear is an opinion, not a fact. Everything we see is a perspective, not the truth.",
+  "author": "Marcus Aurelius",
+  "tags": [
+   "truth"
+  ]
+ },
+ {
   "quote": "I wrote the story myself. It's about a girl who lost her reputation and never missed it.",
   "author": "Mae West",
   "tags": [
@@ -7145,7 +8095,7 @@
   ]
  },
  {
-  "quote": "You're an idiot.\"\"I've never claimed to be otherwise.",
+  "quote": "\"You're an idiot.\" \"I've never claimed to be otherwise.\"",
   "author": "Cassandra Clare",
   "tags": [
    "humor",
@@ -7160,6 +8110,13 @@
    "empathy",
    "listening",
    "understanding-others"
+  ]
+ },
+ {
+  "quote": "The important thing to you is not how many years in your life, but how much life in your years!",
+  "author": "Edward J. Stieglitz",
+  "tags": [
+   "inspirational"
   ]
  },
  {
@@ -7210,6 +8167,13 @@
   ]
  },
  {
+  "quote": "As it has been said:Love and a coughcannot be concealed.Even a small cough.Even a small love.",
+  "author": "Anne Sexton",
+  "tags": [
+   "poetry"
+  ]
+ },
+ {
   "quote": "By the pricking of my thumbs, Something wicked this way comes.",
   "author": "William Shakespeare",
   "tags": [
@@ -7236,7 +8200,7 @@
   ]
  },
  {
-  "quote": "Of all the words of mice and men, the saddest are, \"It might have been.",
+  "quote": "Of all the words of mice and men, the saddest are, \"It might have been.\"",
   "author": "Kurt Vonnegut",
   "tags": [
    "hindsight",
@@ -7258,6 +8222,13 @@
    "humor",
    "poetry",
    "religion"
+  ]
+ },
+ {
+  "quote": "Remember, darkness does not always equate to evil, just as light does not always bring good.",
+  "author": "P.C. Cast",
+  "tags": [
+   "inspirational"
   ]
  },
  {
@@ -7319,7 +8290,15 @@
   ]
  },
  {
-  "quote": "What day is it?” asked Pooh. “It’s today,” squeaked Piglet. “My favorite day,” said Pooh.",
+  "quote": "In individuals, insanity is rare; but in groups, parties, nations and epochs, it is the rule.",
+  "author": "Friedrich Nietzsche",
+  "tags": [
+   "insanity",
+   "society"
+  ]
+ },
+ {
+  "quote": "“What day is it?” asked Pooh. “It’s today,” squeaked Piglet. “My favorite day,” said Pooh.",
   "author": "A.A. Milne",
   "tags": [
    "live-in-the-moment",
@@ -7342,7 +8321,7 @@
   ]
  },
  {
-  "quote": "Ah, music,\" he said, wiping his eyes. \"A magic beyond all we do here!",
+  "quote": "\"Ah, music,\" he said, wiping his eyes. \"A magic beyond all we do here!\"",
   "author": "J.K. Rowling",
   "tags": [
    "dumbledore",
@@ -7356,6 +8335,14 @@
   "author": "Pablo Picasso",
   "tags": [
    "art"
+  ]
+ },
+ {
+  "quote": "When I was about eight, I decided that the most wonderful thing, next to a human being, was a book.",
+  "author": "Margaret Walker",
+  "tags": [
+   "books",
+   "inspirational"
   ]
  },
  {
@@ -7516,6 +8503,25 @@
   ]
  },
  {
+  "quote": "We are addicted to our thoughts. We cannot change anything if we cannot change our thinking.",
+  "author": "Santosh Kalwar",
+  "tags": [
+   "addiction",
+   "life-lessons",
+   "philosophy",
+   "thinking",
+   "thoughts"
+  ]
+ },
+ {
+  "quote": "Happiness can be found, even in the darkest of times, if one only remembers to turn on the light.",
+  "author": "J.K.Rowling",
+  "tags": [
+   "dumbledore",
+   "philosophy"
+  ]
+ },
+ {
   "quote": "You know how they say you only hurt the ones you love? Well, it works both ways.",
   "author": "Chuck Palahniuk",
   "tags": [
@@ -7531,7 +8537,7 @@
   ]
  },
  {
-  "quote": "What do you want?\"\"Just coffee. Black - like my soul.",
+  "quote": "\"What do you want?\" \"Just coffee. Black - like my soul.\"",
   "author": "Cassandra Clare",
   "tags": [
    "coffee",
@@ -7596,6 +8602,13 @@
   ]
  },
  {
+  "quote": "I travel not to go anywhere, but to go. I travel for travel's sake. The great affair is to move.",
+  "author": "Robert Louis Stevenson",
+  "tags": [
+   "travel"
+  ]
+ },
+ {
   "quote": "I don't think of all the misery, but of the beauty that still remains.",
   "author": "Anne Frank",
   "tags": [
@@ -7621,6 +8634,15 @@
   ]
  },
  {
+  "quote": "It is good to have an end to journey toward; but it is the journey that matters, in the end.",
+  "author": "Ursula K. Le Guin",
+  "tags": [
+   "goals",
+   "journey",
+   "travel"
+  ]
+ },
+ {
   "quote": "I must have loved you a lot.",
   "author": "Suzanne Collins",
   "tags": [
@@ -7637,6 +8659,17 @@
    "famous",
    "inspirational",
    "valour"
+  ]
+ },
+ {
+  "quote": "When you are content to be simply yourself and don't compare or compete, everyone will respect you.",
+  "author": "Lao Tzu",
+  "tags": [
+   "ataraxy",
+   "be-yourself",
+   "integrity",
+   "self-reliance",
+   "self-respect"
   ]
  },
  {
@@ -7667,7 +8700,7 @@
   ]
  },
  {
-  "quote": "We're staying together,\" he promised. \"You're not getting away from me. Never again.",
+  "quote": "\"We're staying together,\" he promised. \"You're not getting away from me. Never again.\"",
   "author": "Rick Riordan",
   "tags": [
    "annabeth-chase",
@@ -7747,6 +8780,13 @@
   ]
  },
  {
+  "quote": "When everything goes to hell, the people who stand by you without flinching -- they are your family.",
+  "author": "Jim Butcher",
+  "tags": [
+   "family"
+  ]
+ },
+ {
   "quote": "Black holes are where God divided by zero.",
   "author": "Albert Einstein",
   "tags": [
@@ -7823,6 +8863,14 @@
   "author": "Mark Twain",
   "tags": [
    "humor"
+  ]
+ },
+ {
+  "quote": "The real voyage of discovery consists not in seeking new landscapes, but in having new eyes.",
+  "author": "Marcel Proust",
+  "tags": [
+   "discovery",
+   "travel"
   ]
  },
  {
@@ -7941,6 +8989,13 @@
   ]
  },
  {
+  "quote": "Selfishness is not living as one wishes to live, it is asking others to live as one wishes to live.",
+  "author": "Oscar Wilde",
+  "tags": [
+   "selfishness"
+  ]
+ },
+ {
   "quote": "A smile is a curve that sets everything straight.",
   "author": "Phyllis Diller",
   "tags": [
@@ -8015,6 +9070,13 @@
   ]
  },
  {
+  "quote": "To choose doubt as a philosophy of life is akin to choosing immobility as a means of transportation.",
+  "author": "Yann Martel",
+  "tags": [
+   "life"
+  ]
+ },
+ {
   "quote": "If you have good friends, no matter how much life is sucking , they can make you laugh.",
   "author": "P.C. Cast Kristin Cast",
   "tags": [
@@ -8027,6 +9089,13 @@
   "tags": [
    "humor",
    "work"
+  ]
+ },
+ {
+  "quote": "It doesn't matter. I have books, new books, and I can bear anything as long as there are books.",
+  "author": "Jo Walton",
+  "tags": [
+   "books"
   ]
  },
  {
@@ -8102,6 +9171,14 @@
   ]
  },
  {
+  "quote": "Morning is wonderful. Its only drawback is that it comes at such an inconvenient time of day.",
+  "author": "Glen Cook",
+  "tags": [
+   "morning",
+   "waking-up"
+  ]
+ },
+ {
   "quote": "I could die for you. But I couldn't, and wouldn't, live for you.",
   "author": "Ayn Rand",
   "tags": [
@@ -8166,6 +9243,11 @@
    "happiness",
    "pride"
   ]
+ },
+ {
+  "quote": "Learn from the mistakes of others. You can never live long enough to make them all yourself.",
+  "author": "Groucho Marx",
+  "tags": []
  },
  {
   "quote": "There's nowhere you can be that isn't where you're meant to be...",
@@ -8237,7 +9319,7 @@
   ]
  },
  {
-  "quote": "Atticus, he was real nice.\"\"Most people are, Scout, when you finally see them.",
+  "quote": "\"Atticus, he was real nice.\" \"Most people are, Scout, when you finally see them.\"",
   "author": "Harper Lee",
   "tags": [
    "inspirational"
@@ -8304,6 +9386,17 @@
   ]
  },
  {
+  "quote": "Let the improvement of yourself keep you so busy that you have no time to criticize others.",
+  "author": "Roy T. Bennett",
+  "tags": [
+   "improvement",
+   "inspiration",
+   "inspirational",
+   "inspirational-attitude",
+   "inspirational-life"
+  ]
+ },
+ {
   "quote": "Second star to the right and straight on 'til morning.",
   "author": "J.M. Barrie",
   "tags": [
@@ -8359,7 +9452,7 @@
   ]
  },
  {
-  "quote": "You’re dangerous,” he says. “Why?” “Because you make me believe in the impossible",
+  "quote": "“You’re dangerous,” he says. “Why?” “Because you make me believe in the impossible”",
   "author": "Simone Elkeles",
   "tags": [
    "romance"
@@ -8390,6 +9483,13 @@
   ]
  },
  {
+  "quote": "Ignore those that make you fearful and sad, that degrade you back towards disease and death.",
+  "author": "Rumi Jalalud-Din",
+  "tags": [
+   "inspiration"
+  ]
+ },
+ {
   "quote": "Those who can make you believe absurdities, can make you commit atrocities.",
   "author": "Voltaire",
   "tags": [
@@ -8407,6 +9507,22 @@
    "books",
    "originality",
    "unique"
+  ]
+ },
+ {
+  "quote": "The world was collapsing, and the only thing that really mattered to me was that she was alive.",
+  "author": "Rick Riordan",
+  "tags": [
+   "infatuation",
+   "love",
+   "obsession"
+  ]
+ },
+ {
+  "quote": "People tend to complicate their own lives, as if living weren't already complicated enough.",
+  "author": "Carlos Ruiz Zafón",
+  "tags": [
+   "life-lessons"
   ]
  },
  {
@@ -8481,7 +9597,7 @@
   ]
  },
  {
-  "quote": "I don't go out with strangers,\" I said.\"Good thing I do. I'll pick you up at five.",
+  "quote": "\"I don't go out with strangers,\" I said.\"Good thing I do. I'll pick you up at five.\"",
   "author": "Becca Fitzpatrick",
   "tags": [
    "fallen-angels"
@@ -8551,6 +9667,15 @@
   "tags": [
    "education",
    "reading"
+  ]
+ },
+ {
+  "quote": "I can't eat and I can't sleep. I'm not doing well in terms of being a functional human, you know?",
+  "author": "Ned Vizzini",
+  "tags": [
+   "depression",
+   "sadness",
+   "suicide"
   ]
  },
  {
@@ -8692,6 +9817,13 @@
    "poetry",
    "prose",
    "writing"
+  ]
+ },
+ {
+  "quote": "I know how devastated you must be to miss me, but leave a message, and I'll try to ease your agony",
+  "author": "Richelle Mead",
+  "tags": [
+   "adrian-ivashkov"
   ]
  },
  {
@@ -8863,10 +9995,44 @@
   ]
  },
  {
+  "quote": "Whoever is careless with the truth in small matters cannot be trusted with important matters",
+  "author": "Albert Einstein",
+  "tags": [
+   "character",
+   "honesty",
+   "integrity"
+  ]
+ },
+ {
+  "quote": "I am both happy and sad at the same time, and I'm still trying to figure out how that could be.",
+  "author": "Stephen Chbosky",
+  "tags": [
+   "confused",
+   "happy",
+   "sad"
+  ]
+ },
+ {
+  "quote": "Another belief of mine: that everyone else my age is an adult, whereas I am merely in disguise.",
+  "author": "Margaret Atwood",
+  "tags": [
+   "age-adult"
+  ]
+ },
+ {
   "quote": "Autumn is a second spring when every leaf is a flower.",
   "author": "Albert Camus",
   "tags": [
    "autumn"
+  ]
+ },
+ {
+  "quote": "Being with you never felt wrong. It's the one thing I did right. You're the one thing I did right.",
+  "author": "Becca Fitzpatrick",
+  "tags": [
+   "crescendo",
+   "love",
+   "patch"
   ]
  },
  {
@@ -8895,6 +10061,14 @@
    "jamie",
    "jared",
    "melanie"
+  ]
+ },
+ {
+  "quote": "Good sex is like good bridge. If you don't have a good partner, you'd better have a good hand.",
+  "author": "Mae West",
+  "tags": [
+   "humor",
+   "sex"
   ]
  },
  {
@@ -9219,6 +10393,15 @@
   ]
  },
  {
+  "quote": "The greatness of a nation and its moral progress can be judged by the way its animals are treated.",
+  "author": "Mahatma Gandhi",
+  "tags": [
+   "animals",
+   "ethics",
+   "morals"
+  ]
+ },
+ {
   "quote": "There are much worse games to play.",
   "author": "Suzanne Collins",
   "tags": [
@@ -9247,6 +10430,13 @@
   "tags": [
    "adventure",
    "laughter"
+  ]
+ },
+ {
+  "quote": "To give pleasure to a single heart by a single act is better than a thousand heads bowing in prayer.",
+  "author": "Mahatma Gandhi",
+  "tags": [
+   "inspiration"
   ]
  },
  {
@@ -9515,6 +10705,17 @@
   ]
  },
  {
+  "quote": "Help others without any reason and give without the expectation of receiving anything in return.",
+  "author": "Roy T. Bennett",
+  "tags": [
+   "give",
+   "giving",
+   "inspiration",
+   "inspirational",
+   "inspirational-quotes"
+  ]
+ },
+ {
   "quote": "It is better to offer no excuse than a bad one.",
   "author": "George Washington",
   "tags": [
@@ -9604,6 +10805,17 @@
   ]
  },
  {
+  "quote": "The unhappiest people in this world, are those who care the most about what other people think.",
+  "author": "C. JoyBell C.",
+  "tags": [
+   "freedom",
+   "inspirational",
+   "inspirational-attitude",
+   "inspirational-quotes",
+   "life-and-living"
+  ]
+ },
+ {
   "quote": "I love you as certain dark things are loved, secretly, between the shadow and the soul.",
   "author": "Pablo Neruda",
   "tags": [
@@ -9630,6 +10842,13 @@
   "author": "Suzanne Collins",
   "tags": [
    "humor"
+  ]
+ },
+ {
+  "quote": "When you consider things like the stars, our affairs don't seem to matter very much, do they?",
+  "author": "Virginia Woolf",
+  "tags": [
+   "life"
   ]
  },
  {
@@ -9687,6 +10906,14 @@
   "tags": [
    "force",
    "peace"
+  ]
+ },
+ {
+  "quote": "If you win, you need not have to explain...If you lose, you should not be there to explain!",
+  "author": "Adolf Hitler",
+  "tags": [
+   "philosophy",
+   "war"
   ]
  },
  {
@@ -9758,6 +10985,14 @@
   ]
  },
  {
+  "quote": "If everybody minded their own business, the world would go around a great deal faster than it does.",
+  "author": "Lewis Caroll",
+  "tags": [
+   "alice-in-wonderland",
+   "carroll"
+  ]
+ },
+ {
   "quote": "If we have no peace, it is because we have forgotten that we belong to each other.",
   "author": "Mother Teresa",
   "tags": [
@@ -9777,6 +11012,13 @@
    "night",
    "rebirth",
    "reincarnation"
+  ]
+ },
+ {
+  "quote": "Dare to live the life you have dreamed for yourself. Go forward and make your dreams come true.",
+  "author": "Ralph Waldo Emerson",
+  "tags": [
+   "dreams"
   ]
  },
  {
@@ -9801,6 +11043,14 @@
   "tags": [
    "rena-silverman",
    "samuel-beckett"
+  ]
+ },
+ {
+  "quote": "If my doctor told me I had only six minutes to live, I wouldn't brood. I'd type a little faster.",
+  "author": "Isaac Asimov",
+  "tags": [
+   "humor",
+   "writing"
   ]
  },
  {
@@ -9857,6 +11107,15 @@
   "author": "Woody Allen",
   "tags": [
    "sex"
+  ]
+ },
+ {
+  "quote": "Be steady and well-ordered in your life so that you can be fierce and original in your work.",
+  "author": "Gustave Flaubert",
+  "tags": [
+   "inspirational",
+   "life",
+   "work"
   ]
  },
  {
@@ -10044,6 +11303,1508 @@
    "change",
    "nature",
    "responsibility"
+  ]
+ },
+ {
+  "quote": "To see what is right and not to do it is want of courage.",
+  "author": "Confucius",
+  "tags": [
+   "courage",
+   "wisdom"
+  ]
+ },
+ {
+  "quote": "The superior man is modest in his speech, but exceeds in his actions.",
+  "author": "Confucius",
+  "tags": [
+   "wisdom",
+   "success"
+  ]
+ },
+ {
+  "quote": "Learning without thought is labor lost; thought without learning is perilous.",
+  "author": "Confucius",
+  "tags": [
+   "knowledge",
+   "learning",
+   "wisdom"
+  ]
+ },
+ {
+  "quote": "All warfare is based on deception.",
+  "author": "Sun Tzu",
+  "tags": [
+   "strategy",
+   "wisdom"
+  ]
+ },
+ {
+  "quote": "All men by nature desire to know.",
+  "author": "Aristotle",
+  "tags": [
+   "knowledge",
+   "philosophy"
+  ]
+ },
+ {
+  "quote": "The roots of education are bitter, but the fruit is sweet.",
+  "author": "Aristotle",
+  "tags": [
+   "knowledge",
+   "education"
+  ]
+ },
+ {
+  "quote": "First say to yourself what you would be; and then do what you have to do.",
+  "author": "Epictetus",
+  "tags": [
+   "inspirational",
+   "success"
+  ]
+ },
+ {
+  "quote": "Very little is needed to make a happy life.",
+  "author": "Marcus Aurelius",
+  "tags": [
+   "happiness",
+   "life"
+  ]
+ },
+ {
+  "quote": "The universe is change; our life is what our thoughts make it.",
+  "author": "Marcus Aurelius",
+  "tags": [
+   "life",
+   "philosophy"
+  ]
+ },
+ {
+  "quote": "While we are postponing, life speeds by.",
+  "author": "Seneca",
+  "tags": [
+   "life",
+   "time"
+  ]
+ },
+ {
+  "quote": "We suffer more often in imagination than in reality.",
+  "author": "Seneca",
+  "tags": [
+   "courage",
+   "philosophy"
+  ]
+ },
+ {
+  "quote": "Character is destiny.",
+  "author": "Heraclitus",
+  "tags": [
+   "philosophy",
+   "life"
+  ]
+ },
+ {
+  "quote": "You cannot step twice into the same river.",
+  "author": "Heraclitus",
+  "tags": [
+   "philosophy",
+   "change"
+  ]
+ },
+ {
+  "quote": "Love is a kind of warfare.",
+  "author": "Ovid",
+  "tags": [
+   "love"
+  ]
+ },
+ {
+  "quote": "He who has begun has half done. Dare to be wise; begin!",
+  "author": "Horace",
+  "tags": [
+   "wisdom",
+   "inspirational"
+  ]
+ },
+ {
+  "quote": "Love conquers all.",
+  "author": "Virgil",
+  "tags": [
+   "love"
+  ]
+ },
+ {
+  "quote": "They can because they think they can.",
+  "author": "Virgil",
+  "tags": [
+   "success",
+   "inspirational"
+  ]
+ },
+ {
+  "quote": "The greatest thing in the world is to know how to belong to oneself.",
+  "author": "Michel de Montaigne",
+  "tags": [
+   "wisdom",
+   "freedom"
+  ]
+ },
+ {
+  "quote": "The best is the enemy of the good.",
+  "author": "Voltaire",
+  "tags": [
+   "wisdom"
+  ]
+ },
+ {
+  "quote": "Let us cultivate our garden.",
+  "author": "Voltaire",
+  "tags": [
+   "life",
+   "philosophy"
+  ]
+ },
+ {
+  "quote": "Love truth, but pardon error.",
+  "author": "Voltaire",
+  "tags": [
+   "truth",
+   "wisdom"
+  ]
+ },
+ {
+  "quote": "I think, therefore I am.",
+  "author": "René Descartes",
+  "tags": [
+   "philosophy"
+  ]
+ },
+ {
+  "quote": "All things excellent are as difficult as they are rare.",
+  "author": "Baruch Spinoza",
+  "tags": [
+   "philosophy",
+   "success"
+  ]
+ },
+ {
+  "quote": "Knowledge is power.",
+  "author": "Francis Bacon",
+  "tags": [
+   "knowledge"
+  ]
+ },
+ {
+  "quote": "Hope is a good breakfast, but it is a bad supper.",
+  "author": "Francis Bacon",
+  "tags": [
+   "hope",
+   "humor"
+  ]
+ },
+ {
+  "quote": "They also serve who only stand and wait.",
+  "author": "John Milton",
+  "tags": [
+   "faith",
+   "wisdom"
+  ]
+ },
+ {
+  "quote": "Every man desires to live long, but no man would be old.",
+  "author": "Jonathan Swift",
+  "tags": [
+   "life",
+   "humor"
+  ]
+ },
+ {
+  "quote": "When a man is tired of London, he is tired of life.",
+  "author": "Samuel Johnson",
+  "tags": [
+   "life",
+   "humor"
+  ]
+ },
+ {
+  "quote": "Well done is better than well said.",
+  "author": "Benjamin Franklin",
+  "tags": [
+   "success",
+   "wisdom"
+  ]
+ },
+ {
+  "quote": "Honesty is the first chapter in the book of wisdom.",
+  "author": "Thomas Jefferson",
+  "tags": [
+   "truth",
+   "wisdom"
+  ]
+ },
+ {
+  "quote": "I am a slow walker, but I never walk back.",
+  "author": "Abraham Lincoln",
+  "tags": [
+   "success",
+   "courage"
+  ]
+ },
+ {
+  "quote": "Every artist was first an amateur.",
+  "author": "Ralph Waldo Emerson",
+  "tags": [
+   "inspirational",
+   "art"
+  ]
+ },
+ {
+  "quote": "Hitch your wagon to a star.",
+  "author": "Ralph Waldo Emerson",
+  "tags": [
+   "inspirational"
+  ]
+ },
+ {
+  "quote": "In wildness is the preservation of the world.",
+  "author": "Henry David Thoreau",
+  "tags": [
+   "nature"
+  ]
+ },
+ {
+  "quote": "Hope is the thing with feathers.",
+  "author": "Emily Dickinson",
+  "tags": [
+   "hope",
+   "poetry"
+  ]
+ },
+ {
+  "quote": "Always do right. This will gratify some people and astonish the rest.",
+  "author": "Mark Twain",
+  "tags": [
+   "humor",
+   "wisdom"
+  ]
+ },
+ {
+  "quote": "Brevity is the sister of talent.",
+  "author": "Anton Chekhov",
+  "tags": [
+   "writing",
+   "wisdom"
+  ]
+ },
+ {
+  "quote": "One must imagine Sisyphus happy.",
+  "author": "Albert Camus",
+  "tags": [
+   "philosophy",
+   "happiness"
+  ]
+ },
+ {
+  "quote": "Hell is other people.",
+  "author": "Jean-Paul Sartre",
+  "tags": [
+   "philosophy"
+  ]
+ },
+ {
+  "quote": "Man is condemned to be free.",
+  "author": "Jean-Paul Sartre",
+  "tags": [
+   "freedom",
+   "philosophy"
+  ]
+ },
+ {
+  "quote": "One is not born, but rather becomes, a woman.",
+  "author": "Simone de Beauvoir",
+  "tags": [
+   "philosophy",
+   "women"
+  ]
+ },
+ {
+  "quote": "One never notices what has been done; one can only see what remains to be done.",
+  "author": "Marie Curie",
+  "tags": [
+   "success",
+   "science"
+  ]
+ },
+ {
+  "quote": "Be less curious about people and more curious about ideas.",
+  "author": "Marie Curie",
+  "tags": [
+   "knowledge",
+   "curiosity"
+  ]
+ },
+ {
+  "quote": "If I have seen further it is by standing on the shoulders of Giants.",
+  "author": "Isaac Newton",
+  "tags": [
+   "knowledge",
+   "science"
+  ]
+ },
+ {
+  "quote": "Truth is ever to be found in simplicity, and not in the multiplicity and confusion of things.",
+  "author": "Isaac Newton",
+  "tags": [
+   "truth",
+   "science"
+  ]
+ },
+ {
+  "quote": "The present is theirs; the future, for which I really worked, is mine.",
+  "author": "Nikola Tesla",
+  "tags": [
+   "success",
+   "science"
+  ]
+ },
+ {
+  "quote": "The first principle is that you must not fool yourself—and you are the easiest person to fool.",
+  "author": "Richard Feynman",
+  "tags": [
+   "science",
+   "truth"
+  ]
+ },
+ {
+  "quote": "What I cannot create, I do not understand.",
+  "author": "Richard Feynman",
+  "tags": [
+   "science",
+   "knowledge"
+  ]
+ },
+ {
+  "quote": "We are a way for the cosmos to know itself.",
+  "author": "Carl Sagan",
+  "tags": [
+   "science",
+   "nature"
+  ]
+ },
+ {
+  "quote": "For small creatures such as we the vastness is bearable only through love.",
+  "author": "Carl Sagan",
+  "tags": [
+   "love",
+   "science"
+  ]
+ },
+ {
+  "quote": "Imagination will often carry us to worlds that never were. But without it we go nowhere.",
+  "author": "Carl Sagan",
+  "tags": [
+   "imagination",
+   "science"
+  ]
+ },
+ {
+  "quote": "Great things are done by a series of small things brought together.",
+  "author": "Vincent van Gogh",
+  "tags": [
+   "success",
+   "inspirational"
+  ]
+ },
+ {
+  "quote": "What would life be if we had no courage to attempt anything?",
+  "author": "Vincent van Gogh",
+  "tags": [
+   "courage",
+   "life"
+  ]
+ },
+ {
+  "quote": "The best way to know God is to love many things.",
+  "author": "Vincent van Gogh",
+  "tags": [
+   "love",
+   "faith"
+  ]
+ },
+ {
+  "quote": "Strength does not come from physical capacity. It comes from an indomitable will.",
+  "author": "Mahatma Gandhi",
+  "tags": [
+   "strength",
+   "courage"
+  ]
+ },
+ {
+  "quote": "I learned that courage was not the absence of fear, but the triumph over it.",
+  "author": "Nelson Mandela",
+  "tags": [
+   "courage",
+   "fear"
+  ]
+ },
+ {
+  "quote": "After climbing a great hill, one only finds that there are many more hills to climb.",
+  "author": "Nelson Mandela",
+  "tags": [
+   "life",
+   "courage"
+  ]
+ },
+ {
+  "quote": "Injustice anywhere is a threat to justice everywhere.",
+  "author": "Martin Luther King Jr.",
+  "tags": [
+   "justice",
+   "freedom"
+  ]
+ },
+ {
+  "quote": "Life's most persistent and urgent question is, 'What are you doing for others?'.",
+  "author": "Martin Luther King Jr.",
+  "tags": [
+   "life",
+   "inspirational"
+  ]
+ },
+ {
+  "quote": "Never in the field of human conflict was so much owed by so many to so few.",
+  "author": "Winston Churchill",
+  "tags": [
+   "courage",
+   "history"
+  ]
+ },
+ {
+  "quote": "To improve is to change; to be perfect is to change often.",
+  "author": "Winston Churchill",
+  "tags": [
+   "change",
+   "success"
+  ]
+ },
+ {
+  "quote": "You must do the thing you think you cannot do.",
+  "author": "Eleanor Roosevelt",
+  "tags": [
+   "courage",
+   "inspirational"
+  ]
+ },
+ {
+  "quote": "Far and away the best prize that life offers is the chance to work hard at work worth doing.",
+  "author": "Theodore Roosevelt",
+  "tags": [
+   "success",
+   "work"
+  ]
+ },
+ {
+  "quote": "Speak softly and carry a big stick; you will go far.",
+  "author": "Theodore Roosevelt",
+  "tags": [
+   "wisdom",
+   "leadership"
+  ]
+ },
+ {
+  "quote": "You can't cross the sea merely by standing and staring at the water.",
+  "author": "Rabindranath Tagore",
+  "tags": [
+   "courage",
+   "inspirational"
+  ]
+ },
+ {
+  "quote": "The butterfly counts not months but moments, and has time enough.",
+  "author": "Rabindranath Tagore",
+  "tags": [
+   "time",
+   "nature"
+  ]
+ },
+ {
+  "quote": "Time is the substance I am made of.",
+  "author": "Jorge Luis Borges",
+  "tags": [
+   "time",
+   "philosophy"
+  ]
+ },
+ {
+  "quote": "Until the lions have their own historians, the history of the hunt will always glorify the hunter.",
+  "author": "Chinua Achebe",
+  "tags": [
+   "truth",
+   "history"
+  ]
+ },
+ {
+  "quote": "We may encounter many defeats but we must not be defeated.",
+  "author": "Maya Angelou",
+  "tags": [
+   "courage",
+   "strength"
+  ]
+ },
+ {
+  "quote": "If you are neutral in situations of injustice, you have chosen the side of the oppressor.",
+  "author": "Desmond Tutu",
+  "tags": [
+   "courage",
+   "justice"
+  ]
+ },
+ {
+  "quote": "Until you dig a hole, you plant a tree, you water it and make it survive, you haven't done a thing.",
+  "author": "Wangari Maathai",
+  "tags": [
+   "nature",
+   "success"
+  ]
+ },
+ {
+  "quote": "A woman must have money and a room of her own if she is to write fiction.",
+  "author": "Virginia Woolf",
+  "tags": [
+   "writing",
+   "women"
+  ]
+ },
+ {
+  "quote": "No need to hurry. No need to sparkle. No need to be anybody but oneself.",
+  "author": "Virginia Woolf",
+  "tags": [
+   "life",
+   "wisdom"
+  ]
+ },
+ {
+  "quote": "No man's knowledge here can go beyond his experience.",
+  "author": "John Locke",
+  "tags": [
+   "knowledge",
+   "philosophy"
+  ]
+ },
+ {
+  "quote": "Ask yourself whether you are happy, and you cease to be so.",
+  "author": "John Stuart Mill",
+  "tags": [
+   "happiness",
+   "philosophy"
+  ]
+ },
+ {
+  "quote": "The good life is one inspired by love and guided by knowledge.",
+  "author": "Bertrand Russell",
+  "tags": [
+   "life",
+   "love",
+   "knowledge"
+  ]
+ },
+ {
+  "quote": "To be without some of the things you want is an indispensable part of happiness.",
+  "author": "Bertrand Russell",
+  "tags": [
+   "happiness",
+   "wisdom"
+  ]
+ },
+ {
+  "quote": "Genius is one per cent inspiration, ninety-nine per cent perspiration.",
+  "author": "Thomas Edison",
+  "tags": [
+   "success",
+   "work"
+  ]
+ },
+ {
+  "quote": "How very little can be done under the spirit of fear.",
+  "author": "Florence Nightingale",
+  "tags": [
+   "fear",
+   "courage"
+  ]
+ },
+ {
+  "quote": "Every day is a journey, and the journey itself is home.",
+  "author": "Matsuo Bashō",
+  "tags": [
+   "life",
+   "poetry"
+  ]
+ },
+ {
+  "quote": "Be water, my friend.",
+  "author": "Bruce Lee",
+  "tags": [
+   "wisdom",
+   "philosophy"
+  ]
+ },
+ {
+  "quote": "Nothing gold can stay.",
+  "author": "Robert Frost",
+  "tags": [
+   "life",
+   "poetry"
+  ]
+ },
+ {
+  "quote": "Home is the place where, when you have to go there, They have to take you in.",
+  "author": "Robert Frost",
+  "tags": [
+   "love",
+   "life"
+  ]
+ },
+ {
+  "quote": "We are cups, constantly and quietly being filled.",
+  "author": "Ray Bradbury",
+  "tags": [
+   "life",
+   "writing"
+  ]
+ },
+ {
+  "quote": "Violence is the last refuge of the incompetent.",
+  "author": "Isaac Asimov",
+  "tags": [
+   "wisdom"
+  ]
+ },
+ {
+  "quote": "Self-education is, I firmly believe, the only kind of education there is.",
+  "author": "Isaac Asimov",
+  "tags": [
+   "education",
+   "knowledge"
+  ]
+ },
+ {
+  "quote": "Courage is not simply one of the virtues, but the form of every virtue at the testing point.",
+  "author": "C.S. Lewis",
+  "tags": [
+   "courage"
+  ]
+ },
+ {
+  "quote": "Life is a tragedy when seen in close-up, but a comedy in long-shot.",
+  "author": "Charlie Chaplin",
+  "tags": [
+   "life",
+   "humor"
+  ]
+ },
+ {
+  "quote": "We think too much and feel too little.",
+  "author": "Charlie Chaplin",
+  "tags": [
+   "life",
+   "love"
+  ]
+ },
+ {
+  "quote": "Facts are facts and will not disappear on account of your likes.",
+  "author": "Jawaharlal Nehru",
+  "tags": [
+   "truth"
+  ]
+ },
+ {
+  "quote": "Arise, awake, and stop not till the goal is reached.",
+  "author": "Swami Vivekananda",
+  "tags": [
+   "inspirational",
+   "success"
+  ]
+ },
+ {
+  "quote": "You cannot believe in God until you believe in yourself.",
+  "author": "Swami Vivekananda",
+  "tags": [
+   "faith",
+   "courage"
+  ]
+ },
+ {
+  "quote": "Dream, dream, dream. Dreams transform into thoughts and thoughts result in action.",
+  "author": "A. P. J. Abdul Kalam",
+  "tags": [
+   "dreams",
+   "inspirational"
+  ]
+ },
+ {
+  "quote": "Nothing can be created out of nothing.",
+  "author": "Lucretius",
+  "tags": [
+   "philosophy",
+   "nature"
+  ]
+ },
+ {
+  "quote": "Laziness may appear attractive, but work gives satisfaction.",
+  "author": "Anne Frank",
+  "tags": [
+   "work",
+   "success"
+  ]
+ },
+ {
+  "quote": "Nature uses as little as possible of anything.",
+  "author": "Johannes Kepler",
+  "tags": [
+   "nature",
+   "science"
+  ]
+ },
+ {
+  "quote": "Who looks outside, dreams; who looks inside, awakes.",
+  "author": "Carl Jung",
+  "tags": [
+   "wisdom",
+   "dreams"
+  ]
+ },
+ {
+  "quote": "The strongest man in the world is he who stands most alone.",
+  "author": "Henrik Ibsen",
+  "tags": [
+   "strength",
+   "courage"
+  ]
+ },
+ {
+  "quote": "He not busy being born is busy dying.",
+  "author": "Bob Dylan",
+  "tags": [
+   "life",
+   "music"
+  ]
+ },
+ {
+  "quote": "Fight for the things that you care about, but do it in a way that will lead others to join you.",
+  "author": "Ruth Bader Ginsburg",
+  "tags": [
+   "courage",
+   "leadership"
+  ]
+ },
+ {
+  "quote": "Real change, enduring change, happens one step at a time.",
+  "author": "Ruth Bader Ginsburg",
+  "tags": [
+   "change",
+   "success"
+  ]
+ },
+ {
+  "quote": "Courage is the price that Life exacts for granting peace.",
+  "author": "Amelia Earhart",
+  "tags": [
+   "courage"
+  ]
+ },
+ {
+  "quote": "Chance favors only the prepared mind.",
+  "author": "Louis Pasteur",
+  "tags": [
+   "science",
+   "success"
+  ]
+ },
+ {
+  "quote": "Solitude is the profoundest fact of the human condition.",
+  "author": "Octavio Paz",
+  "tags": [
+   "life",
+   "philosophy"
+  ]
+ },
+ {
+  "quote": "The beginning is the most important part of any work.",
+  "author": "Plato",
+  "tags": [
+   "success",
+   "wisdom"
+  ]
+ },
+ {
+  "quote": "For once touched by love, everyone becomes a poet.",
+  "author": "Plato",
+  "tags": [
+   "love",
+   "poetry"
+  ]
+ },
+ {
+  "quote": "Waste no more time arguing what a good man should be. Be one.",
+  "author": "Marcus Aurelius",
+  "tags": [
+   "wisdom",
+   "philosophy"
+  ]
+ },
+ {
+  "quote": "It is not that we have a short space of time, but that we waste much of it.",
+  "author": "Seneca",
+  "tags": [
+   "life",
+   "time",
+   "philosophy"
+  ]
+ },
+ {
+  "quote": "The life of the dead is in the memory of the living.",
+  "author": "Cicero",
+  "tags": [
+   "death",
+   "life"
+  ]
+ },
+ {
+  "quote": "Gratitude is not only the greatest of virtues, but the parent of all others.",
+  "author": "Cicero",
+  "tags": [
+   "wisdom",
+   "gratitude"
+  ]
+ },
+ {
+  "quote": "Let your hook always be cast; in the pool where you least expect it, there will be fish.",
+  "author": "Ovid",
+  "tags": [
+   "hope",
+   "success"
+  ]
+ },
+ {
+  "quote": "Seize the day, believing as little as possible in the morrow.",
+  "author": "Horace",
+  "tags": [
+   "life",
+   "inspirational"
+  ]
+ },
+ {
+  "quote": "Anger is a momentary madness so control your passion or it will control you.",
+  "author": "Horace",
+  "tags": [
+   "wisdom"
+  ]
+ },
+ {
+  "quote": "Fortune favors the bold.",
+  "author": "Virgil",
+  "tags": [
+   "courage"
+  ]
+ },
+ {
+  "quote": "I quote others only in order the better to express myself.",
+  "author": "Michel de Montaigne",
+  "tags": [
+   "writing",
+   "humor"
+  ]
+ },
+ {
+  "quote": "Doubt is not a pleasant condition, but certainty is an absurd one.",
+  "author": "Voltaire",
+  "tags": [
+   "philosophy",
+   "truth"
+  ]
+ },
+ {
+  "quote": "Vision is the art of seeing things invisible.",
+  "author": "Jonathan Swift",
+  "tags": [
+   "inspirational",
+   "wisdom"
+  ]
+ },
+ {
+  "quote": "Curiosity is one of the permanent and certain characteristics of a vigorous intellect.",
+  "author": "Samuel Johnson",
+  "tags": [
+   "knowledge",
+   "curiosity"
+  ]
+ },
+ {
+  "quote": "The strongest of all warriors are these two — Time and Patience.",
+  "author": "Leo Tolstoy",
+  "tags": [
+   "wisdom",
+   "time",
+   "strength"
+  ]
+ },
+ {
+  "quote": "In life, there's nothing to be feared, everything is to be understood.",
+  "author": "Marie Curie",
+  "tags": [
+   "courage",
+   "knowledge"
+  ]
+ },
+ {
+  "quote": "As a well-spent day brings happy sleep, so life well used brings happy death.",
+  "author": "Leonardo da Vinci",
+  "tags": [
+   "life",
+   "death"
+  ]
+ },
+ {
+  "quote": "Feet, what do I need them for if I have wings to fly?",
+  "author": "Frida Kahlo",
+  "tags": [
+   "courage",
+   "art"
+  ]
+ },
+ {
+  "quote": "I paint self-portraits because I am so often alone, because I am the person I know best.",
+  "author": "Frida Kahlo",
+  "tags": [
+   "art"
+  ]
+ },
+ {
+  "quote": "The time is always right to do what's right.",
+  "author": "Martin Luther King Jr.",
+  "tags": [
+   "courage",
+   "wisdom"
+  ]
+ },
+ {
+  "quote": "Definitions belonged to the definers — not the defined.",
+  "author": "Toni Morrison",
+  "tags": [
+   "truth",
+   "freedom"
+  ]
+ },
+ {
+  "quote": "Beauty is no quality in things themselves: It exists merely in the mind which contemplates them.",
+  "author": "David Hume",
+  "tags": [
+   "beauty",
+   "philosophy"
+  ]
+ },
+ {
+  "quote": "I attribute my success to this — I never gave or took an excuse.",
+  "author": "Florence Nightingale",
+  "tags": [
+   "success"
+  ]
+ },
+ {
+  "quote": "Absorb what is useful, reject what is useless and add what is essentially your own.",
+  "author": "Bruce Lee",
+  "tags": [
+   "wisdom",
+   "success"
+  ]
+ },
+ {
+  "quote": "If you want to shine like a star, first you have to burn like a star.",
+  "author": "A. P. J. Abdul Kalam",
+  "tags": [
+   "success",
+   "inspirational"
+  ]
+ },
+ {
+  "quote": "What is food to one, is to others bitter poison.",
+  "author": "Lucretius",
+  "tags": [
+   "wisdom"
+  ]
+ },
+ {
+  "quote": "A person who's happy will make others happy.",
+  "author": "Anne Frank",
+  "tags": [
+   "happiness",
+   "kindness"
+  ]
+ },
+ {
+  "quote": "I've found that there is always some beauty left — in nature, sunshine, freedom, in yourself.",
+  "author": "Anne Frank",
+  "tags": [
+   "hope",
+   "beauty",
+   "nature"
+  ]
+ },
+ {
+  "quote": "Instruction does much, but encouragement everything.",
+  "author": "Johann Wolfgang von Goethe",
+  "tags": [
+   "wisdom",
+   "inspirational"
+  ]
+ },
+ {
+  "quote": "A talent is formed in stillness, a character in the world's torrent.",
+  "author": "Johann Wolfgang von Goethe",
+  "tags": [
+   "wisdom",
+   "life"
+  ]
+ },
+ {
+  "quote": "Love does not dominate, it cultivates. And that is more.",
+  "author": "Johann Wolfgang von Goethe",
+  "tags": [
+   "love"
+  ]
+ },
+ {
+  "quote": "Just trust yourself, then you will know how to live.",
+  "author": "Johann Wolfgang von Goethe",
+  "tags": [
+   "courage",
+   "life"
+  ]
+ },
+ {
+  "quote": "Nothing is worth more than this day.",
+  "author": "Johann Wolfgang von Goethe",
+  "tags": [
+   "life",
+   "time"
+  ]
+ },
+ {
+  "quote": "To save all we must risk all.",
+  "author": "Friedrich Schiller",
+  "tags": [
+   "courage"
+  ]
+ },
+ {
+  "quote": "He who has done his best for his own time has lived for all times.",
+  "author": "Friedrich Schiller",
+  "tags": [
+   "success",
+   "life"
+  ]
+ },
+ {
+  "quote": "What is life without the radiance of love?",
+  "author": "Friedrich Schiller",
+  "tags": [
+   "love",
+   "life"
+  ]
+ },
+ {
+  "quote": "Out of the crooked timber of humanity, no straight thing was ever made.",
+  "author": "Immanuel Kant",
+  "tags": [
+   "philosophy"
+  ]
+ },
+ {
+  "quote": "It is precisely in knowing its limits that philosophy consists.",
+  "author": "Immanuel Kant",
+  "tags": [
+   "philosophy",
+   "wisdom"
+  ]
+ },
+ {
+  "quote": "There is more wisdom in your body than in your deepest philosophy.",
+  "author": "Friedrich Nietzsche",
+  "tags": [
+   "wisdom",
+   "philosophy"
+  ]
+ },
+ {
+  "quote": "What is great in man is that he is a bridge and not a goal.",
+  "author": "Friedrich Nietzsche",
+  "tags": [
+   "philosophy",
+   "life"
+  ]
+ },
+ {
+  "quote": "Only a life lived for others is a life worthwhile.",
+  "author": "Albert Einstein",
+  "tags": [
+   "life",
+   "kindness"
+  ]
+ },
+ {
+  "quote": "I never think of the future. It comes soon enough.",
+  "author": "Albert Einstein",
+  "tags": [
+   "humor",
+   "time"
+  ]
+ },
+ {
+  "quote": "Do not worry about your difficulties in Mathematics. I can assure you mine are still greater.",
+  "author": "Albert Einstein",
+  "tags": [
+   "humor",
+   "science"
+  ]
+ },
+ {
+  "quote": "Death is the side of life which is turned away from us.",
+  "author": "Rainer Maria Rilke",
+  "tags": [
+   "death",
+   "life"
+  ]
+ },
+ {
+  "quote": "And the point is, to live everything. Live the questions now.",
+  "author": "Rainer Maria Rilke",
+  "tags": [
+   "life",
+   "wisdom"
+  ]
+ },
+ {
+  "quote": "Oh, love isn't there to make us happy. I believe it exists to show us how much we can endure.",
+  "author": "Hermann Hesse",
+  "tags": [
+   "love"
+  ]
+ },
+ {
+  "quote": "If I know what love is, it is because of you.",
+  "author": "Hermann Hesse",
+  "tags": [
+   "love"
+  ]
+ },
+ {
+  "quote": "Religions get lost as people do.",
+  "author": "Franz Kafka",
+  "tags": [
+   "faith"
+  ]
+ },
+ {
+  "quote": "Don't be afraid of death so much as an inadequate life.",
+  "author": "Bertolt Brecht",
+  "tags": [
+   "life",
+   "death",
+   "courage"
+  ]
+ },
+ {
+  "quote": "Little changes are the enemies of great changes.",
+  "author": "Bertolt Brecht",
+  "tags": [
+   "change",
+   "wisdom"
+  ]
+ },
+ {
+  "quote": "Unhappy the land that is in need of heroes.",
+  "author": "Bertolt Brecht",
+  "tags": [
+   "courage",
+   "wisdom"
+  ]
+ },
+ {
+  "quote": "Nothing is so often and so irrevocably missed as the opportunity which crops up daily.",
+  "author": "Marie von Ebner-Eschenbach",
+  "tags": [
+   "life",
+   "wisdom"
+  ]
+ },
+ {
+  "quote": "Those who know nothing must believe everything.",
+  "author": "Marie von Ebner-Eschenbach",
+  "tags": [
+   "knowledge",
+   "wisdom"
+  ]
+ },
+ {
+  "quote": "If there is a faith which can move mountains, then it is a faith in one's own strength.",
+  "author": "Marie von Ebner-Eschenbach",
+  "tags": [
+   "faith",
+   "strength"
+  ]
+ },
+ {
+  "quote": "One has to do good in order for it to exist in the world.",
+  "author": "Marie von Ebner-Eschenbach",
+  "tags": [
+   "kindness",
+   "wisdom"
+  ]
+ },
+ {
+  "quote": "Forgiveness is the key to action and freedom.",
+  "author": "Hannah Arendt",
+  "tags": [
+   "freedom",
+   "philosophy"
+  ]
+ },
+ {
+  "quote": "Wealth is like sea-water; the more we drink, the thirstier we become.",
+  "author": "Arthur Schopenhauer",
+  "tags": [
+   "wisdom",
+   "happiness"
+  ]
+ },
+ {
+  "quote": "Mostly it is loss which teaches us about the worth of things.",
+  "author": "Arthur Schopenhauer",
+  "tags": [
+   "wisdom",
+   "life"
+  ]
+ },
+ {
+  "quote": "Every child is in a way a genius; and every genius is in a way a child.",
+  "author": "Arthur Schopenhauer",
+  "tags": [
+   "philosophy",
+   "imagination"
+  ]
+ },
+ {
+  "quote": "One has to do something new in order to see something new.",
+  "author": "Georg Christoph Lichtenberg",
+  "tags": [
+   "inspirational",
+   "change"
+  ]
+ },
+ {
+  "quote": "When a book and a head collide and a hollow sound is heard, must it always have come from the book?",
+  "author": "Georg Christoph Lichtenberg",
+  "tags": [
+   "humor",
+   "books"
+  ]
+ },
+ {
+  "quote": "To look forward to pleasure is also a pleasure.",
+  "author": "Gotthold Ephraim Lessing",
+  "tags": [
+   "happiness"
+  ]
+ },
+ {
+  "quote": "Where they burn books, they will also burn people.",
+  "author": "Heinrich Heine",
+  "tags": [
+   "books",
+   "freedom"
+  ]
+ },
+ {
+  "quote": "Experience is a good school. But the fees are high.",
+  "author": "Heinrich Heine",
+  "tags": [
+   "wisdom",
+   "humor"
+  ]
+ },
+ {
+  "quote": "Our life is no dream, but it should and will perhaps become one.",
+  "author": "Novalis",
+  "tags": [
+   "life",
+   "dreams"
+  ]
+ },
+ {
+  "quote": "Wherein lies the danger, grows also the saving power.",
+  "author": "Friedrich Hölderlin",
+  "tags": [
+   "hope",
+   "courage"
+  ]
+ },
+ {
+  "quote": "A great truth is a truth whose opposite is also a truth.",
+  "author": "Thomas Mann",
+  "tags": [
+   "truth",
+   "philosophy"
+  ]
+ },
+ {
+  "quote": "Life is futile unless it be directed towards a definite goal.",
+  "author": "Stefan Zweig",
+  "tags": [
+   "life",
+   "success"
+  ]
+ },
+ {
+  "quote": "Only what we have wrought into our character during life can we take away with us.",
+  "author": "Alexander von Humboldt",
+  "tags": [
+   "life",
+   "wisdom"
+  ]
+ },
+ {
+  "quote": "I want to seize fate by the throat.",
+  "author": "Ludwig van Beethoven",
+  "tags": [
+   "courage",
+   "music"
+  ]
+ },
+ {
+  "quote": "Until he extends the circle of his compassion to all living things, man will not himself find peace.",
+  "author": "Albert Schweitzer",
+  "tags": [
+   "kindness",
+   "nature"
+  ]
+ },
+ {
+  "quote": "To be aware of limitations is already to be beyond them.",
+  "author": "Georg Wilhelm Friedrich Hegel",
+  "tags": [
+   "wisdom",
+   "philosophy"
+  ]
+ },
+ {
+  "quote": "Nothing great in the World has been accomplished without passion.",
+  "author": "Georg Wilhelm Friedrich Hegel",
+  "tags": [
+   "inspirational",
+   "success"
+  ]
+ },
+ {
+  "quote": "Revolutions are the locomotives of history.",
+  "author": "Karl Marx",
+  "tags": [
+   "change",
+   "history"
+  ]
+ },
+ {
+  "quote": "How bold one gets when one is sure of being loved.",
+  "author": "Sigmund Freud",
+  "tags": [
+   "love",
+   "courage"
+  ]
+ },
+ {
+  "quote": "The limits of my language mean the limits of my world.",
+  "author": "Ludwig Wittgenstein",
+  "tags": [
+   "philosophy",
+   "knowledge"
+  ]
+ },
+ {
+  "quote": "Whereof one cannot speak, thereof one must be silent.",
+  "author": "Ludwig Wittgenstein",
+  "tags": [
+   "philosophy",
+   "wisdom"
+  ]
+ },
+ {
+  "quote": "Experiments are the only means of knowledge at our disposal. The rest is poetry, imagination.",
+  "author": "Max Planck",
+  "tags": [
+   "science",
+   "knowledge"
+  ]
+ },
+ {
+  "quote": "If I am what I have and if what I have is lost, who then am I?",
+  "author": "Erich Fromm",
+  "tags": [
+   "philosophy",
+   "life"
+  ]
+ },
+ {
+  "quote": "All things living are in search of a better world.",
+  "author": "Karl Popper",
+  "tags": [
+   "hope",
+   "life"
+  ]
+ },
+ {
+  "quote": "Time does not change us, it just unfolds us.",
+  "author": "Max Frisch",
+  "tags": [
+   "time",
+   "life"
+  ]
+ },
+ {
+  "quote": "If there is a meaning in life at all, then there must be a meaning in suffering.",
+  "author": "Viktor Frankl",
+  "tags": [
+   "life",
+   "philosophy"
+  ]
+ },
+ {
+  "quote": "To everyone God is the kind of God he believes in.",
+  "author": "Dietrich Bonhoeffer",
+  "tags": [
+   "faith"
+  ]
+ },
+ {
+  "quote": "Politics is the art of the possible.",
+  "author": "Otto von Bismarck",
+  "tags": [
+   "wisdom",
+   "politics"
+  ]
+ },
+ {
+  "quote": "What belongs together, is growing together again.",
+  "author": "Willy Brandt",
+  "tags": [
+   "hope",
+   "freedom"
+  ]
+ },
+ {
+  "quote": "Love and art do not embrace what is beautiful but what is made beautiful by this embrace.",
+  "author": "Karl Kraus",
+  "tags": [
+   "love",
+   "art",
+   "beauty"
   ]
  }
 ]
