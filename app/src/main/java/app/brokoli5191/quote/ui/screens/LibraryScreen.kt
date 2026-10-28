@@ -12,6 +12,7 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -25,18 +26,26 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import app.brokoli5191.quote.data.QuoteEntity
+import app.brokoli5191.quote.data.QuoteLanguage
 import app.brokoli5191.quote.data.QuoteSourceMode
+import app.brokoli5191.quote.data.alternateLanguage
+import app.brokoli5191.quote.data.alternateText
+import app.brokoli5191.quote.data.hasUnknownAuthor
 import app.brokoli5191.quote.ui.QuoteViewModel
 import app.brokoli5191.quote.ui.LocalAppLanguage
 import app.brokoli5191.quote.ui.categoryText
@@ -45,6 +54,7 @@ import app.brokoli5191.quote.ui.uiText
 import app.brokoli5191.quote.ui.components.ExpressiveButton
 import app.brokoli5191.quote.ui.components.ExpressiveIconButton
 import app.brokoli5191.quote.ui.components.ExpressiveTextButton
+import app.brokoli5191.quote.ui.components.TranslationToggle
 import app.brokoli5191.quote.ui.components.rememberExpressiveShape
 import app.brokoli5191.quote.ui.theme.SerifFontFamily
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -88,7 +98,17 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
     val scrollState = rememberScrollState()
     val libraryBlurEnabled = blurNavigationSurfaces && !lowPerformanceMode
     val libraryHazeState = rememberHazeState(blurEnabled = libraryBlurEnabled)
-    val libraryChromeHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 128.dp
+    // The header (title + search field) and the filter row are measured, so the content below
+    // them starts at the real chrome height for every language and font scale.
+    val density = LocalDensity.current
+    val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    var headerHeightPx by remember { mutableIntStateOf(0) }
+    var filterRowHeightPx by remember { mutableIntStateOf(0) }
+    val headerHeight = if (headerHeightPx > 0) with(density) { headerHeightPx.toDp() } else statusBarTop + LibraryHeaderFallbackHeight
+    val filterRowHeight = if (filterRowHeightPx > 0) with(density) { filterRowHeightPx.toDp() } else LibraryFilterRowFallbackHeight
+    val filterRowTop = headerHeight + LibraryFilterRowGap
+    val browseContentTop = filterRowTop + filterRowHeight + LibraryContentGap
+    val libraryChromeHeight = (if (isBrowsing) filterRowTop + filterRowHeight else headerHeight) + LibraryContentGap
     var showCategoryFilterDialog by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
@@ -164,7 +184,7 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                         communitySyncFinished = communitySyncFinished,
                         onRetrySync = { viewModel.syncCommunityQuotes() },
                         lowPerformanceMode = lowPerformanceMode,
-                        topContentPadding = libraryChromeHeight
+                        topContentPadding = browseContentTop
                     )
                 } else {
                     Column(
@@ -173,7 +193,7 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                             .verticalScroll(scrollState)
                             .padding(bottom = 112.dp)
                     ) {
-                        Spacer(modifier = Modifier.height(libraryChromeHeight + 12.dp))
+                        Spacer(modifier = Modifier.height(headerHeight + LibraryContentGap))
 
                         // Beautiful Adaptive Bento Grid with Stunning Stocks loaded via Coil
                         Column(
@@ -199,7 +219,9 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                             val midCategories = bentoCategories.drop(1)
                             midCategories.chunked(2).forEach { pair ->
                                 Row(
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(IntrinsicSize.Min),
                                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                                 ) {
                                     pair.forEach { cat ->
@@ -209,7 +231,8 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                                                 icon = cat.icon,
                                                 tintColor = cat.tintColor,
                                                 height = 110.dp,
-                                                onClick = { selectCategoryWithHaptic(cat.name) }
+                                                onClick = { selectCategoryWithHaptic(cat.name) },
+                                                modifier = Modifier.fillMaxHeight()
                                             )
                                         }
                                     }
@@ -227,7 +250,7 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(libraryChromeHeight + if (isBrowsing) 64.dp else 0.dp)
+                    .height(libraryChromeHeight)
                     .zIndex(1f)
                     .hazeEffect(libraryHazeState) {
                         blurRadius = 32.dp
@@ -244,7 +267,7 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(libraryChromeHeight + if (isBrowsing) 64.dp else 0.dp)
+                    .height(libraryChromeHeight)
                     .zIndex(1.5f)
                     .background(
                         if (isBrowsing) {
@@ -269,6 +292,7 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .zIndex(2f)
+                    .onSizeChanged { headerHeightPx = it.height }
             ) {
                 Column(
                     modifier = Modifier
@@ -287,7 +311,10 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                             text = uiText("Library"),
                             style = MaterialTheme.typography.headlineLarge,
                             color = MaterialTheme.colorScheme.onBackground,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 12.dp)
                         )
                         ExpressiveIconButton(
                             onClick = {
@@ -312,7 +339,7 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                     onValueChange = viewModel::setSearchQuery,
                     placeholder = {
                         Text(
-                            if (language == "de") "Quotes durchsuchen …" else "Search wisdom...",
+                            if (language == "de") "Quotes durchsuchen …" else "Search wisdom…",
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         )
                     },
@@ -353,9 +380,10 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .offset(y = libraryChromeHeight)
+                        .offset(y = filterRowTop)
                         .zIndex(3f)
                         .padding(horizontal = 20.dp)
+                        .onSizeChanged { filterRowHeightPx = it.height }
                 )
             }
         }
@@ -388,8 +416,8 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                             indication = null
                         ) {},
                     shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-                    color = MaterialTheme.colorScheme.background,
-                    tonalElevation = 8.dp
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    tonalElevation = 0.dp
                 ) {
                     Column(
                         modifier = Modifier
@@ -449,7 +477,9 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                         ) {
                             visibleFilterCategories.chunked(2).forEach { rowCategoryList ->
                                 Row(
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(IntrinsicSize.Min),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     rowCategoryList.forEach { categoryName ->
@@ -466,20 +496,26 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                                                 }
                                             },
                                             label = {
+                                                // Long German names wrap onto a second line instead of being cut off.
                                                 Text(
                                                     text = categoryText(categoryName),
                                                     style = MaterialTheme.typography.labelMedium.copy(
                                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                                    )
+                                                    ),
+                                                    maxLines = 2,
+                                                    modifier = Modifier.padding(vertical = 6.dp)
                                                 )
                                             },
-                                            modifier = Modifier.weight(1f).height(48.dp),
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .fillMaxHeight()
+                                                .heightIn(min = 48.dp),
                                             shape = rememberExpressiveShape(interactionSource, 23.dp, 10.dp),
                                             interactionSource = interactionSource,
                                             colors = FilterChipDefaults.filterChipColors(
-                                                selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
-                                                selectedLabelColor = MaterialTheme.colorScheme.primary,
-                                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                                                 labelColor = MaterialTheme.colorScheme.onSurfaceVariant
                                             ),
                                             border = FilterChipDefaults.filterChipBorder(
@@ -512,9 +548,11 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                                 colors = ButtonDefaults.textButtonColors(
                                     contentColor = MaterialTheme.colorScheme.primary
                                 ),
-                                modifier = Modifier.padding(end = 8.dp)
+                                modifier = Modifier
+                                    .weight(1f, fill = false)
+                                    .padding(end = 8.dp)
                             ) {
-                                Text(uiText("Clear All"))
+                                Text(uiText("Clear All"), textAlign = TextAlign.Center, maxLines = 2)
                             }
 
                             ExpressiveButton(
@@ -526,9 +564,10 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                                     containerColor = MaterialTheme.colorScheme.primary,
                                     contentColor = MaterialTheme.colorScheme.onPrimary
                                 ),
-                                restingCorner = 12.dp
+                                restingCorner = 12.dp,
+                                modifier = Modifier.weight(1f, fill = false)
                             ) {
-                                Text(uiText("Apply Filter"))
+                                Text(uiText("Apply Filter"), textAlign = TextAlign.Center, maxLines = 2)
                             }
                         }
                     }
@@ -548,7 +587,7 @@ fun CategoryBrowseViewInPlace(
     communitySyncFinished: Boolean = true,
     onRetrySync: () -> Unit = {},
     lowPerformanceMode: Boolean = false,
-    topContentPadding: androidx.compose.ui.unit.Dp = 0.dp
+    topContentPadding: Dp = 0.dp
 ) {
     val context = LocalContext.current
     val shareTitle = uiText("Share Wisdom")
@@ -556,6 +595,18 @@ fun CategoryBrowseViewInPlace(
     val onBackWithHaptic = {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
         onBack()
+    }
+    // Ids whose entry animation already ran: a card slides in only the first time it appears,
+    // not again when it is scrolled back into view.
+    val animatedQuoteIds = remember { HashSet<Int>() }
+    val onShare = remember(context, shareTitle) {
+        { text: String ->
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, text)
+            }
+            context.startActivity(Intent.createChooser(intent, shareTitle))
+        }
     }
 
     Box(
@@ -612,7 +663,7 @@ fun CategoryBrowseViewInPlace(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = topContentPadding + 56.dp, bottom = 32.dp),
+                    .padding(top = topContentPadding, bottom = 32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
@@ -741,21 +792,19 @@ fun CategoryBrowseViewInPlace(
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(top = topContentPadding + 56.dp, bottom = 112.dp),
+                contentPadding = PaddingValues(top = topContentPadding, bottom = 112.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(quotes, key = { it.id }) { quote ->
+                items(quotes, key = { it.id }, contentType = { BrowseQuoteContentType }) { quote ->
+                    val animateEntry = remember(quote.id) {
+                        !lowPerformanceMode && animatedQuoteIds.add(quote.id)
+                    }
                     QuoteBrowseItemCard(
                         quote = quote,
                         lowPerformanceMode = lowPerformanceMode,
-                        onToggleFavorite = { onToggleFavorite(quote) },
-                        onShare = {
-                            val intent = Intent(Intent.ACTION_SEND).apply {
-                                type = "text/plain"
-                                putExtra(Intent.EXTRA_TEXT, formattedQuote(quote.text, quote.author))
-                            }
-                            context.startActivity(Intent.createChooser(intent, shareTitle))
-                        }
+                        animateEntry = animateEntry,
+                        onToggleFavorite = onToggleFavorite,
+                        onShare = onShare
                     )
                 }
             }
@@ -771,40 +820,47 @@ private fun LibraryFilterRow(
     modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
+        modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .clip(FilterPillShape)
-                .background(MaterialTheme.colorScheme.primary)
-                .height(48.dp)
-                .padding(horizontal = 16.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = category?.let { categoryText(it) } ?: uiText("Search results"),
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onPrimary
-            )
+        // The pill wraps its label and may grow to two lines; it never pushes the button away.
+        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+            Box(
+                modifier = Modifier
+                    .clip(FilterPillShape)
+                    .background(MaterialTheme.colorScheme.primary)
+                    .heightIn(min = 48.dp)
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = category?.let { categoryText(it) } ?: uiText("Search results"),
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
 
         ExpressiveTextButton(
             onClick = onBack,
-            modifier = Modifier.height(48.dp),
+            modifier = Modifier
+                .heightIn(min = 48.dp)
+                .widthIn(max = 200.dp),
             restingCorner = 32.dp,
             colors = ButtonDefaults.textButtonColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                 contentColor = MaterialTheme.colorScheme.onSurface
             ),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp)
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp)
         ) {
             Text(
                 text = uiText("Clear Filter"),
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                textAlign = TextAlign.Center,
+                maxLines = 2
             )
         }
     }
@@ -814,39 +870,65 @@ private fun LibraryFilterRow(
 @Composable
 fun QuoteBrowseItemCard(
     quote: QuoteEntity,
-    onToggleFavorite: () -> Unit,
-    onShare: () -> Unit,
-    lowPerformanceMode: Boolean = false
+    onToggleFavorite: (QuoteEntity) -> Unit,
+    onShare: (String) -> Unit,
+    lowPerformanceMode: Boolean = false,
+    animateEntry: Boolean = !lowPerformanceMode
 ) {
     val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
     val cardScope = rememberCoroutineScope()
     var copyConfirmed by remember { mutableStateOf(false) }
-    val offsetX = remember { Animatable(if (lowPerformanceMode) 0f else 80f) }
-    val alphaAnim = remember { Animatable(if (lowPerformanceMode) 1f else 0f) }
+    // Animatables only exist for cards that actually slide in.
+    val offsetX = if (animateEntry) remember { Animatable(80f) } else null
+    val alphaAnim = if (animateEntry) remember { Animatable(0f) } else null
 
-    LaunchedEffect(Unit) {
-        if (!lowPerformanceMode) offsetX.animateTo(
-            targetValue = 0f,
-            animationSpec = spring(stiffness = 300f, dampingRatio = 0.8f)
-        )
+    if (offsetX != null && alphaAnim != null) {
+        LaunchedEffect(Unit) {
+            offsetX.animateTo(
+                targetValue = 0f,
+                animationSpec = spring(stiffness = 300f, dampingRatio = 0.8f)
+            )
+        }
+        LaunchedEffect(Unit) {
+            alphaAnim.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 250)
+            )
+        }
     }
-    LaunchedEffect(Unit) {
-        if (!lowPerformanceMode) alphaAnim.animateTo(
-            targetValue = 1f,
-            animationSpec = tween(durationMillis = 250)
-        )
+
+    val alternateText = quote.alternateText()
+    val alternateLanguage = quote.alternateLanguage()
+    var showTranslation by rememberSaveable(quote.id) { mutableStateOf(false) }
+    val displayedText = if (showTranslation && alternateText != null) alternateText else quote.text
+    val appLanguage = LocalAppLanguage.current
+    // Quotation marks follow the language of the text on screen, not the app language. An own quote
+    // without a translation has no known text language, so it keeps neutral English marks.
+    val displayedLanguage = when {
+        alternateLanguage == null && quote.isUserAdded -> QuoteLanguage.ENGLISH
+        alternateLanguage == null -> appLanguage
+        showTranslation -> alternateLanguage
+        alternateLanguage == QuoteLanguage.GERMAN -> QuoteLanguage.ENGLISH
+        else -> QuoteLanguage.GERMAN
     }
+    val displayedAuthor = if (quote.hasUnknownAuthor) uiText("Unknown") else quote.author
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .graphicsLayer {
-                translationX = offsetX.value
-                alpha = alphaAnim.value
-            }
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), RoundedCornerShape(20.dp)),
-        shape = RoundedCornerShape(20.dp),
+            .then(
+                if (offsetX != null && alphaAnim != null) {
+                    Modifier.graphicsLayer {
+                        translationX = offsetX.value
+                        alpha = alphaAnim.value
+                    }
+                } else {
+                    Modifier
+                }
+            )
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), BrowseCardShape),
+        shape = BrowseCardShape,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
         )
@@ -856,7 +938,7 @@ fun QuoteBrowseItemCard(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                text = "\"${quote.text}\"",
+                text = if (displayedLanguage == QuoteLanguage.GERMAN) "„$displayedText“" else "“$displayedText”",
                 style = MaterialTheme.typography.bodyLarge.copy(
                     fontFamily = SerifFontFamily,
                     fontStyle = FontStyle.Italic,
@@ -865,32 +947,50 @@ fun QuoteBrowseItemCard(
                 color = MaterialTheme.colorScheme.onSurface
             )
 
+            if (alternateText != null && alternateLanguage != null) {
+                // The chip names the language the quote switches to.
+                val targetLanguage = when {
+                    !showTranslation -> alternateLanguage
+                    alternateLanguage == QuoteLanguage.GERMAN -> QuoteLanguage.ENGLISH
+                    else -> QuoteLanguage.GERMAN
+                }
+                TranslationToggle(
+                    showingTranslation = showTranslation,
+                    targetLanguage = targetLanguage,
+                    onToggle = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        showTranslation = !showTranslation
+                    }
+                )
+            }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (quote.author.isNotBlank()) Text(
-                    text = "— ${quote.author}",
+                if (displayedAuthor.isNotBlank()) Text(
+                    text = "— $displayedAuthor",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier
                         .weight(1f)
-                        .padding(end = 8.dp),
-                    maxLines = 1,
+                        .padding(end = 4.dp),
+                    // Two lines so names like "Marcus Aurelius" stay readable next to the actions.
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
 
                 Row(
                     modifier = Modifier.wrapContentWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(0.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     ExpressiveIconButton(onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        clipboard.setPrimaryClip(ClipData.newPlainText("quote", formattedQuote(quote.text, quote.author)))
+                        clipboard.setPrimaryClip(ClipData.newPlainText("quote", formattedQuote(displayedText, displayedAuthor)))
                         copyConfirmed = true
                         cardScope.launch {
                             delay(1200)
@@ -906,7 +1006,7 @@ fun QuoteBrowseItemCard(
 
                     ExpressiveIconButton(onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onShare()
+                        onShare(formattedQuote(displayedText, displayedAuthor))
                     }) {
                         Icon(
                             imageVector = Icons.Default.Share,
@@ -925,7 +1025,7 @@ fun QuoteBrowseItemCard(
                     ExpressiveIconButton(onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         isLikedAnim = true
-                        onToggleFavorite()
+                        onToggleFavorite(quote)
                     }) {
                         Icon(
                             imageVector = if (quote.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
@@ -943,6 +1043,16 @@ fun QuoteBrowseItemCard(
     }
 }
 
+private val BrowseCardShape = RoundedCornerShape(20.dp)
+private const val BrowseQuoteContentType = "browse_quote"
+
+// Chrome layout: gap between search field and filter row, gap above the first card, and
+// estimates used for the first frame until the header and filter row have been measured.
+private val LibraryFilterRowGap = 12.dp
+private val LibraryContentGap = 16.dp
+private val LibraryHeaderFallbackHeight = 136.dp
+private val LibraryFilterRowFallbackHeight = 48.dp
+
 private val FilterPillShape = RoundedCornerShape(32.dp)
 
 
@@ -951,19 +1061,22 @@ fun CategoryBentoCard(
     name: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     tintColor: Color,
-    height: androidx.compose.ui.unit.Dp,
-    onClick: () -> Unit
+    height: Dp,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val expressiveShape = rememberExpressiveShape(interactionSource, 20.dp, 10.dp)
+    val tint = categoryTint(tintColor, lightSurface = MaterialTheme.colorScheme.surface.luminance() > 0.5f)
     Card(
         onClick = onClick,
-        modifier = Modifier
+        // A minimum height instead of a fixed one, so names still fit at large font scales.
+        modifier = modifier
             .fillMaxWidth()
-            .height(height)
+            .heightIn(min = height)
             .border(
                 width = 1.dp,
-                color = tintColor.copy(alpha = 0.15f),
+                color = tint.copy(alpha = 0.15f),
                 shape = expressiveShape
             ),
         shape = expressiveShape,
@@ -974,11 +1087,13 @@ fun CategoryBentoCard(
     ) {
         Box(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .heightIn(min = height)
+                .fillMaxHeight()
                 .background(
                     Brush.verticalGradient(
                         listOf(
-                            tintColor.copy(alpha = 0.08f),
+                            tint.copy(alpha = 0.08f),
                             MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
                         )
                     )
@@ -994,39 +1109,41 @@ fun CategoryBentoCard(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = tintColor.copy(alpha = 0.12f),
+                    tint = tint.copy(alpha = 0.12f),
                     modifier = Modifier.size(72.dp)
                 )
             }
 
-            // Primary visual crisp icon in top-left
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .background(
-                        color = tintColor.copy(alpha = 0.1f),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                    .padding(8.dp)
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = tintColor,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-
-            // Bottom descriptive and label texts
+            // Icon on top, label at the bottom; the card grows instead of overlapping them.
             Column(
                 modifier = Modifier
-                    .align(Alignment.BottomStart)
                     .fillMaxWidth()
+                    .heightIn(min = height - 32.dp)
+                    .fillMaxHeight(),
+                verticalArrangement = Arrangement.SpaceBetween
             ) {
+                // Primary visual crisp icon in top-left
+                Box(
+                    modifier = Modifier
+                        .background(
+                            color = tint.copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .padding(8.dp)
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = tint,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+
                 Text(
                     text = categoryText(name),
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(top = 8.dp)
                 )
             }
         }

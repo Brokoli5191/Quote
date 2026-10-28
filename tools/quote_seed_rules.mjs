@@ -35,7 +35,7 @@ const FOREIGN_MARKERS = new Set(`
 const NON_LATIN_LETTER = /[\p{Script=Arabic}\p{Script=Armenian}\p{Script=Bengali}\p{Script=Cyrillic}\p{Script=Devanagari}\p{Script=Georgian}\p{Script=Greek}\p{Script=Han}\p{Script=Hangul}\p{Script=Hebrew}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}]/u;
 
 export const MAX_TAGS = 5;
-export const MAX_QUOTE_LENGTH = 90;
+export const MAX_QUOTE_LENGTH = 100;
 
 export function repairMojibake(value) {
   let normalized = String(value || '')
@@ -43,33 +43,216 @@ export function repairMojibake(value) {
     .replace(/Ã¢â‚¬Å“/g, '“').replace(/Ã¢â‚¬ï¿½/g, '”')
     .replace(/Ã¢â‚¬â€œ/g, '–').replace(/Ã¢â‚¬â€/g, '—')
     .replace(/Ã¢â‚¬Â¦/g, '…').replace(/Ã¢â‚¬Â²/g, '′')
-    .replace(/Ã¢â‚¬/g, '—');
+    .replace(/Ã¢â‚¬/g, '—')
+    // E2 80 9D (”) loses its last byte as Windows-1252 has no 0x9D, leaving a replacement char.
+    .replace(/â€\uFFFD/g, '”');
 
-  if (!/[ÃƒÃ‚Ã¢Ã˜Ã™]/.test(normalized)) return normalized;
+  if (!/[ÃƒÃ‚Ã¢Ã˜Ã™]/.test(normalized)) return repairMojibakeSegments(normalized);
   const bytes = [];
   for (const char of normalized) {
     const code = char.codePointAt(0);
     const byte = WINDOWS_1252.get(char) ?? (code <= 0xff ? code : null);
-    if (byte === null) return normalized;
+    if (byte === null) return repairMojibakeSegments(normalized);
     bytes.push(byte);
   }
   const repaired = Buffer.from(bytes).toString('utf8');
-  return repaired.includes('\uFFFD') ? normalized : repaired;
+  return repaired.includes('\uFFFD') ? repairMojibakeSegments(normalized) : repaired;
+}
+
+const MOJIBAKE_CONTINUATION = '[\\u0080-\\u00bf' + [...WINDOWS_1252.keys()].join('') + ']';
+const MOJIBAKE_SEGMENT = new RegExp(`[\\u00c2-\\u00f4]${MOJIBAKE_CONTINUATION}{1,3}`, 'g');
+
+// Repairs UTF-8 sequences that were decoded as Windows-1252 inside otherwise intact text,
+// e.g. "ideasâ€”perhaps" next to genuine curly quotes. Runs a few times for double encoding.
+function repairMojibakeSegments(value) {
+  let text = value;
+  for (let pass = 0; pass < 3; pass++) {
+    const next = text.replace(MOJIBAKE_SEGMENT, segment => {
+      const bytes = [...segment].map(char => WINDOWS_1252.get(char) ?? char.codePointAt(0));
+      const length = bytes[0] >= 0xf0 ? 4 : bytes[0] >= 0xe0 ? 3 : 2;
+      if (bytes.length < length) return segment;
+      const decoded = Buffer.from(bytes.slice(0, length)).toString('utf8');
+      if (decoded.includes('\uFFFD') || [...decoded].length !== 1) return segment;
+      return decoded + segment.slice(length);
+    });
+    if (next === text) break;
+    text = next;
+  }
+  return text;
+}
+
+const STRAIGHT_QUOTE = '"';
+const OPENING_CONTEXT = /[\s([{\u2014\u2013\-\/“„]/;
+
+// Pairs double quotation marks. Curly („ “ ”) and straight (") marks are tracked separately, so a
+// curly pair around the whole text is not confused with straight marks inside it. A straight mark
+// right after a word or punctuation closes; one at the start or after a space/bracket/dash opens.
+// Only the first straight mark may be an unmatched closer (text that starts mid-quote); a later
+// one with nothing open is treated as an opener with a missing space before it.
+export function pairQuoteMarks(text) {
+  const pairs = new Map();
+  const unmatchedClose = [];
+  const curly = [];
+  const straight = [];
+  let seenStraight = false;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (char === '„' || (char === '“' && text[curly.at(-1)] !== '„')) {
+      curly.push(i);
+    } else if (char === '”' || char === '“') {
+      if (curly.length) pairs.set(curly.pop(), i);
+      else unmatchedClose.push(i);
+    } else if (char === STRAIGHT_QUOTE) {
+      const prev = text[i - 1];
+      const next = text[i + 1];
+      if (/\d/.test(prev ?? '') && straight.length === 0) continue; // inch mark, e.g. 12"
+      const prevIsCloser = prev === STRAIGHT_QUOTE && !straight.includes(i - 1);
+      const opensByContext = prev === undefined || OPENING_CONTEXT.test(prev) || prevIsCloser;
+      const isolated = opensByContext && (next === undefined || /\s/.test(next));
+      const opens = isolated || (!opensByContext && seenStraight)
+        ? straight.length === 0
+        : opensByContext;
+      seenStraight = true;
+      if (opens) straight.push(i);
+      else if (straight.length) pairs.set(straight.pop(), i);
+      else unmatchedClose.push(i);
+    }
+  }
+  const unmatchedOpen = [...curly, ...straight].sort((a, b) => a - b);
+  return { pairs, unmatchedOpen, unmatchedClose };
+}
+
+function closingMarkFor(mark) {
+  if (mark === '„') return '“';
+  return mark === '“' ? '”' : STRAIGHT_QUOTE;
+}
+
+function openingMarkFor(mark) {
+  return mark === STRAIGHT_QUOTE ? STRAIGHT_QUOTE : '“';
+}
+
+// Removes a quotation-mark pair only when it wraps the entire text.
+function stripWrappingQuotes(text) {
+  let result = text;
+  while (result.length > 1 && pairQuoteMarks(result).pairs.get(0) === result.length - 1) {
+    result = result.slice(1, -1).trim();
+  }
+  return result;
+}
+
+// Closes unmatched opening marks at the end and opens unmatched closing marks at the start.
+export function balanceQuoteMarks(text) {
+  const { unmatchedOpen, unmatchedClose } = pairQuoteMarks(text);
+  if (unmatchedOpen.length === 0 && unmatchedClose.length === 0) return text;
+  const prefix = unmatchedClose.map(index => openingMarkFor(text[index])).reverse().join('');
+  const suffix = unmatchedOpen.map(index => closingMarkFor(text[index])).reverse().join('');
+  return prefix + text + suffix;
 }
 
 export function cleanText(value) {
-  return repairMojibake(value)
+  const text = repairMojibake(value)
     .replace(/\uFFFD/g, '')
     .replace(/\u00a0/g, ' ')
     .replace(/\s+/g, ' ')
     .replace(/([.!?,”])(?=“)/g, '$1 ')
-    .trim()
-    .replace(/^[“”„"]|[“”„"]$/g, '')
     .trim();
+  return spaceAfterClosingQuotes(stripWrappingQuotes(balanceQuoteMarks(stripWrappingQuotes(text))));
+}
+
+// "Hi?"She said → "Hi?" She said: only after closing straight marks that end a sentence or clause.
+function spaceAfterClosingQuotes(text) {
+  const { pairs, unmatchedClose } = pairQuoteMarks(text);
+  const closers = new Set([...pairs.values(), ...unmatchedClose]);
+  let result = '';
+  for (let i = 0; i < text.length; i++) {
+    result += text[i];
+    if (
+      text[i] === STRAIGHT_QUOTE && closers.has(i) && /[.!?,]/.test(text[i - 1] ?? '') &&
+      /[\p{L}"]/u.test(text[i + 1] ?? '')
+    ) result += ' ';
+  }
+  return result;
+}
+
+// Source spelling (after the generic fixes in canonicalAuthor) -> display name. Covers typos,
+// inverted names, missing diacritics, full-name variants and joined co-author credits.
+export const AUTHOR_ALIASES = new Map([
+  ['Alexandre Dumas-fils', 'Alexandre Dumas fils'],
+  ['Alfred Lord Tennyson', 'Alfred, Lord Tennyson'],
+  ['Alfred Tennyson', 'Alfred, Lord Tennyson'],
+  ['Anais Nin', 'Anaïs Nin'],
+  ['Andre Gide', 'André Gide'],
+  ['Anne Bronte', 'Anne Brontë'],
+  ['Arthur William Edgar O\'Shaughnessy', 'Arthur O\'Shaughnessy'],
+  ['Carl Gustav Jung', 'Carl Jung'],
+  ['Cathy Guiswite', 'Cathy Guisewite'],
+  ['Charlotte Bronte', 'Charlotte Brontë'],
+  ['Confucious', 'Confucius'],
+  ['Corrie Ten Boom', 'Corrie ten Boom'],
+  ['Desiderius Erasmus Roterodamus', 'Desiderius Erasmus'],
+  ['Edgar Allen Poe', 'Edgar Allan Poe'],
+  ['Francois Mauriac', 'François Mauriac'],
+  ['Friedrich Wilhelm Nietzsche', 'Friedrich Nietzsche'],
+  ['Gabriel Garcia Marquez', 'Gabriel García Márquez'],
+  ['Haruki Marukami', 'Haruki Murakami'],
+  ['Hemingway, Ernest', 'Ernest Hemingway'],
+  ['Henry Ward Beecherr', 'Henry Ward Beecher'],
+  ['Herman Hesse', 'Hermann Hesse'],
+  ['Honore de Balzac', 'Honoré de Balzac'],
+  ['J.K. rowling', 'J.K. Rowling'],
+  ['JK Rowling', 'J.K. Rowling'],
+  ['Lance Armstrong Sally Jenkins', 'Lance Armstrong and Sally Jenkins'],
+  ['Lao Tsu', 'Lao Tzu'],
+  ['Lewis Caroll', 'Lewis Carroll'],
+  ['Lucius Annaeus Seneca', 'Seneca'],
+  ['Marcus Tullius Cicero', 'Cicero'],
+  ['Markus Herz', 'Marcus Herz'],
+  ['Mary Wollstonecraft Shelley', 'Mary Shelley'],
+  ['Mawlana Jalal-al-Din Rumi', 'Rumi'],
+  ['Moliere', 'Molière'],
+  ['Mother Theresa', 'Mother Teresa'],
+  ['Nikolai V. Gogol', 'Nikolai Gogol'],
+  ['Oscar Wilde (attributed to)', 'Oscar Wilde'],
+  ['P.C. Cast Kristin Cast', 'P.C. Cast and Kristin Cast'],
+  ['Pedro Calderon de la Barca', 'Pedro Calderón de la Barca'],
+  ['Robert Marley', 'Bob Marley'],
+  ['Rumi Jalalud-Din', 'Rumi'],
+  ['Salvador Dali', 'Salvador Dalí'],
+  ['Sir Francis Bacon', 'Francis Bacon'],
+  ['St. Francis Of Assisi', 'St. Francis of Assisi'],
+  ['Thomas A. Edison', 'Thomas Edison'],
+  ['Tolstoy Leo', 'Leo Tolstoy'],
+  ['Victor hugo', 'Victor Hugo'],
+  ['Vincent Willem van Gogh', 'Vincent van Gogh'],
+  ['Viktor E. Frankl', 'Viktor Frankl'],
+  ['William Shakespear', 'William Shakespeare'],
+  ['Winston S. Churchill', 'Winston Churchill'],
+]);
+
+// Generic spelling fixes first ("douglas adams", "J. K. Rowling", "J.K.Rowling",
+// "Martin Luther King, Jr."), then the alias table.
+export function canonicalAuthor(value) {
+  let name = String(value || '').replace(/\s+/g, ' ').trim();
+  if (name === name.toLowerCase()) {
+    name = name.replace(/(^|[\s.-])(\p{Ll})/gu, (match, before, letter) => before + letter.toUpperCase());
+  }
+  name = name
+    .replace(/(?<=(?:^|[\s.])\p{Lu})\.\s+(?=\p{Lu}\.)/gu, '.')
+    .replace(/(\b\p{Lu}\.)(?=\p{Lu}\p{Ll})/gu, '$1 ')
+    .replace(/,\s*(Jr|Sr)\.?$/u, ' $1.');
+  return AUTHOR_ALIASES.get(name) ?? name;
+}
+
+// Key under which spelling variants of one author collide (case, diacritics, punctuation, spacing).
+export function authorKey(value) {
+  return String(value || '')
+    .normalize('NFKD')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '');
 }
 
 export function cleanAuthor(value) {
-  return cleanText(value).replace(/,+$/, '').trim();
+  return canonicalAuthor(cleanText(value).replace(/,+$/, '').trim());
 }
 
 export function quoteKey(value) {

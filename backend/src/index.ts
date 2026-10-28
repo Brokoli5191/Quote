@@ -1,5 +1,14 @@
 import { handleAdmin } from "./admin";
 import { privacyPage } from "./privacy";
+import {
+  cleanText,
+  ipRateLimitKey,
+  normalizeForComparison,
+  parseLanguage,
+  quoteComparisonKey,
+  readBodyWithLimit,
+  type QuoteLanguage
+} from "./validation";
 
 export interface Env {
   DB: D1Database;
@@ -16,16 +25,36 @@ interface Submission {
   tags: string[];
   installationId: string;
   appVersion?: string;
+  language: QuoteLanguage;
 }
 
 type ValidationResult =
   | { ok: true; value: Submission }
   | { ok: false; message: string };
 
+type ErrorCode =
+  | "invalid_request"
+  | "validation"
+  | "too_large"
+  | "rate_limited"
+  | "duplicate"
+  | "already_reviewed"
+  | "not_found"
+  | "method_not_allowed"
+  | "forbidden"
+  | "server_error";
+
 const MAX_BODY_LENGTH = 16_384;
 const INSTALLATION_LIMIT = 5;
 const IP_LIMIT = 20;
+const IP_HASH_RETENTION_SECONDS = 30 * 86400;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+// Submission status as the app sees it: an approved quote that is no longer published is "removed".
+// The legacy "duplicate" state is not part of the app contract and is reported as rejected.
+const PUBLIC_STATUS_SQL =
+  `CASE WHEN s.status = 'approved' AND (c.id IS NULL OR c.active = 0) THEN 'removed'
+    WHEN s.status = 'duplicate' THEN 'rejected' ELSE s.status END`;
 
 export function validateSubmission(input: unknown): ValidationResult {
   if (input === null || typeof input !== "object" || Array.isArray(input)) {
@@ -33,11 +62,12 @@ export function validateSubmission(input: unknown): ValidationResult {
   }
 
   const body = input as Record<string, unknown>;
-  const quoteText = cleanText(body.quoteText);
+  const quoteText = cleanText(body.quoteText ?? body.text);
   const author = cleanText(body.author);
   const category = cleanText(body.category);
   const installationId = typeof body.installationId === "string" ? body.installationId.trim() : "";
   const appVersion = body.appVersion === undefined ? undefined : cleanText(body.appVersion);
+  const language = parseLanguage(body.language);
 
   if (quoteText.length < 3 || quoteText.length > 500) {
     return invalid("quoteText must contain between 3 and 500 characters.");
@@ -53,6 +83,9 @@ export function validateSubmission(input: unknown): ValidationResult {
   }
   if (appVersion !== undefined && (appVersion.length < 1 || appVersion.length > 30)) {
     return invalid("appVersion must contain between 1 and 30 characters.");
+  }
+  if (!language.ok) {
+    return invalid(language.message);
   }
   if (!Array.isArray(body.tags) || body.tags.length > 8) {
     return invalid("tags must be an array containing at most 8 items.");
@@ -74,7 +107,7 @@ export function validateSubmission(input: unknown): ValidationResult {
 
   return {
     ok: true,
-    value: { quoteText, author, category, tags, installationId, appVersion }
+    value: { quoteText, author, category, tags, installationId, appVersion, language: language.value ?? "en" }
   };
 }
 
@@ -82,18 +115,14 @@ function invalid(message: string): ValidationResult {
   return { ok: false, message };
 }
 
-function cleanText(value: unknown): string {
-  return typeof value === "string" ? value.trim().replace(/\s+/g, " ") : "";
-}
-
-function normalizeForComparison(value: string): string {
-  return value.normalize("NFKC").toLocaleLowerCase("en-US");
-}
-
 async function hash(value: string): Promise<string> {
   const bytes = new TextEncoder().encode(value);
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function installationHashFor(env: Env, installationId: string): Promise<string> {
+  return hash(`${env.RATE_LIMIT_SALT}:installation:${installationId}`);
 }
 
 function corsHeaders(request: Request, env: Env): Record<string, string> {
@@ -103,8 +132,8 @@ function corsHeaders(request: Request, env: Env): Record<string, string> {
   }
   return {
     "Access-Control-Allow-Origin": origin,
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, X-Installation-Id",
+    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
     "Access-Control-Max-Age": "86400",
     "Vary": "Origin"
   };
@@ -119,6 +148,17 @@ function json(request: Request, env: Env, body: unknown, status = 200): Response
       "X-Content-Type-Options": "nosniff"
     }
   });
+}
+
+// Every error body carries a human readable `error` (read by older app versions) and a stable `code`.
+function errorJson(request: Request, env: Env, status: number, code: ErrorCode, error: string): Response {
+  return json(request, env, { error, code }, status);
+}
+
+function methodNotAllowed(request: Request, env: Env, allow: string): Response {
+  const response = errorJson(request, env, 405, "method_not_allowed", "Method not allowed.");
+  response.headers.set("Allow", allow);
+  return response;
 }
 
 function landingPage(): Response {
@@ -160,73 +200,118 @@ function landingPage(): Response {
   });
 }
 
+interface ExistingSubmission {
+  id: string;
+  status: string;
+  reviewNote: string | null;
+  communityQuoteId: string | null;
+  installationHash: string;
+}
+
+function findSubmissionByContent(env: Env, contentHash: string): Promise<ExistingSubmission | null> {
+  return env.DB.prepare(
+    `SELECT s.id, ${PUBLIC_STATUS_SQL} AS status, s.review_note AS reviewNote,
+      c.id AS communityQuoteId, s.installation_hash AS installationHash
+     FROM submissions s LEFT JOIN community_quotes c ON c.submission_id = s.id
+     WHERE s.content_hash = ? LIMIT 1`
+  ).bind(contentHash).first<ExistingSubmission>();
+}
+
+// A retry from the installation that already submitted this quote (lost response,
+// restored backup) gets the existing submission back instead of an error. The 1.7.0 app
+// treats every non-201 answer as a failure and shows `error`, so it is included for it.
+function ownDuplicate(request: Request, env: Env, existing: ExistingSubmission): Response {
+  return json(request, env, {
+    id: existing.id,
+    status: existing.status,
+    reviewNote: existing.reviewNote,
+    communityQuoteId: existing.communityQuoteId,
+    duplicate: true,
+    error: "This quote has already been submitted."
+  });
+}
+
+function duplicateError(request: Request, env: Env): Response {
+  return errorJson(request, env, 409, "duplicate", "This quote has already been submitted.");
+}
+
+function rateLimited(request: Request, env: Env): Response {
+  return errorJson(request, env, 429, "rate_limited", "Submission limit reached. Please try again tomorrow.");
+}
+
 async function submit(request: Request, env: Env): Promise<Response> {
   if (!request.headers.get("Content-Type")?.toLowerCase().startsWith("application/json")) {
-    return json(request, env, { error: "Content-Type must be application/json." }, 415);
+    return errorJson(request, env, 415, "invalid_request", "Content-Type must be application/json.");
   }
 
-  const declaredLength = Number(request.headers.get("Content-Length") ?? 0);
-  if (declaredLength > MAX_BODY_LENGTH) {
-    return json(request, env, { error: "Request body is too large." }, 413);
-  }
-
-  const rawBody = await request.text();
-  if (rawBody.length > MAX_BODY_LENGTH) {
-    return json(request, env, { error: "Request body is too large." }, 413);
+  const body = await readBodyWithLimit(request, MAX_BODY_LENGTH);
+  if (!body.ok) {
+    return errorJson(request, env, body.status, body.code, body.message);
   }
 
   let input: unknown;
   try {
-    input = JSON.parse(rawBody);
+    input = JSON.parse(body.text);
   } catch {
-    return json(request, env, { error: "Request body contains invalid JSON." }, 400);
+    return errorJson(request, env, 400, "invalid_request", "Request body contains invalid JSON.");
   }
 
   const validation = validateSubmission(input);
   if (!validation.ok) {
-    return json(request, env, { error: validation.message }, 400);
+    return errorJson(request, env, 400, "validation", validation.message);
   }
 
   if (!env.RATE_LIMIT_SALT) {
     console.error("RATE_LIMIT_SALT is not configured");
-    return json(request, env, { error: "Service is temporarily unavailable." }, 503);
+    return errorJson(request, env, 503, "server_error", "Service is temporarily unavailable.");
   }
 
   const submission = validation.value;
   const clientIp = request.headers.get("CF-Connecting-IP") ?? "unknown";
   const [installationHash, ipHash, contentHash] = await Promise.all([
-    hash(`${env.RATE_LIMIT_SALT}:installation:${submission.installationId}`),
-    hash(`${env.RATE_LIMIT_SALT}:ip:${clientIp}`),
+    installationHashFor(env, submission.installationId),
+    hash(`${env.RATE_LIMIT_SALT}:ip:${ipRateLimitKey(clientIp)}`),
     hash(`${normalizeForComparison(submission.quoteText)}\n${normalizeForComparison(submission.author)}`)
   ]);
+  const comparisonKey = quoteComparisonKey(submission.quoteText) || null;
 
-  const duplicate = await env.DB.prepare(
-    "SELECT id, status FROM submissions WHERE content_hash = ? LIMIT 1"
-  ).bind(contentHash).first<{ id: string; status: string }>();
-  if (duplicate) {
-    return json(request, env, { error: "This quote has already been submitted." }, 409);
+  const existing = await findSubmissionByContent(env, contentHash);
+  if (existing && existing.installationHash === installationHash) {
+    return ownDuplicate(request, env, existing);
   }
 
-  const [installationCount, ipCount] = await Promise.all([
-    env.DB.prepare(
-      "SELECT COUNT(*) AS count FROM submissions WHERE installation_hash = ? AND submitted_at >= unixepoch() - 86400"
-    ).bind(installationHash).first<{ count: number }>(),
-    env.DB.prepare(
-      "SELECT COUNT(*) AS count FROM submissions WHERE ip_hash = ? AND submitted_at >= unixepoch() - 86400"
-    ).bind(ipHash).first<{ count: number }>()
-  ]);
-
-  if ((installationCount?.count ?? 0) >= INSTALLATION_LIMIT || (ipCount?.count ?? 0) >= IP_LIMIT) {
-    return json(request, env, { error: "Submission limit reached. Please try again tomorrow." }, 429);
+  const limits = await env.DB.prepare(
+    `SELECT
+      (SELECT COUNT(*) FROM submissions WHERE installation_hash = ? AND submitted_at >= unixepoch() - 86400) AS installationCount,
+      (SELECT COUNT(*) FROM submissions WHERE ip_hash = ? AND submitted_at >= unixepoch() - 86400) AS ipCount`
+  ).bind(installationHash, ipHash).first<{ installationCount: number; ipCount: number }>();
+  if ((limits?.installationCount ?? 0) >= INSTALLATION_LIMIT || (limits?.ipCount ?? 0) >= IP_LIMIT) {
+    return rateLimited(request, env);
   }
 
+  if (existing) {
+    return duplicateError(request, env);
+  }
+  const blocked = await env.DB.prepare(
+    `SELECT EXISTS (SELECT 1 FROM blocked_content_hashes WHERE content_hash = ?)
+      OR EXISTS (SELECT 1 FROM community_quotes WHERE active = 1 AND normalized_text = ?) AS blocked`
+  ).bind(contentHash, comparisonKey).first<{ blocked: number }>();
+  if (blocked?.blocked) {
+    return duplicateError(request, env);
+  }
+
+  // The limits are checked again inside the INSERT so that parallel requests cannot all pass.
   const id = crypto.randomUUID();
+  let changes: number;
   try {
-    await env.DB.prepare(
+    const result = await env.DB.prepare(
       `INSERT INTO submissions (
         id, quote_text, normalized_text, author, category, tags_json, content_hash,
-        installation_hash, ip_hash, app_version
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        installation_hash, ip_hash, app_version, language
+      )
+      SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      WHERE (SELECT COUNT(*) FROM submissions WHERE installation_hash = ? AND submitted_at >= unixepoch() - 86400) < ?
+        AND (SELECT COUNT(*) FROM submissions WHERE ip_hash = ? AND submitted_at >= unixepoch() - 86400) < ?`
     ).bind(
       id,
       submission.quoteText,
@@ -237,13 +322,26 @@ async function submit(request: Request, env: Env): Promise<Response> {
       contentHash,
       installationHash,
       ipHash,
-      submission.appVersion ?? null
+      submission.appVersion ?? null,
+      submission.language,
+      installationHash,
+      INSTALLATION_LIMIT,
+      ipHash,
+      IP_LIMIT
     ).run();
+    changes = result.meta.changes;
   } catch (error) {
     if (String(error).includes("UNIQUE constraint failed")) {
-      return json(request, env, { error: "This quote has already been submitted." }, 409);
+      const winner = await findSubmissionByContent(env, contentHash);
+      if (winner && winner.installationHash === installationHash) {
+        return ownDuplicate(request, env, winner);
+      }
+      return duplicateError(request, env);
     }
     throw error;
+  }
+  if (changes === 0) {
+    return rateLimited(request, env);
   }
 
   return json(request, env, { id, status: "pending" }, 201);
@@ -253,11 +351,11 @@ async function communityUpdates(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   const afterValue = url.searchParams.get("after") ?? "0";
   if (!/^\d+$/.test(afterValue)) {
-    return json(request, env, { error: "after must be a non-negative revision." }, 400);
+    return errorJson(request, env, 400, "invalid_request", "after must be a non-negative revision.");
   }
   const after = Number(afterValue);
   if (!Number.isSafeInteger(after)) {
-    return json(request, env, { error: "after must be a non-negative revision." }, 400);
+    return errorJson(request, env, 400, "invalid_request", "after must be a non-negative revision.");
   }
 
   const state = await env.DB.prepare("SELECT revision FROM sync_state WHERE id = 1")
@@ -270,10 +368,12 @@ async function communityUpdates(request: Request, env: Env): Promise<Response> {
 
   const result = await env.DB.prepare(
     `SELECT id, quote_text AS quoteText, author, category, tags_json AS tagsJson,
+      language, translation, submission_id AS submissionId,
       revision, active, published_at AS publishedAt
      FROM community_quotes WHERE revision > ?
      UNION ALL
      SELECT id, NULL AS quoteText, NULL AS author, NULL AS category, '[]' AS tagsJson,
+      NULL AS language, NULL AS translation, NULL AS submissionId,
       revision, 0 AS active, deleted_at AS publishedAt
      FROM community_quote_deletions WHERE revision > ?
      ORDER BY revision LIMIT 501`
@@ -283,6 +383,9 @@ async function communityUpdates(request: Request, env: Env): Promise<Response> {
     author: string | null;
     category: string | null;
     tagsJson: string;
+    language: QuoteLanguage | null;
+    translation: string | null;
+    submissionId: string | null;
     revision: number;
     active: number;
     publishedAt: number;
@@ -301,6 +404,9 @@ async function communityUpdates(request: Request, env: Env): Promise<Response> {
       author: row.author!,
       category: row.category!,
       tags: JSON.parse(row.tagsJson),
+      language: row.language ?? "en",
+      translation: row.translation,
+      submissionId: row.submissionId!,
       revision: row.revision,
       publishedAt: row.publishedAt
     })),
@@ -314,26 +420,93 @@ async function communityUpdates(request: Request, env: Env): Promise<Response> {
   });
 }
 
-async function submissionStatus(request: Request, env: Env, id: string): Promise<Response> {
-  if (!UUID_PATTERN.test(id)) return json(request, env, { error: "Not found." }, 404);
+type InstallationLookup =
+  | { ok: true; installationHash: string }
+  | { ok: false; response: Response };
+
+async function installationFromHeader(request: Request, env: Env): Promise<InstallationLookup> {
   const installationId = request.headers.get("X-Installation-Id")?.trim() ?? "";
   if (!UUID_PATTERN.test(installationId)) {
-    return json(request, env, { error: "X-Installation-Id must be a valid UUID." }, 400);
+    return {
+      ok: false,
+      response: errorJson(request, env, 400, "invalid_request", "X-Installation-Id must be a valid UUID.")
+    };
   }
-  if (!env.RATE_LIMIT_SALT) return json(request, env, { error: "Service is temporarily unavailable." }, 503);
+  if (!env.RATE_LIMIT_SALT) {
+    return {
+      ok: false,
+      response: errorJson(request, env, 503, "server_error", "Service is temporarily unavailable.")
+    };
+  }
+  return { ok: true, installationHash: await installationHashFor(env, installationId) };
+}
 
-  const installationHash = await hash(`${env.RATE_LIMIT_SALT}:installation:${installationId}`);
+async function submissionStatus(request: Request, env: Env, id: string): Promise<Response> {
+  if (!UUID_PATTERN.test(id)) return errorJson(request, env, 404, "not_found", "Not found.");
+  const installation = await installationFromHeader(request, env);
+  if (!installation.ok) return installation.response;
+
   const status = await env.DB.prepare(
-    `SELECT s.status, s.reviewed_at AS reviewedAt, c.id AS communityQuoteId
+    `SELECT s.id, ${PUBLIC_STATUS_SQL} AS status, s.review_note AS reviewNote,
+      s.reviewed_at AS reviewedAt, c.id AS communityQuoteId
      FROM submissions s LEFT JOIN community_quotes c ON c.submission_id = s.id
      WHERE s.id = ? AND s.installation_hash = ? LIMIT 1`
-  ).bind(id, installationHash).first<{
+  ).bind(id, installation.installationHash).first<{
+    id: string;
     status: string;
+    reviewNote: string | null;
     reviewedAt: number | null;
     communityQuoteId: string | null;
   }>();
-  if (!status) return json(request, env, { error: "Not found." }, 404);
+  if (!status) return errorJson(request, env, 404, "not_found", "Not found.");
   return json(request, env, status);
+}
+
+async function withdrawSubmission(request: Request, env: Env, id: string): Promise<Response> {
+  if (!UUID_PATTERN.test(id)) return errorJson(request, env, 404, "not_found", "Not found.");
+  const installation = await installationFromHeader(request, env);
+  if (!installation.ok) return installation.response;
+
+  const deleted = await env.DB.prepare(
+    "DELETE FROM submissions WHERE id = ? AND installation_hash = ? AND status = 'pending'"
+  ).bind(id, installation.installationHash).run();
+  if (deleted.meta.changes > 0) {
+    return new Response(null, { status: 204, headers: { ...corsHeaders(request, env), "Cache-Control": "no-store" } });
+  }
+
+  const existing = await env.DB.prepare(
+    "SELECT status FROM submissions WHERE id = ? AND installation_hash = ? LIMIT 1"
+  ).bind(id, installation.installationHash).first<{ status: string }>();
+  if (!existing) return errorJson(request, env, 404, "not_found", "Not found.");
+  return errorJson(request, env, 409, "already_reviewed", "This submission has already been reviewed.");
+}
+
+// Daily maintenance: IP hashes are only needed for the 24-hour rate limit, so they are
+// blanked after the retention period. Installation hashes stay because the app needs them
+// to look up the status of its own submissions.
+export async function runMaintenance(env: Env): Promise<void> {
+  await env.DB.prepare(
+    "UPDATE submissions SET ip_hash = '' WHERE ip_hash <> '' AND submitted_at < unixepoch() - ?"
+  ).bind(IP_HASH_RETENTION_SECONDS).run();
+
+  const missingKeys = await env.DB.prepare(
+    "SELECT id, quote_text AS quoteText FROM community_quotes WHERE normalized_text IS NULL LIMIT 500"
+  ).all<{ id: string; quoteText: string }>();
+  if (missingKeys.results.length > 0) {
+    await env.DB.batch(missingKeys.results.map(row =>
+      env.DB.prepare("UPDATE community_quotes SET normalized_text = ? WHERE id = ?")
+        .bind(quoteComparisonKey(row.quoteText), row.id)
+    ));
+  }
+}
+
+async function guarded(request: Request, env: Env, label: string, handler: () => Promise<Response>): Promise<Response> {
+  try {
+    return await handler();
+  } catch (error) {
+    console.error(label, error);
+    return errorJson(request, env, 500, "server_error", "Internal server error.");
+  }
 }
 
 export default {
@@ -341,12 +514,7 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === "/admin" || url.pathname.startsWith("/admin/")) {
-      try {
-        return await handleAdmin(request, env);
-      } catch (error) {
-        console.error("Admin request failed", error);
-        return json(request, env, { error: "Internal server error." }, 500);
-      }
+      return guarded(request, env, "Admin request failed", () => handleAdmin(request, env));
     }
 
     if (url.pathname === "/" && request.method === "GET") {
@@ -361,57 +529,41 @@ export default {
       return privacyPage();
     }
 
+    if (request.method === "OPTIONS" && url.pathname.startsWith("/api/submissions")) {
+      const headers = corsHeaders(request, env);
+      return Object.keys(headers).length > 0
+        ? new Response(null, { status: 204, headers })
+        : errorJson(request, env, 403, "forbidden", "Origin is not allowed.");
+    }
+
     if (url.pathname === "/api/community/quotes") {
-      if (request.method !== "GET") {
-        const response = json(request, env, { error: "Method not allowed." }, 405);
-        response.headers.set("Allow", "GET");
-        return response;
-      }
-      try {
-        return await communityUpdates(request, env);
-      } catch (error) {
-        console.error("Community update request failed", error);
-        return json(request, env, { error: "Internal server error." }, 500);
-      }
+      if (request.method !== "GET") return methodNotAllowed(request, env, "GET");
+      return guarded(request, env, "Community update request failed", () => communityUpdates(request, env));
     }
 
     const statusMatch = url.pathname.match(/^\/api\/submissions\/([0-9a-f-]+)\/status$/i);
     if (statusMatch) {
-      if (request.method !== "GET") {
-        const response = json(request, env, { error: "Method not allowed." }, 405);
-        response.headers.set("Allow", "GET");
-        return response;
-      }
-      try {
-        return await submissionStatus(request, env, statusMatch[1]);
-      } catch (error) {
-        console.error("Submission status request failed", error);
-        return json(request, env, { error: "Internal server error." }, 500);
-      }
+      if (request.method !== "GET") return methodNotAllowed(request, env, "GET");
+      return guarded(request, env, "Submission status request failed", () =>
+        submissionStatus(request, env, statusMatch[1]));
+    }
+
+    const submissionMatch = url.pathname.match(/^\/api\/submissions\/([0-9a-f-]+)$/i);
+    if (submissionMatch) {
+      if (request.method !== "DELETE") return methodNotAllowed(request, env, "DELETE, OPTIONS");
+      return guarded(request, env, "Submission withdrawal failed", () =>
+        withdrawSubmission(request, env, submissionMatch[1]));
     }
 
     if (url.pathname !== "/api/submissions") {
-      return json(request, env, { error: "Not found." }, 404);
+      return errorJson(request, env, 404, "not_found", "Not found.");
     }
 
-    if (request.method === "OPTIONS") {
-      const headers = corsHeaders(request, env);
-      return Object.keys(headers).length > 0
-        ? new Response(null, { status: 204, headers })
-        : json(request, env, { error: "Origin is not allowed." }, 403);
-    }
+    if (request.method !== "POST") return methodNotAllowed(request, env, "POST, OPTIONS");
+    return guarded(request, env, "Submission failed", () => submit(request, env));
+  },
 
-    if (request.method !== "POST") {
-      const response = json(request, env, { error: "Method not allowed." }, 405);
-      response.headers.set("Allow", "POST, OPTIONS");
-      return response;
-    }
-
-    try {
-      return await submit(request, env);
-    } catch (error) {
-      console.error("Submission failed", error);
-      return json(request, env, { error: "Internal server error." }, 500);
-    }
+  async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
+    await runMaintenance(env);
   }
 } satisfies ExportedHandler<Env>;

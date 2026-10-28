@@ -9,6 +9,9 @@
     "ACCESS_TEAM_DOMAIN": "brokoli5191.cloudflareaccess.com",
     "ACCESS_AUD": "037d592a09bd6cb8936ecccfc59398c77450f4281505d878af5d1bbdb2f5b81c"
   },
+  "triggers": {
+    "crons": ["17 3 * * *"]
+  },
   "routes": [
     {
       "pattern": "quote.cowsay.win",

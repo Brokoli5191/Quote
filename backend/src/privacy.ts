@@ -23,17 +23,22 @@ export function privacyPage(): Response {
   <main>
     <div class="eyebrow">Quote community</div>
     <h1>Privacy & submission policy</h1>
-    <p class="date">Effective August 5, 2026</p>
+    <p class="date">Effective October 28, 2026</p>
     <section>
       <h2>What is sent</h2>
-      <p>Submitting a custom quote sends its text, author, category, tags, and app version to the Quote moderation service. Submission is optional; custom quotes remain local unless you choose Submit for review.</p>
-      <p>The app also sends a randomly generated installation identifier. The service stores salted hashes of that identifier and the request IP address for rate limiting and abuse prevention. It does not store the raw values in the moderation database.</p>
+      <p>Submitting a custom quote sends its text, author, category, tags, language (English or German), and app version to the Quote moderation service. Submission is optional; custom quotes remain local unless you choose Submit for review.</p>
+      <p>The app also sends a randomly generated installation identifier. The service stores salted hashes of that identifier and the request IP address for rate limiting and abuse prevention. It does not store the raw values in the moderation database. The installation identifier is also sent when the app checks the review status of your submissions or withdraws one.</p>
 
       <h2>How submissions are used</h2>
-      <p>Submissions enter a private review queue. A moderator may correct formatting, attribution, category, or tags before approval. Approved submissions become public community quotes and may be delivered to every Quote user. Rejected submissions are not published.</p>
+      <p>Submissions enter a private review queue. A moderator may correct formatting, attribution, category, tags, or language, and may add a translation into the other language before approval. Approved submissions become public community quotes and may be delivered to every Quote user. Rejected submissions are not published. A moderator may add a short note that the app shows to you with the review result.</p>
+      <p>You can withdraw a submission while it is still waiting for review. Withdrawing deletes it from the review queue.</p>
 
       <h2>Retention</h2>
-      <p>Submission records and moderation outcomes may be retained for duplicate detection, review history, and abuse prevention. Published quotes remain available until they are unpublished by a moderator.</p>
+      <p>The hashed IP address is only needed for the 24-hour submission limit. It is erased automatically from submissions older than 30 days. The hashed installation identifier is kept with each submission so that your app can keep checking its review status.</p>
+      <p>Submission records and moderation outcomes may be retained for duplicate detection, review history, and abuse prevention. When a moderator deletes a submission permanently, a one-way hash of its text is kept so that the same text is not accepted again. Published quotes remain available until they are unpublished by a moderator.</p>
+
+      <h2>Author pictures and descriptions</h2>
+      <p>To show pictures and short descriptions of quote authors, the app loads them directly from Wikipedia and Wikimedia Commons (operated by the Wikimedia Foundation). These requests do not go through the Quote service and contain no submission data, but Wikimedia receives your IP address and the name of the author being looked up, as with any visit to Wikipedia. Wikimedia's own privacy policy applies to those requests.</p>
 
       <h2>Your responsibility</h2>
       <p>Only submit material you have the right to share. Do not submit private information, harassment, unlawful content, or knowingly false attribution. Submission does not guarantee publication.</p>

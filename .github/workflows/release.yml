@@ -5,9 +5,10 @@ on:
   push:
     tags:
       - "v*"
+      - "[0-9]+.[0-9]+.[0-9]+"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-release:
@@ -55,18 +56,56 @@ jobs:
         run: ./gradlew :app:assembleRelease --no-daemon
 
       - name: Prepare release files
+        id: release_files
         shell: bash
         run: |
+          version="$(sed -n 's/^ *versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts)"
+          if [ -z "$version" ]; then
+            echo "versionName not found in app/build.gradle.kts"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
           mkdir -p release
           cp app/build/outputs/apk/release/app-release.apk \
-             release/quote-1.7.0.apk
-          sha256sum release/quote-1.7.0.apk \
-             > release/quote-1.7.0.apk.sha256
+             "release/quote-$version.apk"
+          sha256sum "release/quote-$version.apk" \
+             > "release/quote-$version.apk.sha256"
+          cp app/build/outputs/mapping/release/mapping.txt \
+             "release/quote-$version-mapping.txt"
 
       - name: Upload release APK
         uses: actions/upload-artifact@v4
         with:
-          name: quote-1.7.0
+          name: quote-${{ steps.release_files.outputs.version }}
           path: release/*
           if-no-files-found: error
           retention-days: 30
+
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.release_files.outputs.version }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if [ "${TAG#v}" != "$VERSION" ]; then
+            echo "Tag $TAG does not match versionName $VERSION"
+            exit 1
+          fi
+
+          notes="release-notes.md"
+          if [ -f ".github/release-notes/$VERSION.md" ]; then
+            cp ".github/release-notes/$VERSION.md" "$notes"
+          else
+            echo "## What's New in Quote $VERSION" > "$notes"
+          fi
+          printf '\n**SHA-256:** `%s`\n' "$(cut -d ' ' -f 1 "release/quote-$VERSION.apk.sha256")" >> "$notes"
+
+          gh release create "$TAG" \
+            "release/quote-$VERSION.apk" \
+            "release/quote-$VERSION.apk.sha256" \
+            --title "$VERSION" \
+            --notes-file "$notes" \
+            --verify-tag

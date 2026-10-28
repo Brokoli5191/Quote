@@ -40,10 +40,10 @@ export function dashboardPage(): Response {
     * { box-sizing: border-box; }
     html { background: var(--paper); }
     body { margin: 0; min-height: 100vh; background: var(--paper); color: var(--ink); font: 14px Arial, sans-serif; }
-    button, input, textarea { font: inherit; }
-    button, input, textarea, a { -webkit-tap-highlight-color: transparent; }
+    button, input, textarea, select { font: inherit; }
+    button, input, textarea, select, a { -webkit-tap-highlight-color: transparent; }
     button { color: inherit; cursor: pointer; }
-    button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     .mast { height: 66px; display: flex; align-items: center; justify-content: space-between; padding: 0 clamp(20px, 4vw, 64px); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--paper) 94%, transparent); backdrop-filter: blur(14px); }
     .brand { display: flex; align-items: center; gap: 11px; text-transform: uppercase; letter-spacing: .13em; font-size: 10px; font-weight: bold; }
     .brand-mark { font: 28px Georgia, serif; border-right: 1px solid var(--line); padding-right: 11px; }
@@ -80,6 +80,10 @@ export function dashboardPage(): Response {
     .copy { min-width: 0; }
     .copy q { display: block; font: 19px/1.4 Georgia, serif; quotes: none; }
     .copy small { display: block; margin-top: 10px; color: var(--accent); font-size: 13px; line-height: 1.35; font-weight: bold; }
+    .lang { display: inline-block; margin-right: 7px; padding: 1px 5px; border: 1px solid currentColor; font-size: 10px; letter-spacing: .08em; }
+    .more { width: 100%; min-height: 46px; margin-top: 14px; border: 1px solid var(--line); background: transparent; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: .06em; }
+    .more:hover { background: var(--soft); }
+    .translation { margin: 0 0 18px; color: var(--muted); font: 16px/1.4 Georgia, serif; overflow-wrap: anywhere; }
     .status-dot { width: 7px; height: 7px; margin-right: 6px; display: inline-block; border-radius: 50%; background: var(--accent); }
     .row.unpublished { background: color-mix(in srgb, var(--soft) 38%, transparent); }
     .review { min-width: 0; position: relative; display: flex; flex-direction: column; padding: 28px 30px; border-left: 1px solid var(--line); background: var(--panel-strong); }
@@ -110,7 +114,7 @@ export function dashboardPage(): Response {
     .editor-head h2 { margin: 5px 0 0; font: 30px Georgia, serif; letter-spacing: -.03em; }
     .editor-close { border: 0; background: transparent; font-size: 24px; }
     .editor-form label { display: grid; gap: 7px; color: var(--muted); font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: .1em; }
-    .editor-form input, .editor-form textarea { width: 100%; border: 1px solid var(--line); border-radius: 0; padding: 11px 12px; color: var(--ink); background: var(--paper); resize: vertical; text-transform: none; letter-spacing: normal; font-weight: normal; }
+    .editor-form input, .editor-form textarea, .editor-form select { width: 100%; border: 1px solid var(--line); border-radius: 0; padding: 11px 12px; color: var(--ink); background: var(--paper); resize: vertical; text-transform: none; letter-spacing: normal; font-weight: normal; }
     .dialog-actions { display: flex; justify-content: end; gap: 7px; padding-top: 5px; }
     .dialog-actions button { min-height: 44px; padding: 0 17px; border: 1px solid var(--line); background: transparent; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: .08em; }
     .dialog-actions .primary { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
@@ -181,6 +185,7 @@ export function dashboardPage(): Response {
       <div class="queue">
         <div class="head"><span id="heading">Pending</span><span id="results">Loading</span></div>
         <div class="list" id="list" aria-live="polite"></div>
+        <button class="more" id="more" type="button" hidden>Load more</button>
       </div>
       <aside class="review" id="review"><div class="empty review-empty">Select a quote to review.</div></aside>
     </section>
@@ -196,6 +201,9 @@ export function dashboardPage(): Response {
       <label>Author<input id="author" maxlength="100"></label>
       <label>Category<input id="category" maxlength="50" required></label>
       <label>Tags, comma-separated<input id="tags"></label>
+      <label>Language<select id="language"><option value="en">English</option><option value="de">German</option></select></label>
+      <label><span id="translationLabel">German translation, optional</span><textarea id="translation" rows="3" maxlength="500"></textarea></label>
+      <label>Note to submitter, shown in the app<textarea id="reviewNote" rows="2" maxlength="500"></textarea></label>
       <label>Private reviewer note<textarea id="note" rows="2" maxlength="500"></textarea></label>
       <div class="dialog-actions"><button type="button" id="cancel">Cancel</button><button class="primary" type="submit">Approve quote</button></div>
     </form>
@@ -207,6 +215,7 @@ export function dashboardPage(): Response {
     let counts = [];
     let selectedId = null;
     let query = '';
+    let nextCursor = null;
     const list = document.querySelector('#list');
     const notice = document.querySelector('#notice');
     const tabs = document.querySelector('#tabs');
@@ -215,6 +224,8 @@ export function dashboardPage(): Response {
     const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
     const parseTags = value => { try { const tags = JSON.parse(value || '[]'); return Array.isArray(tags) ? tags : []; } catch (error) { return []; } };
     const titleCase = value => value[0].toUpperCase() + value.slice(1);
+    const languageNames = { en: 'English', de: 'German' };
+    const otherLanguage = language => language === 'de' ? 'en' : 'de';
     const selected = () => current.find(item => item.id === selectedId);
 
     function showNotice(message, isError = false) {
@@ -223,16 +234,19 @@ export function dashboardPage(): Response {
       notice.hidden = !message;
     }
 
-    async function load(status = active) {
+    async function load(status = active, append = false) {
       active = status;
       showNotice('Loading submissions...');
-      list.innerHTML = '';
+      if (!append) list.innerHTML = '';
       try {
-        const response = await fetch('/admin/api/submissions?status=' + encodeURIComponent(status));
+        const cursor = append && nextCursor ? '&cursor=' + encodeURIComponent(nextCursor) : '';
+        const response = await fetch('/admin/api/submissions?status=' + encodeURIComponent(status) + cursor);
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Could not load submissions.');
-        current = data.submissions;
+        current = append ? current.concat(data.submissions) : data.submissions;
         counts = data.counts;
+        nextCursor = data.nextCursor || null;
+        document.querySelector('#more').hidden = !nextCursor;
         if (!current.some(item => item.id === selectedId)) selectedId = current[0]?.id ?? null;
         renderTabs();
         render();
@@ -254,14 +268,15 @@ export function dashboardPage(): Response {
     function render() {
       const visible = current.filter(item => (item.quoteText + ' ' + (item.author || '') + ' ' + item.category).toLowerCase().includes(query));
       document.querySelector('#heading').textContent = titleCase(active);
-      document.querySelector('#results').textContent = visible.length + ' quote' + (visible.length === 1 ? '' : 's');
+      document.querySelector('#results').textContent = visible.length + ' quote' + (visible.length === 1 ? '' : 's') + (nextCursor ? ' loaded' : '');
       if (!visible.length) {
         list.innerHTML = '<div class="empty">' + (query ? 'No quotes match your search.' : 'Nothing here. The queue is clear.') + '</div>';
       } else {
         list.innerHTML = visible.map((item, index) => {
           const unpublished = item.status === 'approved' && item.communityActive === 0;
           const state = unpublished ? '<span class="status-dot"></span>Unpublished · ' : '';
-          return '<button type="button" class="row ' + (item.id === selectedId ? 'active ' : '') + (unpublished ? 'unpublished' : '') + '" data-id="' + escapeHtml(item.id) + '"><span class="num">' + String(index + 1).padStart(2, '0') + '</span><span class="copy"><q>' + escapeHtml(item.quoteText) + '</q><small>' + state + escapeHtml(item.author || 'Unknown') + '</small></span><time>' + escapeHtml(formatDate(item.submittedAt)) + '</time><span>↗</span></button>';
+          const language = '<span class="lang">' + escapeHtml(String(item.language || 'en').toUpperCase()) + '</span>';
+          return '<button type="button" class="row ' + (item.id === selectedId ? 'active ' : '') + (unpublished ? 'unpublished' : '') + '" data-id="' + escapeHtml(item.id) + '"><span class="num">' + String(index + 1).padStart(2, '0') + '</span><span class="copy"><q>' + escapeHtml(item.quoteText) + '</q><small>' + language + state + escapeHtml(item.author || 'Unknown') + '</small></span><time>' + escapeHtml(formatDate(item.submittedAt)) + '</time><span>↗</span></button>';
         }).join('');
       }
       list.querySelectorAll('.row').forEach(button => button.onclick = () => { selectedId = button.dataset.id; render(); openReview(); });
@@ -280,7 +295,7 @@ export function dashboardPage(): Response {
       if (item.status === 'pending') actions = '<button class="danger" data-reject>Reject</button><button class="primary" data-approve>Review & approve ↗</button>';
       if (item.status === 'rejected') actions = '<button class="danger" data-delete>Delete permanently</button><button class="primary" data-approve>Review & approve</button>';
       if (item.status === 'approved' && item.communityQuoteId) actions = (item.communityActive ? '<button data-toggle>Unpublish</button>' : '<button class="danger" data-delete-community>Delete permanently</button><button data-toggle>Republish</button>') + '<button class="primary" data-edit>Edit quote</button>';
-      review.innerHTML = '<button class="close" type="button" aria-label="Close review">×</button><div class="review-top"><span>Selected quote</span><span>' + escapeHtml(formatDate(item.submittedAt)) + '</span></div><span class="mark">“</span><blockquote>' + escapeHtml(item.quoteText) + '</blockquote><div class="author"><span class="field-label">Author</span><strong>' + escapeHtml(item.author || 'Unknown') + '</strong></div><div class="details"><div class="detail"><span class="field-label">Category</span><span>' + escapeHtml(item.category) + '</span></div><div class="detail"><span class="field-label">Status</span><span>' + escapeHtml(publication) + '</span></div></div>' + (tags.length ? '<div><span class="field-label">Tags</span><div class="tags">' + tags.map(tag => '<span class="tag">#' + escapeHtml(tag) + '</span>').join('') + '</div></div>' : '') + '<p class="origin">Received through the app' + (item.appVersion ? ' · Version ' + escapeHtml(item.appVersion) : '') + '</p><div class="actions">' + actions + '</div>';
+      review.innerHTML = '<button class="close" type="button" aria-label="Close review">×</button><div class="review-top"><span>Selected quote</span><span>' + escapeHtml(formatDate(item.submittedAt)) + '</span></div><span class="mark">“</span><blockquote>' + escapeHtml(item.quoteText) + '</blockquote>' + (item.translation ? '<div class="author"><span class="field-label">' + escapeHtml(languageNames[otherLanguage(item.language)]) + ' translation</span><p class="translation">' + escapeHtml(item.translation) + '</p></div>' : '') + '<div class="author"><span class="field-label">Author</span><strong>' + escapeHtml(item.author || 'Unknown') + '</strong></div><div class="details"><div class="detail"><span class="field-label">Category</span><span>' + escapeHtml(item.category) + '</span></div><div class="detail"><span class="field-label">Status</span><span>' + escapeHtml(publication) + '</span></div><div class="detail"><span class="field-label">Language</span><span>' + escapeHtml(languageNames[item.language] || 'English') + '</span></div>' + (item.reviewNote ? '<div class="detail"><span class="field-label">Note to submitter</span><span>' + escapeHtml(item.reviewNote) + '</span></div>' : '') + '</div>' + (tags.length ? '<div><span class="field-label">Tags</span><div class="tags">' + tags.map(tag => '<span class="tag">#' + escapeHtml(tag) + '</span>').join('') + '</div></div>' : '') + '<p class="origin">Received through the app' + (item.appVersion ? ' · Version ' + escapeHtml(item.appVersion) : '') + '</p><div class="actions">' + actions + '</div>';
       review.querySelector('.close').onclick = closeReview;
       const approveButton = review.querySelector('[data-approve]');
       const rejectButton = review.querySelector('[data-reject]');
@@ -321,8 +336,17 @@ export function dashboardPage(): Response {
       document.querySelector('#author').value = item.author || '';
       document.querySelector('#category').value = item.category;
       document.querySelector('#tags').value = parseTags(item.tagsJson).join(', ');
+      document.querySelector('#language').value = item.language === 'de' ? 'de' : 'en';
+      document.querySelector('#translation').value = item.translation || '';
+      document.querySelector('#reviewNote').value = communityId ? (item.reviewNote || '') : '';
+      updateTranslationLabel();
       document.querySelector('#note').value = '';
       editor.showModal();
+    }
+
+    function updateTranslationLabel() {
+      const target = otherLanguage(document.querySelector('#language').value);
+      document.querySelector('#translationLabel').textContent = languageNames[target] + ' translation, optional';
     }
 
     function openEditor(id) {
@@ -346,8 +370,10 @@ export function dashboardPage(): Response {
 
     async function reject(id) {
       const item = current.find(value => value.id === id);
-      if (!item || !confirm('Reject this submission?')) return;
-      try { await moderate(id, 'reject', { quoteText:item.quoteText, author:item.author, category:item.category, tags:parseTags(item.tagsJson), note:'' }); }
+      if (!item) return;
+      const reason = prompt('Reject this submission? Optionally add a reason; it is shown to the submitter in the app.', '');
+      if (reason === null) return;
+      try { await moderate(id, 'reject', { quoteText:item.quoteText, author:item.author, category:item.category, tags:parseTags(item.tagsJson), note:'', reviewNote:reason }); }
       catch (error) { showNotice(error.message, true); }
     }
 
@@ -387,6 +413,8 @@ export function dashboardPage(): Response {
       } catch (error) { showNotice(error.message, true); }
     }
 
+    document.querySelector('#more').onclick = () => load(active, true);
+    document.querySelector('#language').onchange = updateTranslationLabel;
     document.querySelector('#search').oninput = event => { query = event.target.value.trim().toLowerCase(); render(); };
     document.querySelector('#backdrop').onclick = closeReview;
     document.querySelector('#cancel').onclick = () => editor.close();
@@ -403,6 +431,9 @@ export function dashboardPage(): Response {
         author: document.querySelector('#author').value,
         category: document.querySelector('#category').value,
         tags: document.querySelector('#tags').value.split(',').map(value => value.trim()).filter(Boolean),
+        language: document.querySelector('#language').value,
+        translation: document.querySelector('#translation').value,
+        reviewNote: document.querySelector('#reviewNote').value,
         note: document.querySelector('#note').value
       };
       try {

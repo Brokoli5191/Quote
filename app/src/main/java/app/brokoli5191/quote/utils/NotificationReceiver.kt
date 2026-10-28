@@ -7,12 +7,10 @@ import app.brokoli5191.quote.data.AppDatabase
 import app.brokoli5191.quote.data.QuoteRepository
 import app.brokoli5191.quote.data.QuoteSourceMode
 import app.brokoli5191.quote.data.QuoteLanguage
+import app.brokoli5191.quote.data.dailyDateKey
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 class NotificationReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -31,7 +29,7 @@ class NotificationReceiver : BroadcastReceiver() {
             try {
                 val db = AppDatabase.getInstance(context)
                 val repository = QuoteRepository(db.quoteDao(), app.brokoli5191.quote.data.InstallationSeed.get(context))
-                val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+                val todayStr = dailyDateKey()
                 val sourceMode = prefs.getString("quote_source_mode", QuoteSourceMode.ALL) ?: QuoteSourceMode.ALL
                 val language = prefs.getString("app_language", QuoteLanguage.ENGLISH) ?: QuoteLanguage.ENGLISH
                 val quote = repository.getDailyQuote(

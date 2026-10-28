@@ -25,12 +25,10 @@ import app.brokoli5191.quote.data.QuoteEntity
 import app.brokoli5191.quote.data.QuoteRepository
 import app.brokoli5191.quote.data.QuoteSourceMode
 import app.brokoli5191.quote.data.QuoteLanguage
+import app.brokoli5191.quote.data.dailyDateKey
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 class QuoteWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
@@ -65,7 +63,7 @@ class QuoteWidgetProvider : AppWidgetProvider() {
             AppDatabase.getInstance(context).quoteDao(),
             InstallationSeed.get(context)
         )
-        val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        val date = dailyDateKey()
         CoroutineScope(Dispatchers.Default).launch {
             try {
                 val prefs = context.getSharedPreferences("aura_prefs", Context.MODE_PRIVATE)

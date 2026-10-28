@@ -8,6 +8,9 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import app.brokoli5191.quote.BuildConfig
+import app.brokoli5191.quote.data.AppDatabase
+import app.brokoli5191.quote.data.AuthorInfo
+import app.brokoli5191.quote.data.AuthorRepository
 import app.brokoli5191.quote.data.QuoteEntity
 import app.brokoli5191.quote.data.QuoteRepository
 import app.brokoli5191.quote.data.QuoteSubmissionClient
@@ -18,9 +21,16 @@ import app.brokoli5191.quote.data.CommunitySyncManager
 import app.brokoli5191.quote.data.CategoryMapper
 import app.brokoli5191.quote.data.QuoteSourceMode
 import app.brokoli5191.quote.data.QuoteLanguage
+import app.brokoli5191.quote.data.SubmissionError
+import app.brokoli5191.quote.data.SubmissionStatusInfo
+import app.brokoli5191.quote.data.WithdrawResult
+import app.brokoli5191.quote.data.dailyDateKey
 import app.brokoli5191.quote.data.isAvailableIn
 import app.brokoli5191.quote.data.localized
 import app.brokoli5191.quote.data.matchesSourceMode
+import app.brokoli5191.quote.data.normalizedText
+import app.brokoli5191.quote.data.quoteMatchKey
+import app.brokoli5191.quote.data.submissionValidationError
 import app.brokoli5191.quote.utils.NotificationHelper
 import app.brokoli5191.quote.utils.NotificationScheduler
 import app.brokoli5191.quote.utils.CategoryQuoteVerifier
@@ -28,9 +38,13 @@ import app.brokoli5191.quote.utils.CategoryVerificationResult
 import app.brokoli5191.quote.utils.UpdateChecker
 import app.brokoli5191.quote.utils.UpdateStatus
 import app.brokoli5191.quote.utils.CommunitySyncWorker
+import android.os.SystemClock
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.util.*
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -40,8 +54,12 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
     private val prefs get() = app.getSharedPreferences("aura_prefs", Context.MODE_PRIVATE)
     private val submissionClient = QuoteSubmissionClient()
     private val communitySyncManager = CommunitySyncManager(app, repository)
+    private val authorRepository = AuthorRepository(app, AppDatabase.getInstance(app).authorInfoDao())
     private var communitySyncRunning = false
+    private var lastCommunitySyncAt = 0L
     private val updateCheckRunning = AtomicBoolean(false)
+    // Raw rows of recently deleted quotes, so Undo restores stored data and not a localized display copy.
+    private val recentlyDeleted = HashMap<Int, QuoteEntity>()
 
     private val _dailyQuote = MutableStateFlow<QuoteEntity?>(null)
     val dailyQuote: StateFlow<QuoteEntity?> = _dailyQuote.asStateFlow()
@@ -118,33 +136,48 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
     private val _submittingQuoteIds = MutableStateFlow<Set<Int>>(emptySet())
     val submittingQuoteIds: StateFlow<Set<Int>> = _submittingQuoteIds.asStateFlow()
 
+    private val _showOnboarding = MutableStateFlow(false)
+    val showOnboarding: StateFlow<Boolean> = _showOnboarding.asStateFlow()
+
+    private val _authorImagesEnabled = MutableStateFlow(true)
+    val authorImagesEnabled: StateFlow<Boolean> = _authorImagesEnabled.asStateFlow()
+
     private var lastLoadedDate = ""
     private var submissionStatusRefreshRunning = false
 
-    private val rawAllQuotes = repository.allQuotes
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
+    // Lists are filtered and localized on Dispatchers.Default. Room re-emits on every write to the
+    // quotes table, so identical results are dropped before the work is done again.
     val allQuotes: StateFlow<List<QuoteEntity>> = combine(
-        rawAllQuotes, appLanguage, showAnonymousQuotes
+        repository.allQuotes.distinctUntilChanged(), appLanguage, showAnonymousQuotes
     ) { quotes, language, showAnonymous ->
         quotes.asSequence()
             .filter { it.isAvailableIn(language) && (showAnonymous || !it.isAnonymous) }
             .map { it.localized(language) }
             .toList()
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val favorites: StateFlow<List<QuoteEntity>> = combine(
-        repository.favorites, appLanguage, showAnonymousQuotes
+        repository.favorites.distinctUntilChanged(), appLanguage, showAnonymousQuotes
     ) { quotes, language, showAnonymous ->
-        quotes.filter { it.isAvailableIn(language) && (showAnonymous || !it.isAnonymous) }
-            .map { it.localized(language) }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        // A favorited own quote and its favorited community copy are the same quote: keep the own one.
+        val linkedCopies = linkedCommunityCopies(quotes)
+        quotes.filter {
+            it.isAvailableIn(language) && (showAnonymous || !it.isAnonymous) && it.serverId !in linkedCopies
+        }.map { it.localized(language) }
+    }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // My Quotes always shows every own quote, whatever the app language.
     val userAdded: StateFlow<List<QuoteEntity>> = combine(
-        repository.userAdded, appLanguage
+        repository.userAdded.distinctUntilChanged(), appLanguage
     ) { quotes, language ->
-        quotes.filter { it.isAvailableIn(language) }.map { it.localized(language) }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        quotes.map { it.localized(language) }
+    }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val hasBackStack: StateFlow<Boolean> = combine(
         _showDevScreen, _showNewQuoteScreen, _selectedTab, _selectedCategories, _searchQuery
@@ -159,7 +192,9 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
         quoteSourceMode
     ) { quotes, query, categories, sourceMode ->
         var list = if ("Community" in categories || "Local" in categories) {
-            quotes
+            // Own quotes are listed here, so their published community copies would show twice.
+            val linkedCopies = linkedCommunityCopies(quotes)
+            if (linkedCopies.isEmpty()) quotes else quotes.filter { it.serverId !in linkedCopies }
         } else {
             quotes.filter { it.matchesSourceMode(sourceMode) }
         }
@@ -191,21 +226,42 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
         }
     }
         // Filter ~2500 rows off the main thread so search keystrokes don't jank.
-        .flowOn(kotlinx.coroutines.Dispatchers.Default)
+        .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
+        _showOnboarding.value = resolveOnboarding()
         loadThemeSettings()
         loadDailyQuote()
         syncCommunityQuotes()
         CommunitySyncWorker.schedule(app)
     }
 
+    // Must run before loadThemeSettings, which writes theme_mode on a fresh install.
+    private fun resolveOnboarding(): Boolean {
+        if (prefs.contains(KEY_ONBOARDING_COMPLETED)) return !prefs.getBoolean(KEY_ONBOARDING_COMPLETED, false)
+        val existingInstall = prefs.contains("database_json_seeded_v11") || prefs.contains("theme_mode")
+        prefs.edit().putBoolean(KEY_ONBOARDING_COMPLETED, existingInstall).apply()
+        return !existingInstall
+    }
+
+    fun completeOnboarding() {
+        _showOnboarding.value = false
+        prefs.edit().putBoolean(KEY_ONBOARDING_COMPLETED, true).apply()
+    }
+
+    fun resetOnboarding() {
+        _showOnboarding.value = true
+        prefs.edit().putBoolean(KEY_ONBOARDING_COMPLETED, false).apply()
+    }
+
     fun syncCommunityQuotes() {
         if (communitySyncRunning) return
         communitySyncRunning = true
+        lastCommunitySyncAt = SystemClock.elapsedRealtime()
         viewModelScope.launch {
             try {
+                // Also refreshes submission states and updates the widget when something changed.
                 communitySyncManager.sync()
                 loadDailyQuote()
             } finally {
@@ -215,30 +271,46 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
         }
     }
 
+    /**
+     * Call from the activity's ON_RESUME. Picks up a new day and, at most every 15 minutes,
+     * syncs community quotes and refreshes submission states.
+     */
+    fun onAppResumed() {
+        refreshDailyQuoteIfNeeded()
+        val now = SystemClock.elapsedRealtime()
+        if (lastCommunitySyncAt != 0L && now - lastCommunitySyncAt < RESUME_SYNC_INTERVAL_MS) return
+        syncCommunityQuotes()
+    }
+
     fun runVerification() {
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
             val result = CategoryQuoteVerifier.verify(repository)
             _verificationResult.value = result
         }
     }
 
     fun checkAndSeedDatabase() {
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            val isSeeded = prefs.getBoolean("database_json_seeded_v11", false)
+        viewModelScope.launch(Dispatchers.IO) {
+            val isSeeded = prefs.getBoolean(SEEDED_FLAG, false)
             val count = repository.getQuotesCount()
             if (!isSeeded || count < 30) {
-                // Favorite-preserving re-seed: keeps user-added quotes and restores
-                // favorites by (text, author) so the bigger DB costs no user data.
+                // Favorite-preserving re-seed: keeps user-added and community quotes and restores
+                // favorites by (text, author) so the new seed costs no user data.
                 repository.reseedPreservingFavorites(app)
-                prefs.edit().putBoolean("database_json_seeded_v11", true).apply()
+                prefs.edit().putBoolean(SEEDED_FLAG, true).apply()
                 loadDailyQuote()
             }
-            if (!prefs.getBoolean("stored_quote_text_repaired_v1", false)) {
-                repository.repairStoredText()
-                prefs.edit().putBoolean("stored_quote_text_repaired_v1", true).apply()
+            if (!prefs.getBoolean("stored_quote_text_repaired_v2", false)) {
+                // Earlier versions dropped inner closing quotation marks; the bundled rows were
+                // just re-seeded, so only own and community rows need the repair. Runs under the
+                // sync lock so it never interleaves with a sync writing the same rows.
+                CommunitySyncManager.mutex.withLock {
+                    repository.repairStoredText(setOf(QuoteOrigin.PERSONAL, QuoteOrigin.COMMUNITY))
+                }
+                prefs.edit().putBoolean("stored_quote_text_repaired_v2", true).apply()
                 loadDailyQuote()
             }
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+            withContext(Dispatchers.Main) {
                 checkForUpdatesIfNeeded()
             }
         }
@@ -275,6 +347,35 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
         _lowPerformanceMode.value = prefs.getBoolean("low_performance_mode", false)
         _blurNavigationSurfaces.value = prefs.getBoolean("blur_navigation_surfaces", false)
         _autoUpdateEnabled.value = prefs.getBoolean("auto_update_enabled", true)
+        _authorImagesEnabled.value = prefs.getBoolean(KEY_AUTHOR_IMAGES, true)
+    }
+
+    fun setAuthorImagesEnabled(enabled: Boolean) {
+        _authorImagesEnabled.value = enabled
+        prefs.edit().putBoolean(KEY_AUTHOR_IMAGES, enabled).apply()
+    }
+
+    /**
+     * Portrait, short description and Wikipedia link for [author] in [language], or null for
+     * unknown authors and names without a verified match. The image (and the runtime lookup for
+     * names outside the bundled map) is only used when author images are enabled.
+     */
+    suspend fun loadAuthorInfo(author: String, language: String = _appLanguage.value): AuthorInfo? =
+        authorRepository.authorInfo(author, language, _authorImagesEnabled.value)
+
+    private val authorInfoFlows = object : LinkedHashMap<String, StateFlow<AuthorInfo?>>(32, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, StateFlow<AuthorInfo?>>?): Boolean =
+            size > 100
+    }
+
+    /** [loadAuthorInfo] as a flow that follows the app language and the author-images setting. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun authorInfo(author: String): StateFlow<AuthorInfo?> = synchronized(authorInfoFlows) {
+        authorInfoFlows.getOrPut(author) {
+            combine(_appLanguage, _authorImagesEnabled) { language, images -> language to images }
+                .mapLatest { (language, images) -> authorRepository.authorInfo(author, language, images) }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+        }
     }
 
     fun setAutoUpdateEnabled(enabled: Boolean) {
@@ -284,7 +385,7 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
 
     fun checkForUpdatesIfNeeded() {
         if (!_autoUpdateEnabled.value) return
-        val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        val today = dailyDateKey()
         val lastCheck = prefs.getString("last_update_check_date", "") ?: ""
         if (lastCheck == today) return
         checkForUpdates()
@@ -293,7 +394,7 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
     fun checkForUpdates() {
         if (!updateCheckRunning.compareAndSet(false, true)) return
         _updateStatus.value = UpdateStatus.Checking
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
                 val release = UpdateChecker.checkLatestRelease()
                 if (release == null) {
@@ -309,7 +410,7 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
                 } else {
                     _updateStatus.value = UpdateStatus.UpToDate
                 }
-                val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+                val today = dailyDateKey()
                 prefs.edit().putString("last_update_check_date", today).apply()
             } finally {
                 updateCheckRunning.set(false)
@@ -323,7 +424,7 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
     }
 
     fun downloadUpdate(downloadUrl: String, version: String) {
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
             _updateStatus.value = UpdateStatus.Downloading(0)
             val path = UpdateChecker.downloadApk(app, downloadUrl, version) { progress ->
                 _updateStatus.value = UpdateStatus.Downloading(progress)
@@ -407,7 +508,7 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
     }
 
     fun loadDailyQuote() {
-        val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        val todayStr = dailyDateKey()
         lastLoadedDate = todayStr
         viewModelScope.launch {
             val quote = repository.getDailyQuote(
@@ -421,14 +522,14 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
     }
 
     fun refreshDailyQuoteIfNeeded() {
-        val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        val todayStr = dailyDateKey()
         if (lastLoadedDate != todayStr) {
             loadDailyQuote()
         }
     }
 
     fun cycleDailyQuote() {
-        val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        val todayStr = dailyDateKey()
         viewModelScope.launch {
             val quote = repository.cycleDailyQuote(
                 todayStr,
@@ -446,9 +547,9 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
     }
 
     fun triggerTestNotification() {
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
-                val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+                val todayStr = dailyDateKey()
                 val quote = repository.getDailyQuote(
                     todayStr,
                     _quoteSourceMode.value,
@@ -570,18 +671,92 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
         }
     }
 
+    /**
+     * Edits an own quote. Not allowed while a submission is pending (withdraw it first). A rejected
+     * or removed submission is cleared when the text or author changed, so the edited quote can be
+     * submitted again; the server identifies a submission by those two, so other edits keep the review.
+     */
+    fun updateUserQuote(
+        quote: QuoteEntity,
+        text: String,
+        author: String,
+        category: String,
+        tags: String,
+        onDone: (Boolean) -> Unit = {}
+    ) {
+        val normalizedText = text.trim()
+        val normalizedAuthor = author.trim()
+        val normalizedTags = tags.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+        if (normalizedText.length !in 3..500 || normalizedAuthor.length > 100 ||
+            normalizedTags.size > 8 || normalizedTags.any { it.length > 30 }
+        ) {
+            onDone(false)
+            return
+        }
+        viewModelScope.launch {
+            val raw = repository.getQuoteById(quote.id)
+            if (raw == null || !raw.isUserAdded || raw.submissionStatus == QuoteSubmissionStatus.PENDING) {
+                onDone(false)
+                return@launch
+            }
+            val updated = raw.copy(
+                text = normalizedText,
+                author = normalizedAuthor.ifBlank { "Unknown" },
+                category = category.takeIf { it in CategoryMapper.categories } ?: raw.category,
+                tags = normalizedTags.distinctBy { it.lowercase() }.joinToString(", ")
+            )
+            val resetSubmission = (raw.submissionStatus == QuoteSubmissionStatus.REJECTED ||
+                raw.submissionStatus == QuoteSubmissionStatus.REMOVED) &&
+                submissionContentKey(raw) != submissionContentKey(updated)
+            repository.insertQuote(
+                if (!resetSubmission) updated else updated.copy(
+                    submissionStatus = QuoteSubmissionStatus.NOT_SUBMITTED,
+                    submissionId = null,
+                    submittedAt = null,
+                    reviewNote = null,
+                    linkedServerId = null
+                )
+            )
+            onDone(true)
+        }
+    }
+
+    /**
+     * Deletes a quote. A pending submission is withdrawn on the server too, so a deleted quote
+     * is not published later. [restoreDeletedQuote] brings back the stored row.
+     */
     fun deleteQuote(id: Int) {
         viewModelScope.launch {
+            val raw = repository.getQuoteById(id) ?: return@launch
+            recentlyDeleted[id] = raw
             repository.deleteQuote(id)
+            val submissionId = raw.submissionId
+            if (raw.isUserAdded && raw.submissionStatus == QuoteSubmissionStatus.PENDING && submissionId != null) {
+                if (withdrawOnServer(submissionId) == null) {
+                    // Withdrawn: an Undo brings the quote back as not submitted.
+                    if (repository.getQuoteById(id) != null) {
+                        repository.clearSubmission(id)
+                    } else {
+                        recentlyDeleted[id]?.let { recentlyDeleted[id] = it.withoutSubmission() }
+                    }
+                }
+            }
         }
     }
 
     fun restoreDeletedQuote(quote: QuoteEntity) {
         viewModelScope.launch {
-            repository.insertQuote(quote)
+            val raw = recentlyDeleted.remove(quote.id)
+                ?: quote.copy(author = if (quote.isUserAdded && quote.author == "Unbekannt") "Unknown" else quote.author)
+            repository.insertQuote(raw)
         }
     }
 
+    /**
+     * Sends an own quote for review. [onError] receives a [SubmissionError] code, which the UI maps
+     * to localized text. Works for new, rejected and removed quotes; a retry of a submission the
+     * server already has (lost response, restored backup) recovers its id and state.
+     */
     fun submitQuoteForReview(
         quote: QuoteEntity,
         onSuccess: () -> Unit,
@@ -593,22 +768,112 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
         _submittingQuoteIds.value += quote.id
         viewModelScope.launch {
             try {
-                val installationId = prefs.getString("submission_installation_id", null)
-                    ?: UUID.randomUUID().toString().also {
-                        prefs.edit().putString("submission_installation_id", it).apply()
-                    }
-                when (val result = submissionClient.submit(quote, installationId, BuildConfig.VERSION_NAME)) {
+                // Always send the stored row, never a localized display copy.
+                val raw = repository.getQuoteById(quote.id) ?: return@launch
+                if (!raw.isUserAdded || raw.submissionStatus == QuoteSubmissionStatus.PENDING ||
+                    raw.submissionStatus == QuoteSubmissionStatus.APPROVED
+                ) return@launch
+                raw.submissionValidationError()?.let {
+                    onError(it)
+                    return@launch
+                }
+                when (val result = submissionClient.submit(raw, installationId(), BuildConfig.VERSION_NAME)) {
                     is QuoteSubmissionResult.Success -> {
-                        repository.markSubmissionPending(quote.id, result.submissionId)
-                        onSuccess()
+                        repository.markSubmitted(
+                            raw.id,
+                            result.submissionId,
+                            SubmissionStatusInfo(result.status, result.reviewNote, result.communityQuoteId)
+                        )
+                        if (result.duplicate && (
+                                result.status == QuoteSubmissionStatus.REJECTED ||
+                                    result.status == QuoteSubmissionStatus.REMOVED
+                                )
+                        ) {
+                            // The server already decided on this exact text and author; nothing new was sent.
+                            onError(SubmissionError.ALREADY_REVIEWED)
+                        } else {
+                            onSuccess()
+                        }
                     }
-                    is QuoteSubmissionResult.Error -> onError(result.message)
+                    is QuoteSubmissionResult.Error -> onError(result.code)
                 }
             } finally {
                 _submittingQuoteIds.value -= quote.id
             }
         }
     }
+
+    /** Submits a rejected or removed quote again (edit it first with [updateUserQuote] if the reviewer asked). */
+    fun resubmitQuote(
+        quote: QuoteEntity,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) = submitQuoteForReview(quote, onSuccess, onError)
+
+    /**
+     * Withdraws a pending submission; the quote stays in My Quotes as not submitted.
+     * [onError] receives a [SubmissionError] code ([SubmissionError.ALREADY_REVIEWED] when a
+     * moderator was faster; the state is refreshed then).
+     */
+    fun withdrawSubmission(
+        quote: QuoteEntity,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        if (quote.id in _submittingQuoteIds.value) return
+        _submittingQuoteIds.value += quote.id
+        viewModelScope.launch {
+            try {
+                val raw = repository.getQuoteById(quote.id) ?: return@launch
+                val submissionId = raw.submissionId
+                if (raw.submissionStatus != QuoteSubmissionStatus.PENDING || submissionId == null) {
+                    if (raw.submissionStatus == QuoteSubmissionStatus.NOT_SUBMITTED) onSuccess()
+                    else onError(SubmissionError.ALREADY_REVIEWED)
+                    return@launch
+                }
+                when (val error = withdrawOnServer(submissionId)) {
+                    null -> {
+                        repository.clearSubmission(raw.id)
+                        onSuccess()
+                    }
+                    else -> {
+                        if (error == SubmissionError.ALREADY_REVIEWED) communitySyncManager.refreshSubmissionStatuses()
+                        onError(error)
+                    }
+                }
+            } finally {
+                _submittingQuoteIds.value -= quote.id
+            }
+        }
+    }
+
+    // Returns null when the submission is gone from the server, else a SubmissionError code.
+    private suspend fun withdrawOnServer(submissionId: String): String? {
+        val installationIds = CommunitySyncManager.submissionInstallationIds(prefs)
+        for (installationId in installationIds) {
+            when (val result = submissionClient.withdraw(submissionId, installationId)) {
+                WithdrawResult.Success -> return null
+                WithdrawResult.NotFound -> continue
+                is WithdrawResult.Error -> return result.code
+            }
+        }
+        return null
+    }
+
+    // What the backend hashes to identify a submission: text and author, NFKC, lowercased, spacing collapsed.
+    private fun submissionContentKey(quote: QuoteEntity): String {
+        val stored = quote.normalizedText()
+        return listOf(stored.text, stored.author).joinToString("\n") {
+            java.text.Normalizer.normalize(it.trim().replace(Regex("\\s+"), " "), java.text.Normalizer.Form.NFKC)
+                .lowercase(Locale.US)
+        }
+    }
+
+    private fun installationId(): String =
+        prefs.getString(CommunitySyncManager.KEY_INSTALLATION_ID, null)
+            ?: UUID.randomUUID().toString().also {
+                prefs.edit().putString(CommunitySyncManager.KEY_INSTALLATION_ID, it).apply()
+            }
 
     fun refreshSubmissionStatuses() {
         if (submissionStatusRefreshRunning) return
@@ -647,7 +912,7 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
     }
 
     fun exportBackup(uri: android.net.Uri, onSuccess: () -> Unit, onError: (String) -> Unit) {
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
                 val backupItems = repository.getAllQuotesSync().filter { it.isUserAdded || it.isFavorite }
 
@@ -665,14 +930,27 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
                         put("savedDate", quote.savedDate ?: "")
                         put("language", quote.language)
                         put("textDe", quote.textDe ?: "")
+                        put("textEn", quote.textEn ?: "")
                         put("isAnonymous", quote.isAnonymous)
+                        put("origin", quote.origin)
+                        quote.serverId?.let { put("serverId", it) }
+                        if (quote.isUserAdded) {
+                            put("submissionStatus", quote.submissionStatus)
+                            quote.submissionId?.let { put("submissionId", it) }
+                            quote.submittedAt?.let { put("submittedAt", it) }
+                            quote.reviewNote?.let { put("reviewNote", it) }
+                            quote.linkedServerId?.let { put("linkedServerId", it) }
+                        }
                     })
                 }
 
                 val backup = org.json.JSONObject().apply {
-                    put("formatVersion", 2)
+                    put("formatVersion", 3)
                     put("exportedAt", System.currentTimeMillis())
                     put("settings", createSettingsBackup())
+                    // Lets a restored install keep tracking (and withdrawing) its earlier submissions.
+                    prefs.getString(CommunitySyncManager.KEY_INSTALLATION_ID, null)
+                        ?.let { put("submissionInstallationId", it) }
                     put("quotes", jsonArray)
                 }
 
@@ -682,12 +960,12 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
                     os.write(backup.toString(4).toByteArray(Charsets.UTF_8))
                 }
 
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                withContext(Dispatchers.Main) {
                     onSuccess()
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                withContext(Dispatchers.Main) {
                     onError(e.localizedMessage ?: "Unknown error")
                 }
             }
@@ -699,7 +977,7 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
         onSuccess: (insertedCustom: Int, updatedFavs: Int, settingsRestored: Boolean) -> Unit,
         onError: (String) -> Unit
     ) {
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
                 val content = app.contentResolver.openInputStream(uri)?.use { it.bufferedReader().readText() }
                     ?: throw Exception("Could not open file")
@@ -712,14 +990,24 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
                         ?: throw Exception("Backup does not contain a quotes list")
                     else -> throw Exception("Unknown backup format")
                 }
+                (backupRoot as? org.json.JSONObject)
+                    ?.optString("submissionInstallationId", "")
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let(::restoreInstallationId)
+
                 val dbQuotes = repository.getAllQuotesSync()
-                val existingCustomKeys = dbQuotes
+                val customByKey = dbQuotes
                     .filter { it.isUserAdded }
-                    .map { it.text.trim() to it.author.trim() }
-                    .toMutableSet()
+                    .associateByTo(HashMap()) { quoteMatchKey(it.text) to quoteMatchKey(it.author) }
+                val nonCustomByKey = dbQuotes
+                    .filter { !it.isUserAdded }
+                    .associateBy { quoteMatchKey(it.text) to quoteMatchKey(it.author) }
+                val byServerId = dbQuotes.filter { it.serverId != null }.associateBy { it.serverId }
 
                 var insertedCustom = 0
                 var updatedFavs = 0
+                // Community favorites whose quotes are not synced yet; favorited when the feed brings them.
+                val pendingFavorites = LinkedHashMap<String, String?>()
 
                 for (i in 0 until jsonArray.length()) {
                     val obj = jsonArray.getJSONObject(i)
@@ -727,11 +1015,13 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
                     val author = obj.getString("author")
                     val isFavorite = obj.optBoolean("isFavorite", false)
                     val isUserAdded = obj.optBoolean("isUserAdded", false)
+                    val key = quoteMatchKey(text) to quoteMatchKey(author)
 
                     if (isUserAdded) {
-                        val customKey = text.trim() to author.trim()
-                        if (existingCustomKeys.add(customKey)) {
-                            repository.insertQuote(QuoteEntity(
+                        val submission = backupSubmission(obj)
+                        val existing = customByKey[key]
+                        if (existing == null) {
+                            val imported = QuoteEntity(
                                 text = text,
                                 author = author,
                                 category = obj.optString("category", "Uncategorized")
@@ -744,34 +1034,87 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
                                 timestamp = obj.optLong("timestamp", System.currentTimeMillis()),
                                 aboutAuthor = obj.optString("aboutAuthor", ""),
                                 tags = obj.optString("tags", ""),
-                                savedDate = obj.optString("savedDate", null).let { if (it.isNullOrEmpty()) null else it },
+                                savedDate = obj.optString("savedDate", "").ifEmpty { null },
                                 language = obj.optString("language", QuoteLanguage.ENGLISH)
                                     .takeIf { it in setOf(QuoteLanguage.ENGLISH, QuoteLanguage.GERMAN) }
                                     ?: QuoteLanguage.ENGLISH,
                                 textDe = obj.optString("textDe", "").ifBlank { null },
-                                isAnonymous = obj.optBoolean("isAnonymous", false)
-                            ))
+                                textEn = obj.optString("textEn", "").ifBlank { null },
+                                isAnonymous = obj.optBoolean("isAnonymous", false),
+                                submissionStatus = submission?.status ?: QuoteSubmissionStatus.NOT_SUBMITTED,
+                                submissionId = submission?.let { obj.optString("submissionId") },
+                                submittedAt = submission?.let { obj.optLong("submittedAt", 0L).takeIf { it > 0L } },
+                                reviewNote = submission?.reviewNote,
+                                linkedServerId = submission?.communityQuoteId
+                            )
+                            val id = repository.insertQuote(imported).toInt()
+                            customByKey[key] = imported.copy(id = id)
                             insertedCustom++
+                        } else if (submission != null && existing.submissionId == null) {
+                            // The local copy lost its submission (e.g. re-created by hand): take it from the backup.
+                            repository.markSubmitted(existing.id, obj.optString("submissionId"), submission)
                         }
                     } else if (isFavorite) {
-                        val match = dbQuotes.find { it.text.trim() == text.trim() && it.author.trim() == author.trim() }
-                        if (match != null && !match.isFavorite) {
-                            repository.toggleFavorite(match.id, true)
+                        val serverId = obj.optString("serverId", "").takeIf { it.isNotBlank() }
+                        val savedDate = obj.optString("savedDate", "").ifEmpty { null }
+                        val match = serverId?.let(byServerId::get) ?: nonCustomByKey[key]
+                        if (match != null) {
+                            if (!match.isFavorite) {
+                                repository.setFavorite(match.id, savedDate)
+                                updatedFavs++
+                            }
+                        } else if (serverId != null) {
+                            pendingFavorites[serverId] = savedDate
                             updatedFavs++
                         }
                     }
                 }
+                communitySyncManager.rememberPendingFavorites(pendingFavorites)
 
                 val settingsRestored = settings?.let(::restoreSettingsBackup) ?: false
 
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                withContext(Dispatchers.Main) {
+                    if (insertedCustom > 0) refreshSubmissionStatuses()
                     onSuccess(insertedCustom, updatedFavs, settingsRestored)
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                withContext(Dispatchers.Main) {
                     onError(e.localizedMessage ?: "Unknown file format")
                 }
+            }
+        }
+    }
+
+    // Submission state of a backed-up own quote, or null when it was never submitted.
+    private fun backupSubmission(obj: org.json.JSONObject): SubmissionStatusInfo? {
+        val submissionId = obj.optString("submissionId", "").takeIf { it.isNotBlank() } ?: return null
+        val status = obj.optString("submissionStatus", "").takeIf {
+            it in setOf(
+                QuoteSubmissionStatus.PENDING,
+                QuoteSubmissionStatus.APPROVED,
+                QuoteSubmissionStatus.REJECTED,
+                QuoteSubmissionStatus.REMOVED
+            )
+        } ?: return null
+        if (submissionId.isBlank()) return null
+        return SubmissionStatusInfo(
+            status = status,
+            reviewNote = obj.optString("reviewNote", "").ifBlank { null },
+            communityQuoteId = obj.optString("linkedServerId", "").ifBlank { null }
+        )
+    }
+
+    // The backup's installation id becomes this device's id only if it has none yet; otherwise it is
+    // kept as an extra id so status checks and withdrawals still find the old submissions.
+    private fun restoreInstallationId(id: String) {
+        val uuid = runCatching { UUID.fromString(id) }.getOrNull()?.toString() ?: return
+        val current = prefs.getString(CommunitySyncManager.KEY_INSTALLATION_ID, null)
+        when {
+            current == null -> prefs.edit().putString(CommunitySyncManager.KEY_INSTALLATION_ID, uuid).apply()
+            !current.equals(uuid, ignoreCase = true) -> {
+                val extra = prefs.getStringSet(CommunitySyncManager.KEY_EXTRA_INSTALLATION_IDS, emptySet()).orEmpty()
+                prefs.edit().putStringSet(CommunitySyncManager.KEY_EXTRA_INSTALLATION_IDS, extra + uuid).apply()
             }
         }
     }
@@ -790,6 +1133,7 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
         put("lowPerformanceMode", _lowPerformanceMode.value)
         put("blurNavigationSurfaces", _blurNavigationSurfaces.value)
         put("autoUpdateEnabled", _autoUpdateEnabled.value)
+        put("authorImagesEnabled", _authorImagesEnabled.value)
     }
 
     private fun restoreSettingsBackup(settings: org.json.JSONObject): Boolean {
@@ -837,6 +1181,7 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
         restoreBoolean("lowPerformanceMode", "low_performance_mode")
         restoreBoolean("blurNavigationSurfaces", "blur_navigation_surfaces")
         restoreBoolean("autoUpdateEnabled", "auto_update_enabled")
+        restoreBoolean("authorImagesEnabled", KEY_AUTHOR_IMAGES)
 
         if (!restored) return false
         if (!editor.commit()) throw java.io.IOException("Could not save restored settings")
@@ -852,6 +1197,25 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
             component = ComponentName(app, "app.brokoli5191.quote.widget.QuoteWidgetProvider")
         })
         return true
+    }
+
+    // Server ids of community quotes that are the published copy of one of the user's own quotes.
+    private fun linkedCommunityCopies(quotes: List<QuoteEntity>): Set<String> =
+        quotes.mapNotNullTo(HashSet()) { quote -> quote.linkedServerId?.takeIf { quote.isUserAdded } }
+
+    private fun QuoteEntity.withoutSubmission(): QuoteEntity = copy(
+        submissionStatus = QuoteSubmissionStatus.NOT_SUBMITTED,
+        submissionId = null,
+        submittedAt = null,
+        reviewNote = null,
+        linkedServerId = null
+    )
+
+    private companion object {
+        const val SEEDED_FLAG = "database_json_seeded_v12"
+        const val KEY_ONBOARDING_COMPLETED = "onboarding_completed"
+        const val KEY_AUTHOR_IMAGES = "author_images_enabled"
+        const val RESUME_SYNC_INTERVAL_MS = 15L * 60 * 1000
     }
 }
 

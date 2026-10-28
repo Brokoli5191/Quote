@@ -1,7 +1,6 @@
 package app.brokoli5191.quote.ui.screens
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.background
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -18,14 +17,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.windowInsetsBottomHeight
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -49,20 +51,21 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.brokoli5191.quote.ui.QuoteViewModel
 import app.brokoli5191.quote.ui.categoryText
 import app.brokoli5191.quote.ui.uiText
+import app.brokoli5191.quote.ui.components.AuthorAvatar
 import app.brokoli5191.quote.ui.components.ExpressiveButton
 import app.brokoli5191.quote.ui.components.ExpressiveIconButton
 import app.brokoli5191.quote.ui.components.rememberExpressiveShape
@@ -72,13 +75,17 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private val customQuoteCategories = CategoryMapper.categories
+private val FormHorizontalPadding = 20.dp
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 fun NewQuoteScreen(
     viewModel: QuoteViewModel,
     onBack: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // Bottom space the form must keep clear: the keyboard, or whatever sits below it (the app's
+    // bottom bar plus the system navigation bar).
+    bottomInsets: WindowInsets = WindowInsets.ime.union(WindowInsets.navigationBars)
 ) {
     var text by rememberSaveable { mutableStateOf("") }
     var author by rememberSaveable { mutableStateOf("") }
@@ -107,7 +114,14 @@ fun NewQuoteScreen(
         color = MaterialTheme.colorScheme.background,
         contentColor = MaterialTheme.colorScheme.onBackground
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(
+                    bottomInsets.only(WindowInsetsSides.Bottom)
+                        .union(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
+                )
+        ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -122,7 +136,7 @@ fun NewQuoteScreen(
                     )
                 }
                 Spacer(Modifier.width(8.dp))
-                Column {
+                Column(Modifier.weight(1f)) {
                     Text(
                         text = uiText("New quote"),
                         style = MaterialTheme.typography.titleLarge,
@@ -140,7 +154,7 @@ fun NewQuoteScreen(
                 modifier = Modifier
                     .weight(1f)
                     .verticalScroll(formScrollState)
-                    .padding(horizontal = 20.dp),
+                    .padding(horizontal = FormHorizontalPadding),
                 verticalArrangement = Arrangement.spacedBy(18.dp)
             ) {
                 Box {
@@ -158,7 +172,10 @@ fun NewQuoteScreen(
                         isError = quoteInvalid,
                         supportingText = {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text(if (quoteInvalid) uiText("Enter at least 3 characters.") else "")
+                                Text(
+                                    text = if (quoteInvalid) uiText("Enter at least 3 characters.") else "",
+                                    modifier = Modifier.weight(1f).padding(end = 8.dp)
+                                )
                                 Text("${text.length}/500")
                             }
                         },
@@ -184,23 +201,13 @@ fun NewQuoteScreen(
                             .heightIn(min = 64.dp),
                         shape = RoundedCornerShape(16.dp)
                     )
-                    Box(
-                        modifier = Modifier
-                            .size(52.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primaryContainer),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = author.trim().firstOrNull()?.uppercase() ?: "?",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                lineHeight = 20.sp,
-                                platformStyle = PlatformTextStyle(includeFontPadding = false)
-                            ),
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                    val trimmedAuthor = author.trim()
+                    AuthorAvatar(
+                        name = trimmedAuthor,
+                        imageUrl = null,
+                        unknown = trimmedAuthor.isEmpty() || trimmedAuthor == "Unknown" || trimmedAuthor == "Unbekannt",
+                        size = 52.dp
+                    )
                 }
 
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -209,10 +216,25 @@ fun NewQuoteScreen(
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold
                     )
+                    // The chips scroll out to the screen edges instead of being cut off at the
+                    // form padding; the inner padding keeps the first and last chip aligned with it.
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
+                            .layout { measurable, constraints ->
+                                val bleed = FormHorizontalPadding.roundToPx()
+                                val placeable = measurable.measure(
+                                    constraints.copy(
+                                        minWidth = constraints.minWidth + bleed * 2,
+                                        maxWidth = constraints.maxWidth + bleed * 2
+                                    )
+                                )
+                                layout(placeable.width - bleed * 2, placeable.height) {
+                                    placeable.place(-bleed, 0)
+                                }
+                            }
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = FormHorizontalPadding),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         customQuoteCategories.forEach { categoryName ->
@@ -287,9 +309,14 @@ fun NewQuoteScreen(
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text(uiText("Add to My Quotes"), fontWeight = FontWeight.Bold)
+                    Text(
+                        uiText("Add to My Quotes"),
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2
+                    )
                 }
-                Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.ime))
+                Spacer(Modifier.height(8.dp))
             }
         }
     }
@@ -297,6 +324,8 @@ fun NewQuoteScreen(
     if (showDiscardDialog) {
         AlertDialog(
             onDismissRequest = { showDiscardDialog = false },
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 0.dp,
             title = { Text(uiText("Discard draft?")) },
             text = { Text(uiText("Your unsaved quote will be lost.")) },
             dismissButton = {

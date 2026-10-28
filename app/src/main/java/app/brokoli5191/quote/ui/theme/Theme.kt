@@ -2,6 +2,7 @@ package app.brokoli5191.quote.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -80,6 +81,85 @@ private data class QuadrupleColors(
     val onPrimaryContainer: androidx.compose.ui.graphics.Color
 )
 
+/**
+ * Tonal surface roles. Sheets use [containerLow], dialogs [containerHigh]; the rest follows Material 3.
+ */
+private data class SurfaceTones(
+    val background: androidx.compose.ui.graphics.Color,
+    val surface: androidx.compose.ui.graphics.Color,
+    val dim: androidx.compose.ui.graphics.Color,
+    val bright: androidx.compose.ui.graphics.Color,
+    val containerLowest: androidx.compose.ui.graphics.Color,
+    val containerLow: androidx.compose.ui.graphics.Color,
+    val container: androidx.compose.ui.graphics.Color,
+    val containerHigh: androidx.compose.ui.graphics.Color,
+    val containerHighest: androidx.compose.ui.graphics.Color
+)
+
+private val Black = androidx.compose.ui.graphics.Color(0xFF000000)
+private val White = androidx.compose.ui.graphics.Color(0xFFFFFFFF)
+
+/** Plain sRGB mix of [tint] over [base]; small ratios give accent-tinted neutrals. */
+private fun mixTone(
+    base: androidx.compose.ui.graphics.Color,
+    tint: androidx.compose.ui.graphics.Color,
+    ratio: Float
+): androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color(
+    red = base.red + (tint.red - base.red) * ratio,
+    green = base.green + (tint.green - base.green) * ratio,
+    blue = base.blue + (tint.blue - base.blue) * ratio,
+    alpha = 1f
+)
+
+// Dark accents are light pastels, so mixing them into black lifts the tone and adds a hint of hue.
+private fun darkSurfaces(accent: androidx.compose.ui.graphics.Color) = SurfaceTones(
+    background = mixTone(Black, accent, 0.080f),
+    surface = mixTone(Black, accent, 0.110f),
+    dim = mixTone(Black, accent, 0.080f),
+    bright = mixTone(Black, accent, 0.240f),
+    containerLowest = mixTone(Black, accent, 0.055f),
+    containerLow = mixTone(Black, accent, 0.100f),
+    container = mixTone(Black, accent, 0.130f),
+    containerHigh = mixTone(Black, accent, 0.170f),
+    containerHighest = mixTone(Black, accent, 0.210f)
+)
+
+// Background and surface stay pure black; containers are dark accent-tinted so sheets and dialogs stand out.
+private fun amoledSurfaces(accent: androidx.compose.ui.graphics.Color) = SurfaceTones(
+    background = Black,
+    surface = Black,
+    dim = Black,
+    bright = mixTone(Black, accent, 0.160f),
+    containerLowest = Black,
+    containerLow = mixTone(Black, accent, 0.060f),
+    container = mixTone(Black, accent, 0.090f),
+    containerHigh = mixTone(Black, accent, 0.120f),
+    containerHighest = mixTone(Black, accent, 0.160f)
+)
+
+// Light accents are dark, so mixing them into white lowers the tone step by step.
+private fun lightSurfaces(accent: androidx.compose.ui.graphics.Color) = SurfaceTones(
+    background = mixTone(White, accent, 0.035f),
+    surface = mixTone(White, accent, 0.065f),
+    dim = mixTone(White, accent, 0.170f),
+    bright = mixTone(White, accent, 0.020f),
+    containerLowest = White,
+    containerLow = mixTone(White, accent, 0.050f),
+    container = mixTone(White, accent, 0.080f),
+    containerHigh = mixTone(White, accent, 0.110f),
+    containerHighest = mixTone(White, accent, 0.140f)
+)
+
+private fun ColorScheme.withSurfaces(tones: SurfaceTones): ColorScheme = copy(
+    surfaceDim = tones.dim,
+    surfaceBright = tones.bright,
+    surfaceContainerLowest = tones.containerLowest,
+    surfaceContainerLow = tones.containerLow,
+    surfaceContainer = tones.container,
+    surfaceContainerHigh = tones.containerHigh,
+    surfaceContainerHighest = tones.containerHighest
+)
+
 @Composable
 fun MyApplicationTheme(
     themeMode: String = "DARK", // LIGHT, DARK, AMOLED, DYNAMIC
@@ -101,13 +181,6 @@ fun MyApplicationTheme(
         }
         useDark -> {
             val isAmoled = effectiveMode == "AMOLED"
-            val bg = if (isAmoled) androidx.compose.ui.graphics.Color(0xFF000000) else androidx.compose.ui.graphics.Color(0xFF141317)
-            val surf = if (isAmoled) androidx.compose.ui.graphics.Color(0xFF0B0B0C) else androidx.compose.ui.graphics.Color(0xFF1C1B1F)
-            val surfLowest = if (isAmoled) androidx.compose.ui.graphics.Color(0xFF000000) else androidx.compose.ui.graphics.Color(0xFF0F0E12)
-            val surfLow = if (isAmoled) androidx.compose.ui.graphics.Color(0xFF070708) else androidx.compose.ui.graphics.Color(0xFF19181C)
-            val surfContainer = if (isAmoled) androidx.compose.ui.graphics.Color(0xFF111112) else androidx.compose.ui.graphics.Color(0xFF201F23)
-            val surfHigh = if (isAmoled) androidx.compose.ui.graphics.Color(0xFF171719) else androidx.compose.ui.graphics.Color(0xFF2B292D)
-            val surfHighest = if (isAmoled) androidx.compose.ui.graphics.Color(0xFF1C1C1E) else androidx.compose.ui.graphics.Color(0xFF353438)
 
             val colors = when (themeAccent) {
                 "Amber" -> QuadrupleColors(PrimaryAmber, OnPrimaryAmber, PrimaryContainerAmber, OnPrimaryContainerAmber)
@@ -116,6 +189,7 @@ fun MyApplicationTheme(
                 "Rose" -> QuadrupleColors(PrimaryRose, OnPrimaryRose, PrimaryContainerRose, OnPrimaryContainerRose)
                 else -> QuadrupleColors(PrimaryViolet, OnPrimaryViolet, PrimaryContainerViolet, OnPrimaryContainerViolet) // Violet
             }
+            val surfaces = if (isAmoled) amoledSurfaces(colors.primary) else darkSurfaces(colors.primary)
 
             darkColorScheme(
                 primary = colors.primary,
@@ -128,27 +202,15 @@ fun MyApplicationTheme(
                 onSecondaryContainer = OnSecondaryContainerAmber,
                 tertiary = TertiaryGreen,
                 onTertiary = OnTertiaryGreen,
-                background = bg,
+                background = surfaces.background,
                 onBackground = OnSurfaceText,
-                surface = surf,
+                surface = surfaces.surface,
                 onSurface = OnSurfaceText,
-                surfaceVariant = surfHighest,
+                surfaceVariant = surfaces.containerHighest,
                 onSurfaceVariant = OnSurfaceVariantText
-            ).copy(
-                surfaceDim = bg,
-                surfaceBright = surfHighest,
-                surfaceContainerLowest = surfLowest,
-                surfaceContainerLow = surfLow,
-                surfaceContainer = surfContainer,
-                surfaceContainerHigh = surfHigh,
-                surfaceContainerHighest = surfHighest
-            )
+            ).withSurfaces(surfaces)
         }
         else -> { // LIGHT
-            val bg = androidx.compose.ui.graphics.Color(0xFFFBF8FD)
-            val surf = androidx.compose.ui.graphics.Color(0xFFF3EDF7)
-            val surfContainer = androidx.compose.ui.graphics.Color(0xFFECE6F0)
-            val surfHighest = androidx.compose.ui.graphics.Color(0xFFE6E0E9)
             val textLight = androidx.compose.ui.graphics.Color(0xFF1C1B1F)
             val textVariantLight = androidx.compose.ui.graphics.Color(0xFF49454F)
 
@@ -159,6 +221,7 @@ fun MyApplicationTheme(
                 "Rose" -> QuadrupleColors(androidx.compose.ui.graphics.Color(0xFF9D004B), androidx.compose.ui.graphics.Color(0xFFFFFFFF), androidx.compose.ui.graphics.Color(0xFFFFD9E2), androidx.compose.ui.graphics.Color(0xFF3E001A))
                 else -> QuadrupleColors(androidx.compose.ui.graphics.Color(0xFF6750A4), androidx.compose.ui.graphics.Color(0xFFFFFFFF), androidx.compose.ui.graphics.Color(0xFFEADDFF), androidx.compose.ui.graphics.Color(0xFF21005D)) // Violet
             }
+            val surfaces = lightSurfaces(colors.primary)
 
             lightColorScheme(
                 primary = colors.primary,
@@ -171,21 +234,13 @@ fun MyApplicationTheme(
                 onSecondaryContainer = androidx.compose.ui.graphics.Color(0xFF1D192B),
                 tertiary = androidx.compose.ui.graphics.Color(0xFF7D5260),
                 onTertiary = androidx.compose.ui.graphics.Color(0xFFFFFFFF),
-                background = bg,
+                background = surfaces.background,
                 onBackground = textLight,
-                surface = surf,
+                surface = surfaces.surface,
                 onSurface = textLight,
-                surfaceVariant = surfHighest,
+                surfaceVariant = surfaces.containerHighest,
                 onSurfaceVariant = textVariantLight
-            ).copy(
-                surfaceDim = androidx.compose.ui.graphics.Color(0xFFDED8E1),
-                surfaceBright = androidx.compose.ui.graphics.Color(0xFFFFF9FF),
-                surfaceContainerLowest = androidx.compose.ui.graphics.Color(0xFFFFFFFF),
-                surfaceContainerLow = androidx.compose.ui.graphics.Color(0xFFF7F2FA),
-                surfaceContainer = surfContainer,
-                surfaceContainerHigh = androidx.compose.ui.graphics.Color(0xFFEAE4ED),
-                surfaceContainerHighest = surfHighest
-            )
+            ).withSurfaces(surfaces)
         }
     }
 

@@ -13,8 +13,8 @@ android {
     applicationId = "app.brokoli5191.quote"
     minSdk = 24
     targetSdk = 36
-    versionCode = 15
-    versionName = "1.7.0"
+    versionCode = 16
+    versionName = "2.0.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -46,7 +46,8 @@ android {
   buildTypes {
     release {
       isCrunchPngs = false
-      isMinifyEnabled = false
+      isMinifyEnabled = true
+      isShrinkResources = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       val releaseSigning = signingConfigs.getByName("release")
       signingConfig = if (releaseSigning.storeFile?.exists() == true) {
@@ -82,6 +83,7 @@ dependencies {
   implementation(libs.androidx.lifecycle.runtime.ktx)
   implementation(libs.androidx.lifecycle.viewmodel.compose)
   implementation(libs.androidx.navigation.compose)
+  implementation(libs.androidx.profileinstaller)
   implementation(libs.androidx.room.ktx)
   implementation(libs.androidx.room.runtime)
   implementation(libs.coil.compose)

@@ -29,7 +29,8 @@ class QuoteRepositoryTest {
     @Test
     fun normalizeQuoteText_repairsMojibakeAndPreservesDialogue() {
         assertEquals(
-            "You’re dangerous,” he says. “Why?” “Because you make me believe in the impossible",
+            // The leading closer and the trailing opener are balanced instead of dropped.
+            "“You’re dangerous,” he says. “Why?” “Because you make me believe in the impossible”",
             normalizeQuoteText("Youâ€™re dangerous,â€� he says. â€œWhy?â€� â€œBecause you make me believe in the impossible")
         )
     }

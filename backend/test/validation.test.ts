@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { validateSubmission } from "../src/index";
 import { validateModeration } from "../src/admin";
+import {
+  cleanText,
+  ipRateLimitKey,
+  parseLanguage,
+  quoteComparisonKey,
+  readBodyWithLimit
+} from "../src/validation";
 
 const validSubmission = {
   quoteText: "The obstacle is the way.",
@@ -24,8 +31,31 @@ describe("validateSubmission", () => {
       value: {
         ...validSubmission,
         quoteText: "The obstacle is the way.",
-        tags: ["Wisdom"]
+        tags: ["Wisdom"],
+        language: "en"
       }
+    });
+  });
+
+  it("accepts a German submission and the text alias", () => {
+    const { quoteText, ...rest } = validSubmission;
+    const result = validateSubmission({ ...rest, text: quoteText, language: "DE" });
+    expect(result.ok && result.value.language).toBe("de");
+    expect(result.ok && result.value.quoteText).toBe(quoteText);
+  });
+
+  it("rejects unsupported languages", () => {
+    expect(validateSubmission({ ...validSubmission, language: "fr" })).toEqual({
+      ok: false,
+      message: "language must be en or de."
+    });
+  });
+
+  it("removes invisible characters before validating", () => {
+    const result = validateSubmission({ ...validSubmission, quoteText: "\u200B\u202Eab\u2066\uFEFF" });
+    expect(result).toEqual({
+      ok: false,
+      message: "quoteText must contain between 3 and 500 characters."
     });
   });
 
@@ -81,10 +111,157 @@ describe("validateModeration", () => {
     });
   });
 
+  it("reads language, translation and the submitter note", () => {
+    const result = validateModeration({
+      action: "approve",
+      quoteText: "Der Weg ist das Ziel.",
+      author: "",
+      category: "Wisdom",
+      tags: [],
+      language: "de",
+      translation: "  The journey is the reward. ",
+      reviewNote: ""
+    });
+    expect(result.ok && result.value).toMatchObject({
+      language: "de",
+      translation: "The journey is the reward.",
+      reviewNote: null
+    });
+  });
+
+  it("keeps omitted optional fields undefined", () => {
+    const result = validateModeration({
+      action: "approve",
+      quoteText: "Short and sweet.",
+      author: "",
+      category: "Wisdom",
+      tags: []
+    });
+    expect(result.ok && result.value.translation).toBeUndefined();
+    expect(result.ok && result.value.reviewNote).toBeUndefined();
+    expect(result.ok && result.value.language).toBeUndefined();
+  });
+
+  it("rejects a null body", () => {
+    expect(validateModeration(null)).toEqual({
+      ok: false,
+      message: "The request body must be a JSON object."
+    });
+  });
+
   it("rejects unsupported moderation actions", () => {
     expect(validateModeration({ action: "delete" })).toEqual({
       ok: false,
       message: "action must be approve or reject."
     });
+  });
+});
+
+describe("cleanText", () => {
+  it("strips zero-width and bidi control characters", () => {
+    const hidden = "\u200Bab\u200Cc\u200Dd\u200Ee\u200Ff\u202Ag\u202Bh\u202Ci\u202Dj\u202Ek"
+      + "\u2060l\u2061m\u2062n\u2063o\u2064p\u2066q\u2067r\u2068s\u2069t\uFEFFu";
+    expect(cleanText(hidden)).toBe("abcdefghijklmnopqrstu");
+  });
+
+  it("collapses whitespace and drops other control characters", () => {
+    expect(cleanText("  one\t\n two\u0000three\u0007 ")).toBe("one twothree");
+  });
+
+  it("returns an empty string for non-strings", () => {
+    expect(cleanText(42)).toBe("");
+    expect(cleanText(null)).toBe("");
+  });
+});
+
+describe("quoteComparisonKey", () => {
+  it("ignores case, punctuation, quotation marks and hidden characters", () => {
+    expect(quoteComparisonKey("\u201CThe obstacle is\u200B the way!\u201D"))
+      .toBe(quoteComparisonKey("the obstacle is the way"));
+  });
+
+  it("keeps letters from other scripts", () => {
+    expect(quoteComparisonKey("Größe zählt.")).toBe("größezählt");
+  });
+});
+
+describe("parseLanguage", () => {
+  it("treats missing values as undefined", () => {
+    expect(parseLanguage(undefined)).toEqual({ ok: true, value: undefined });
+    expect(parseLanguage(null)).toEqual({ ok: true, value: undefined });
+  });
+
+  it("accepts en and de in any case", () => {
+    expect(parseLanguage(" EN ")).toEqual({ ok: true, value: "en" });
+    expect(parseLanguage("de")).toEqual({ ok: true, value: "de" });
+  });
+
+  it("rejects other values", () => {
+    expect(parseLanguage("fr").ok).toBe(false);
+    expect(parseLanguage(1).ok).toBe(false);
+  });
+});
+
+describe("ipRateLimitKey", () => {
+  it("keeps IPv4 addresses", () => {
+    expect(ipRateLimitKey("203.0.113.7")).toBe("203.0.113.7");
+  });
+
+  it("buckets IPv6 addresses by their /64 prefix", () => {
+    const key = ipRateLimitKey("2001:db8:85a3:42:1:2:3:4");
+    expect(key).toBe("2001:db8:85a3:42::/64");
+    expect(ipRateLimitKey("2001:0DB8:85A3:0042:ffff::1")).toBe(key);
+  });
+
+  it("expands compressed IPv6 addresses", () => {
+    expect(ipRateLimitKey("2001:db8::1")).toBe("2001:db8:0:0::/64");
+    expect(ipRateLimitKey("::1")).toBe("0:0:0:0::/64");
+    expect(ipRateLimitKey("fe80::1%eth0")).toBe("fe80:0:0:0::/64");
+  });
+
+  it("maps IPv4-mapped IPv6 addresses back to IPv4", () => {
+    expect(ipRateLimitKey("::ffff:198.51.100.9")).toBe("198.51.100.9");
+  });
+
+  it("falls back to the raw value for invalid addresses", () => {
+    expect(ipRateLimitKey("1::2::3")).toBe("1::2::3");
+    expect(ipRateLimitKey("unknown")).toBe("unknown");
+  });
+});
+
+describe("readBodyWithLimit", () => {
+  function streamRequest(chunks: string[], headers: Record<string, string> = {}): Request {
+    const encoder = new TextEncoder();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
+        controller.close();
+      }
+    });
+    return new Request("https://example.com/api/submissions", {
+      method: "POST",
+      headers,
+      body,
+      duplex: "half"
+    } as RequestInit);
+  }
+
+  it("reads bodies within the limit", async () => {
+    expect(await readBodyWithLimit(streamRequest(["{\"a\":", "1}"]), 16)).toEqual({ ok: true, text: "{\"a\":1}" });
+  });
+
+  it("stops reading a stream without Content-Length once it exceeds the limit", async () => {
+    const result = await readBodyWithLimit(streamRequest(["x".repeat(10), "x".repeat(10)]), 16);
+    expect(result).toMatchObject({ ok: false, status: 413, code: "too_large" });
+  });
+
+  it("rejects a declared length above the limit", async () => {
+    const result = await readBodyWithLimit(streamRequest(["{}"], { "Content-Length": "999" }), 16);
+    expect(result).toMatchObject({ ok: false, status: 413 });
+  });
+
+  it("rejects a malformed Content-Length", async () => {
+    const request = { headers: new Headers({ "Content-Length": "abc" }), body: null } as unknown as Request;
+    expect(await readBodyWithLimit(request, 16)).toMatchObject({ ok: false, status: 400, code: "invalid_request" });
   });
 });

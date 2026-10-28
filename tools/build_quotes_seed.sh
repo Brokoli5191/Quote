@@ -4,7 +4,7 @@
 #
 # Rules shared with the standalone validator:
 # - English quotes only
-# - no quote longer than 90 characters
+# - no quote longer than 100 characters
 # - no more than five cleaned tags
 # - no duplicate quote text, even if punctuation/case/author differ
 # - locally sourced additions from tools/curated_quotes.json are merged in
