@@ -2,6 +2,11 @@ name: Build Android Release
 
 on:
   workflow_dispatch:
+    inputs:
+      publish:
+        description: "Create the GitHub release (tag = versionName) after building"
+        type: boolean
+        default: false
   push:
     tags:
       - "v*"
@@ -83,12 +88,12 @@ jobs:
           retention-days: 30
 
       - name: Publish GitHub release
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') || inputs.publish
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.release_files.outputs.version }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ github.ref_type == 'tag' && github.ref_name || steps.release_files.outputs.version }}
         run: |
           if [ "${TAG#v}" != "$VERSION" ]; then
             echo "Tag $TAG does not match versionName $VERSION"
@@ -108,4 +113,4 @@ jobs:
             "release/quote-$VERSION.apk.sha256" \
             --title "$VERSION" \
             --notes-file "$notes" \
-            --verify-tag
+            --target "$GITHUB_SHA"
