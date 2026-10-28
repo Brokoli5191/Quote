@@ -1,8 +1,6 @@
 package app.brokoli5191.quote.utils
 
-import android.content.ComponentName
 import android.content.Context
-import android.content.Intent
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -22,13 +20,9 @@ class CommunitySyncWorker(context: Context, params: WorkerParameters) : Coroutin
             AppDatabase.getInstance(applicationContext).quoteDao(),
             InstallationSeed.get(applicationContext)
         )
+        // Shares its lock with the in-app sync and updates the widget itself when quotes changed.
         val synced = CommunitySyncManager(applicationContext, repository).sync()
-        if (!synced) return Result.retry()
-
-        applicationContext.sendBroadcast(Intent("app.brokoli5191.quote.UPDATE_WIDGET").apply {
-            component = ComponentName(applicationContext, "app.brokoli5191.quote.widget.QuoteWidgetProvider")
-        })
-        return Result.success()
+        return if (synced) Result.success() else Result.retry()
     }
 
     companion object {

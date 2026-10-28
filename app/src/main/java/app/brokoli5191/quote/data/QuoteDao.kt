@@ -26,6 +26,39 @@ interface QuoteDao {
     @Query("SELECT * FROM quotes WHERE isUserAdded = 1 AND submissionStatus = 'pending' AND submissionId IS NOT NULL")
     suspend fun getPendingSubmittedQuotes(): List<QuoteEntity>
 
+    // Pending submissions, plus recently submitted ones whose state can still change on the server
+    // (a rejected quote approved later, an approved one unpublished or republished).
+    @Query(
+        "SELECT * FROM quotes WHERE isUserAdded = 1 AND submissionId IS NOT NULL AND (" +
+            "submissionStatus = 'pending' OR (submittedAt >= :since AND (" +
+            "submissionStatus IN ('rejected', 'removed') OR " +
+            "(submissionStatus = 'approved' AND linkedServerId IS NULL))))"
+    )
+    suspend fun getSubmissionsToRefresh(since: Long): List<QuoteEntity>
+
+    @Query("SELECT * FROM quotes WHERE isUserAdded = 1 AND submissionId IN (:submissionIds)")
+    suspend fun getPersonalQuotesBySubmissionIds(submissionIds: List<String>): List<QuoteEntity>
+
+    @Query("SELECT * FROM quotes WHERE isUserAdded = 1 AND linkedServerId IN (:serverIds)")
+    suspend fun getPersonalQuotesByLinkedServerIds(serverIds: List<String>): List<QuoteEntity>
+
+    @Query("SELECT * FROM quotes WHERE origin = 'community' AND isFavorite = 1 AND serverId IN (:serverIds)")
+    suspend fun getFavoriteCommunityQuotes(serverIds: List<String>): List<QuoteEntity>
+
+    @Query("SELECT COUNT(*) FROM quotes WHERE origin = 'community'")
+    suspend fun getCommunityQuotesCount(): Int
+
+    // Candidate ids for the daily quote, filtered in SQL so the whole table is not loaded.
+    // Mirrors matchesSourceMode, isAvailableIn and the anonymous filter.
+    @Query(
+        "SELECT id FROM quotes WHERE origin IN (:origins) " +
+            "AND (:showAnonymous = 1 OR isAnonymous = 0) " +
+            "AND ((:language = 'de' AND (language = 'de' OR (textDe IS NOT NULL AND trim(textDe) != ''))) " +
+            "OR (:language != 'de' AND (language != 'de' OR (textEn IS NOT NULL AND trim(textEn) != '')))) " +
+            "ORDER BY id"
+    )
+    suspend fun getDailyCandidateIds(origins: List<String>, language: String, showAnonymous: Boolean): List<Int>
+
     @Query("SELECT * FROM quotes WHERE category = :category ORDER BY timestamp DESC")
     fun getQuotesByCategory(category: String): Flow<List<QuoteEntity>>
 
@@ -47,11 +80,30 @@ interface QuoteDao {
     @Query("DELETE FROM quotes WHERE id = :id")
     suspend fun deleteQuoteById(id: Int)
 
+    // Swaps the bundled set in one transaction so an interrupted re-seed never leaves it half empty.
+    @Transaction
+    suspend fun replaceBundledQuotes(quotes: List<QuoteEntity>) {
+        deleteNonUserQuotes()
+        insertQuotes(quotes)
+    }
+
     @Query("UPDATE quotes SET submissionStatus = :status, submissionId = :submissionId, submittedAt = :submittedAt WHERE id = :id AND isUserAdded = 1")
     suspend fun updateSubmission(id: Int, status: String, submissionId: String?, submittedAt: Long?)
 
     @Query("UPDATE quotes SET submissionStatus = :status WHERE id = :id AND isUserAdded = 1")
     suspend fun updateSubmissionStatus(id: Int, status: String)
+
+    @Query(
+        "UPDATE quotes SET submissionStatus = :status, reviewNote = :reviewNote, linkedServerId = :linkedServerId " +
+            "WHERE id = :id AND isUserAdded = 1"
+    )
+    suspend fun updateSubmissionState(id: Int, status: String, reviewNote: String?, linkedServerId: String?)
+
+    @Query(
+        "UPDATE quotes SET submissionStatus = 'not_submitted', submissionId = NULL, submittedAt = NULL, " +
+            "reviewNote = NULL, linkedServerId = NULL WHERE id = :id AND isUserAdded = 1"
+    )
+    suspend fun clearSubmission(id: Int)
 
     @Query("DELETE FROM quotes WHERE origin = 'community' AND serverId IN (:serverIds)")
     suspend fun deleteCommunityQuotes(serverIds: List<String>)

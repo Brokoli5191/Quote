@@ -2,12 +2,28 @@ package app.brokoli5191.quote.data
 
 import android.content.Context
 import kotlinx.coroutines.flow.Flow
-import java.nio.charset.StandardCharsets
-import java.nio.charset.Charset
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
-private val WINDOWS_1252: Charset = Charset.forName("windows-1252")
-private val WHITESPACE_REGEX = Regex("\\s+")
-private val DIALOGUE_SPACING_REGEX = Regex("([.!?,”])(?=“)")
+/** Result of applying one community feed page. */
+data class CommunityApplyResult(
+    /** Favorited community quotes that were unpublished: serverId to savedDate. */
+    val removedFavorites: Map<String, String?>,
+    /** Server ids whose favorite was restored from [QuoteRepository.applyCommunityUpdates]'s input. */
+    val restoredFavorites: Set<String>,
+    val changed: Boolean
+)
+
+/** What the status endpoint reported for one submission. */
+data class SubmissionStatusInfo(
+    val status: String,
+    val reviewNote: String? = null,
+    val communityQuoteId: String? = null
+)
+
+/** Day key for daily selections. Fixed locale so the key never contains non-ASCII digits. */
+fun dailyDateKey(date: Date = Date()): String = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(date)
 
 class QuoteRepository(
     private val quoteDao: QuoteDao,
@@ -21,72 +37,72 @@ class QuoteRepository(
         return quoteDao.getQuotesCount()
     }
 
+    suspend fun getCommunityQuotesCount(): Int = quoteDao.getCommunityQuotesCount()
+
     suspend fun clearAllQuotes() {
         quoteDao.deleteAllQuotes()
     }
 
     suspend fun preseedDatabase(context: Context) {
         try {
-            val inputStream = context.resources.openRawResource(app.brokoli5191.quote.R.raw.quotes_seed)
-            val jsonString = inputStream.bufferedReader().use { it.readText() }
-            val jsonArray = org.json.JSONArray(jsonString)
-            val quoteEntities = mutableListOf<QuoteEntity>()
-            val germanTranslations = loadGermanTranslations(context)
-            
-            for (i in 0 until jsonArray.length()) {
-                val item = jsonArray.getJSONObject(i)
-                val quoteText = item.getString("quote")
-                val author = item.getString("author")
-                
-                val tagsArray = item.getJSONArray("tags")
-                val tagsList = mutableListOf<String>()
-                for (j in 0 until tagsArray.length()) {
-                    tagsList.add(tagsArray.getString(j))
-                }
-                
-                val category = CategoryMapper.map(tagsList, quoteText)
-                val cleanText = normalizeQuoteText(quoteText)
-                val cleanAuthor = normalizeAuthorName(author)
-                val tagsStr = tagsList.joinToString(", ")
-
-                quoteEntities.add(
-                    QuoteEntity(
-                        text = cleanText,
-                        author = cleanAuthor,
-                        category = category,
-                        aboutAuthor = "",
-                        tags = tagsStr,
-                        isFavorite = false,
-                        timestamp = System.currentTimeMillis(),
-                        textDe = germanTranslations[cleanText]
-                    )
-                )
-            }
-
-            val anonymousInput = context.resources.openRawResource(app.brokoli5191.quote.R.raw.anonymous_quotes)
-            val anonymousJson = org.json.JSONArray(anonymousInput.bufferedReader().use { it.readText() })
-            for (i in 0 until anonymousJson.length()) {
-                val item = anonymousJson.getJSONObject(i)
-                quoteEntities.add(
-                    QuoteEntity(
-                        text = normalizeQuoteText(item.getString("quote")),
-                        textDe = normalizeQuoteText(item.getString("quote_de")),
-                        author = "",
-                        category = "Reflections",
-                        tags = "reflection, anonymous, original",
-                        isAnonymous = true,
-                        timestamp = System.currentTimeMillis() + i
-                    )
-                )
-            }
-            
-
-            
-            // Highly optimized batch insert in a single transaction
-            quoteDao.insertQuotes(quoteEntities)
+            quoteDao.insertQuotes(loadBundledQuotes(context))
         } catch (e: Exception) {
             e.printStackTrace()
         }
+    }
+
+    private fun loadBundledQuotes(context: Context): List<QuoteEntity> {
+        val inputStream = context.resources.openRawResource(app.brokoli5191.quote.R.raw.quotes_seed)
+        val jsonString = inputStream.bufferedReader().use { it.readText() }
+        val jsonArray = org.json.JSONArray(jsonString)
+        val quoteEntities = mutableListOf<QuoteEntity>()
+        val germanTranslations = loadGermanTranslations(context)
+        val now = System.currentTimeMillis()
+
+        for (i in 0 until jsonArray.length()) {
+            val item = jsonArray.getJSONObject(i)
+            val quoteText = item.getString("quote")
+            val author = item.getString("author")
+
+            val tagsArray = item.getJSONArray("tags")
+            val tagsList = mutableListOf<String>()
+            for (j in 0 until tagsArray.length()) {
+                tagsList.add(tagsArray.getString(j))
+            }
+
+            val category = CategoryMapper.map(tagsList, quoteText)
+            val cleanText = normalizeQuoteText(quoteText)
+            quoteEntities.add(
+                QuoteEntity(
+                    text = cleanText,
+                    author = normalizeAuthorName(author),
+                    category = category,
+                    aboutAuthor = "",
+                    tags = tagsList.joinToString(", "),
+                    isFavorite = false,
+                    timestamp = now,
+                    textDe = germanTranslations[cleanText]
+                )
+            )
+        }
+
+        val anonymousInput = context.resources.openRawResource(app.brokoli5191.quote.R.raw.anonymous_quotes)
+        val anonymousJson = org.json.JSONArray(anonymousInput.bufferedReader().use { it.readText() })
+        for (i in 0 until anonymousJson.length()) {
+            val item = anonymousJson.getJSONObject(i)
+            quoteEntities.add(
+                QuoteEntity(
+                    text = normalizeQuoteText(item.getString("quote")),
+                    textDe = normalizeQuoteText(item.getString("quote_de")),
+                    author = "",
+                    category = "Reflections",
+                    tags = "reflection, anonymous, original",
+                    isAnonymous = true,
+                    timestamp = now + i
+                )
+            )
+        }
+        return quoteEntities
     }
 
     private fun loadGermanTranslations(context: Context): Map<String, String> {
@@ -101,25 +117,35 @@ class QuoteRepository(
     }
 
     /**
-     * Re-seeds the bundled quotes without destroying user data: user-added rows
-     * are left untouched, and favorites on seed rows are restored by matching
-     * (text, author) after re-insert (row ids change on re-seed).
+     * Re-seeds the bundled quotes without destroying user data: user-added and community rows
+     * are left untouched, favorites on seed rows are carried over by a loose (text, author) key
+     * before the single batch insert, and favorited quotes that left the seed are kept as they were.
      */
     suspend fun reseedPreservingFavorites(context: Context) {
-        val oldFavKeys = quoteDao.getAllQuotesSync()
-            .filter { it.isFavorite && !it.isUserAdded }
-            .map { normalizeQuoteText(it.text) to normalizeAuthorName(it.author) }
-            .toSet()
-        quoteDao.deleteNonUserQuotes()
-        preseedDatabase(context)
-        if (oldFavKeys.isNotEmpty()) {
-            val now = System.currentTimeMillis().toString()
-            quoteDao.getAllQuotesSync().forEach { q ->
-                if (!q.isUserAdded && (normalizeQuoteText(q.text) to normalizeAuthorName(q.author)) in oldFavKeys) {
-                    quoteDao.updateFavorite(q.id, true, now)
-                }
-            }
+        val oldFavorites = quoteDao.getAllQuotesSync()
+            .filter { it.isFavorite && !it.isUserAdded && it.origin != QuoteOrigin.COMMUNITY }
+        val byTextAndAuthor = oldFavorites.associateBy { quoteMatchKey(it.text) to quoteMatchKey(it.author) }
+        // Fallback for author names whose spelling was corrected in the new seed.
+        val byText = oldFavorites.groupBy { quoteMatchKey(it.text) }
+            .filterValues { it.size == 1 }
+            .mapValues { it.value.single() }
+        val fresh = try {
+            loadBundledQuotes(context)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return
         }
+        val matched = HashSet<Int>()
+        val seeded = fresh.map { quote ->
+            val textKey = quoteMatchKey(quote.text)
+            val favorite = (byTextAndAuthor[textKey to quoteMatchKey(quote.author)] ?: byText[textKey])
+                ?.takeIf { it.id !in matched }
+                ?: return@map quote
+            matched += favorite.id
+            quote.copy(isFavorite = true, savedDate = favorite.savedDate ?: System.currentTimeMillis().toString())
+        }
+        val keptFavorites = oldFavorites.filter { it.id !in matched }.map { it.copy(id = 0) }
+        quoteDao.replaceBundledQuotes(seeded + keptFavorites)
     }
 
     fun getQuotesByCategory(category: String): Flow<List<QuoteEntity>> {
@@ -139,12 +165,13 @@ class QuoteRepository(
         return quoteDao.insertQuote(quote.normalizedText())
     }
 
-    suspend fun repairStoredText() {
-        val repaired = quoteDao.getAllQuotesSync().mapNotNull { current ->
-            current.normalizedText().takeIf { normalized ->
-                normalized != current
+    /** Re-applies text normalization to stored rows; [onlyOrigins] limits it to some origins. */
+    suspend fun repairStoredText(onlyOrigins: Set<String>? = null) {
+        val repaired = quoteDao.getAllQuotesSync()
+            .filter { onlyOrigins == null || it.origin in onlyOrigins }
+            .mapNotNull { current ->
+                current.normalizedText().takeIf { normalized -> normalized != current }
             }
-        }
         if (repaired.isNotEmpty()) quoteDao.insertQuotes(repaired)
     }
 
@@ -154,6 +181,11 @@ class QuoteRepository(
 
     suspend fun getPendingSubmittedQuotes(): List<QuoteEntity> {
         return quoteDao.getPendingSubmittedQuotes()
+    }
+
+    /** Submissions whose server state should be polled: pending ones and recently reviewed ones. */
+    suspend fun getSubmissionsToRefresh(now: Long = System.currentTimeMillis()): List<QuoteEntity> {
+        return quoteDao.getSubmissionsToRefresh(now - SUBMISSION_REFRESH_WINDOW_MS)
     }
 
     suspend fun deleteQuote(id: Int) {
@@ -169,11 +201,35 @@ class QuoteRepository(
         )
     }
 
+    /** Stores a successful (or idempotently repeated) submission and the state the server reported. */
+    suspend fun markSubmitted(id: Int, submissionId: String, info: SubmissionStatusInfo) {
+        quoteDao.updateSubmission(id, info.status, submissionId, System.currentTimeMillis())
+        applySubmissionStatus(id, info)
+    }
+
     suspend fun updateSubmissionStatus(id: Int, status: String) {
         quoteDao.updateSubmissionStatus(id, status)
     }
 
-    suspend fun applyCommunityUpdates(quotes: List<QuoteEntity>, deletedIds: List<String>) {
+    suspend fun applySubmissionStatus(id: Int, info: SubmissionStatusInfo) {
+        val linked = info.communityQuoteId?.takeIf { info.status == QuoteSubmissionStatus.APPROVED }
+        quoteDao.updateSubmissionState(id, info.status, info.reviewNote?.takeIf { it.isNotBlank() }, linked)
+    }
+
+    suspend fun clearSubmission(id: Int) {
+        quoteDao.clearSubmission(id)
+    }
+
+    /**
+     * Applies one community feed page. Personal rows whose submission was published get linked to
+     * the community copy (status approved), unpublished links turn into "removed", and favorites
+     * survive an unpublish/republish through [restoreFavorites] / [CommunityApplyResult.removedFavorites].
+     */
+    suspend fun applyCommunityUpdates(
+        quotes: List<QuoteEntity>,
+        deletedIds: List<String>,
+        restoreFavorites: Map<String, String?> = emptyMap()
+    ): CommunityApplyResult {
         val normalizedQuotes = quotes.map { it.normalizedText() }
         val existingByServerId = normalizedQuotes
             .mapNotNull { it.serverId }
@@ -182,22 +238,83 @@ class QuoteRepository(
             .flatMap { quoteDao.getQuotesByServerIds(it) }
             .associateBy { it.serverId }
 
+        val restored = HashSet<String>()
         if (normalizedQuotes.isNotEmpty()) {
             quoteDao.insertQuotes(normalizedQuotes.map { incoming ->
                 val existing = incoming.serverId?.let(existingByServerId::get)
-                if (existing == null) incoming else incoming.copy(
-                    id = existing.id,
-                    isFavorite = existing.isFavorite,
-                    savedDate = existing.savedDate,
-                    timestamp = existing.timestamp
-                )
+                when {
+                    existing != null -> incoming.copy(
+                        id = existing.id,
+                        isFavorite = existing.isFavorite,
+                        savedDate = existing.savedDate,
+                        timestamp = existing.timestamp
+                    )
+                    incoming.serverId != null && restoreFavorites.containsKey(incoming.serverId) -> {
+                        restored += incoming.serverId
+                        incoming.copy(
+                            isFavorite = true,
+                            savedDate = restoreFavorites[incoming.serverId] ?: System.currentTimeMillis().toString()
+                        )
+                    }
+                    else -> incoming
+                }
             })
         }
-        if (deletedIds.isNotEmpty()) quoteDao.deleteCommunityQuotes(deletedIds)
+
+        // Link the submitter's personal row to its published copy.
+        val bySubmissionId = normalizedQuotes
+            .filter { !it.submissionId.isNullOrBlank() && it.serverId != null }
+            .associate { it.submissionId!! to it.serverId!! }
+        if (bySubmissionId.isNotEmpty()) {
+            bySubmissionId.keys.chunked(400)
+                .flatMap { quoteDao.getPersonalQuotesBySubmissionIds(it) }
+                .forEach { personal ->
+                    val serverId = bySubmissionId[personal.submissionId] ?: return@forEach
+                    if (personal.linkedServerId != serverId ||
+                        personal.submissionStatus != QuoteSubmissionStatus.APPROVED
+                    ) {
+                        quoteDao.updateSubmissionState(
+                            personal.id,
+                            QuoteSubmissionStatus.APPROVED,
+                            personal.reviewNote,
+                            serverId
+                        )
+                    }
+                }
+        }
+
+        val removedFavorites = HashMap<String, String?>()
+        if (deletedIds.isNotEmpty()) {
+            deletedIds.chunked(400).forEach { chunk ->
+                quoteDao.getFavoriteCommunityQuotes(chunk).forEach { removedFavorites[it.serverId!!] = it.savedDate }
+                quoteDao.getPersonalQuotesByLinkedServerIds(chunk).forEach { personal ->
+                    quoteDao.updateSubmissionState(
+                        personal.id,
+                        QuoteSubmissionStatus.REMOVED,
+                        personal.reviewNote,
+                        null
+                    )
+                }
+                quoteDao.deleteCommunityQuotes(chunk)
+            }
+        }
+        return CommunityApplyResult(
+            removedFavorites = removedFavorites,
+            restoredFavorites = restored,
+            changed = normalizedQuotes.isNotEmpty() || deletedIds.isNotEmpty()
+        )
     }
 
     // Daily quote selector
     suspend fun getDailyQuote(
+        date: String,
+        sourceMode: String = QuoteSourceMode.ALL,
+        language: String = QuoteLanguage.ENGLISH,
+        showAnonymous: Boolean = false
+    ): QuoteEntity? = getDailyQuoteRaw(date, sourceMode, language, showAnonymous)?.localized(language)
+
+    /** Same as [getDailyQuote] but returns the stored row, not a localized display copy. */
+    suspend fun getDailyQuoteRaw(
         date: String,
         sourceMode: String = QuoteSourceMode.ALL,
         language: String = QuoteLanguage.ENGLISH,
@@ -209,29 +326,27 @@ class QuoteRepository(
         if (selection != null) {
             val q = quoteDao.getQuoteById(selection.quoteId)
             if (q != null && q.matchesSourceMode(sourceMode) && q.isAvailableIn(language) && (showAnonymous || !q.isAnonymous)) {
-                return q.localized(language)
+                return q
             }
         }
 
         // Otherwise select a random quote
-        val all = quoteDao.getAllQuotesSync().filter {
-            it.matchesSourceMode(sourceMode) && it.isAvailableIn(language) && (showAnonymous || !it.isAnonymous)
-        }
+        val all = candidateIds(sourceMode, language, showAnonymous)
         if (all.isEmpty()) {
             return null
         }
 
         // Exclude previously used daily quotes to avoid repeats
-        val usedIds = quoteDao.getAllDailySelectionIds().toSet()
-        val available = all.filter { it.id !in usedIds }
+        val usedIds = quoteDao.getAllDailySelectionIds().toHashSet()
+        val available = all.filter { it !in usedIds }
         val pool = if (available.isEmpty()) all else available
 
-        val selectedIdx = dailyQuoteIndex(installationSeed, date, pool.size)
-        val selectedQuote = pool[selectedIdx]
+        val selectedId = pool[dailyQuoteIndex(installationSeed, date, pool.size)]
+        val selectedQuote = quoteDao.getQuoteById(selectedId) ?: return null
 
         // Save selection for today
         quoteDao.insertDailySelection(DailySelectionEntity(selectionKey, selectedQuote.id))
-        return selectedQuote.localized(language)
+        return selectedQuote
     }
 
     suspend fun cycleDailyQuote(
@@ -241,9 +356,7 @@ class QuoteRepository(
         showAnonymous: Boolean = false
     ): QuoteEntity? {
         val selectionKey = "${date}_${language}_${if (showAnonymous) 1 else 0}_${sourceMode}"
-        val all = quoteDao.getAllQuotesSync().filter {
-            it.matchesSourceMode(sourceMode) && it.isAvailableIn(language) && (showAnonymous || !it.isAnonymous)
-        }
+        val all = candidateIds(sourceMode, language, showAnonymous)
         if (all.isEmpty()) {
             return null
         }
@@ -252,83 +365,31 @@ class QuoteRepository(
         val currentQuoteId = selection?.quoteId ?: -1
 
         // Filter out the current one so it rotates to another
-        val choices = all.filter { it.id != currentQuoteId }
+        val choices = all.filter { it != currentQuoteId }
         val finalChoices = if (choices.isEmpty()) all else choices
 
-        // Choose a random quote from finalChoices
-        val nextQuote = finalChoices.shuffled().first()
+        val nextQuote = quoteDao.getQuoteById(finalChoices.random()) ?: return null
 
         quoteDao.insertDailySelection(DailySelectionEntity(selectionKey, nextQuote.id))
         return nextQuote.localized(language)
     }
 
+    private suspend fun candidateIds(sourceMode: String, language: String, showAnonymous: Boolean): List<Int> {
+        val origins = when (sourceMode) {
+            QuoteSourceMode.CURATED -> listOf(QuoteOrigin.BUNDLED)
+            QuoteSourceMode.COMMUNITY -> listOf(QuoteOrigin.COMMUNITY)
+            else -> listOf(QuoteOrigin.BUNDLED, QuoteOrigin.COMMUNITY)
+        }
+        return quoteDao.getDailyCandidateIds(origins, language, showAnonymous)
+    }
+
+    companion object {
+        /** How long rejected/removed/unlinked approved submissions keep being polled. */
+        const val SUBMISSION_REFRESH_WINDOW_MS = 30L * 24 * 60 * 60 * 1000
+    }
 }
 
 internal fun dailyQuoteIndex(installationSeed: Long, date: String, poolSize: Int): Int {
     require(poolSize > 0)
     return kotlin.random.Random(installationSeed xor date.hashCode().toLong()).nextInt(poolSize)
 }
-
-internal fun normalizeAuthorName(value: String): String {
-    var author = value.replace("\"", "").replace("“", "").replace("”", "").trim()
-    author = when (author) {
-        "Ø£Ø­ÙØ§Ù… Ù…Ø³ØªØºØ§Ù†Ù…ÙŠ" -> "Ahlam Mosteghanemi"
-        "Ø£Ø­Ù…Ø¯ Ø®Ø§ÙØ¯ ØªÙˆÙ�ÙŠÙ‚" -> "Ahmed Khaled Towfik"
-        else -> author
-    }
-    author = repairMojibake(author)
-    return author
-        .replace('\uFFFD'.toString(), "")
-        .replace('\u00A0', ' ')
-        .trim()
-        .trimEnd(',')
-        .trim()
-}
-
-internal fun normalizeQuoteText(value: String): String = repairMojibake(value)
-    .replace('\uFFFD'.toString(), "")
-    .replace('\u00A0', ' ')
-    .replace(WHITESPACE_REGEX, " ")
-    .replace(DIALOGUE_SPACING_REGEX, "$1 ")
-    .trim()
-    .trim('"', '“', '”', '„')
-    .trim()
-
-private fun repairMojibake(value: String): String {
-    if ("Ø£Ø¬" in value && "Ø­Ø¨" in value) {
-        return "أجمل حب هو الذي نعثر عليه أثناء بحثنا عن شيء آخر"
-    }
-    var repaired = value
-    repeat(2) {
-        repaired = replaceCommonMojibake(repaired)
-        if (repaired.none(::isMojibakeMarker)) return repaired
-
-        val decoded = String(
-            repaired.toByteArray(WINDOWS_1252),
-            StandardCharsets.UTF_8
-        )
-        if ('\uFFFD' in decoded || mojibakeScore(decoded) >= mojibakeScore(repaired)) return repaired
-        repaired = decoded
-    }
-    return replaceCommonMojibake(repaired)
-}
-
-private fun replaceCommonMojibake(value: String): String = value
-    .replace("â€™", "’").replace("â€˜", "‘")
-    .replace("â€œ", "“").replace("â€�", "”")
-    .replace("â€“", "–").replace("â€”", "—")
-    .replace("â€¦", "…").replace("â€²", "′")
-    .replace("â€\"", "—")
-    .replace("â€", "—")
-    .replace("Â\u00A0", " ")
-    .replace("Â ", " ")
-
-private fun isMojibakeMarker(char: Char): Boolean =
-    char == 'Ã' || char == 'Â' || char == 'â' || char == 'Ø' || char == 'Ù'
-
-private fun mojibakeScore(value: String): Int = value.count(::isMojibakeMarker)
-
-private fun QuoteEntity.normalizedText(): QuoteEntity = copy(
-    text = normalizeQuoteText(text),
-    author = normalizeAuthorName(author)
-)
