@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import { isProbablyEnglish, MAX_QUOTE_LENGTH, MAX_TAGS, quoteKey } from './quote_seed_rules.mjs';
 
 const seedPath = process.argv[2] || 'app/src/main/res/raw/quotes_seed.json';
+const translationsPath = process.argv[3] || 'app/src/main/res/raw/quotes_de.json';
 const quotes = JSON.parse(fs.readFileSync(seedPath, 'utf8'));
 const errors = [];
 const seen = new Map();
@@ -21,9 +22,24 @@ for (const [index, item] of quotes.entries()) {
   else seen.set(key, index + 1);
 }
 
+const translated = new Map();
+for (const [index, item] of JSON.parse(fs.readFileSync(translationsPath, 'utf8')).entries()) {
+  const label = `translation row ${index + 1}`;
+  if (!item.quote_de?.trim()) errors.push(`${label}: empty translation: ${item.quote}`);
+  if (translated.has(item.quote)) errors.push(`${label}: duplicate translation: ${item.quote}`);
+  translated.set(item.quote, item.quote_de);
+}
+const seedQuotes = new Set(quotes.map((item) => item.quote));
+for (const quote of translated.keys()) {
+  if (!seedQuotes.has(quote)) errors.push(`translation for unknown seed quote: ${quote}`);
+}
+for (const quote of seedQuotes) {
+  if (!translated.has(quote)) errors.push(`missing German translation: ${quote}`);
+}
+
 if (errors.length > 0) {
   console.error(errors.join('\n'));
   process.exit(1);
 }
 
-console.log(`Validated ${quotes.length} quotes: English-only, unique, <= ${MAX_TAGS} tags.`);
+console.log(`Validated ${quotes.length} quotes: English-only, unique, <= ${MAX_TAGS} tags, ${translated.size} German translations.`);
