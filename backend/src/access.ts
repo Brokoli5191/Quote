@@ -18,7 +18,11 @@ interface JwksResponse {
 
 type AccessJwk = JsonWebKey & { kid?: string };
 
-let cachedKeys: { expiresAt: number; keys: AccessJwk[] } | undefined;
+let cachedKeys: { expiresAt: number; fetchedAt: number; keys: AccessJwk[] } | undefined;
+
+// Minimum time between forced key refreshes, so tokens with made-up key IDs cannot
+// make the Worker fetch the key set on every request.
+const FORCED_REFRESH_INTERVAL_MS = 60 * 1000;
 
 function decodePart<T>(value: string): T {
   const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
@@ -32,14 +36,25 @@ function decodeBytes(value: string): Uint8Array {
   return Uint8Array.from(atob(padded), character => character.charCodeAt(0));
 }
 
-async function getKeys(teamDomain: string): Promise<AccessJwk[]> {
-  if (cachedKeys && cachedKeys.expiresAt > Date.now()) return cachedKeys.keys;
+async function getKeys(teamDomain: string, forceRefresh = false): Promise<AccessJwk[]> {
+  const now = Date.now();
+  if (cachedKeys && cachedKeys.expiresAt > now) {
+    if (!forceRefresh || now - cachedKeys.fetchedAt < FORCED_REFRESH_INTERVAL_MS) return cachedKeys.keys;
+  }
 
   const response = await fetch(`https://${teamDomain}/cdn-cgi/access/certs`);
   if (!response.ok) throw new Error("Could not load Cloudflare Access keys");
   const body = await response.json<JwksResponse>();
-  cachedKeys = { keys: body.keys, expiresAt: Date.now() + 60 * 60 * 1000 };
+  cachedKeys = { keys: body.keys, fetchedAt: now, expiresAt: now + 60 * 60 * 1000 };
   return body.keys;
+}
+
+// Cloudflare Access rotates its signing keys; a token signed with a key that is not in the
+// cached set triggers one refresh of the key set before it is rejected.
+async function findKey(teamDomain: string, kid: string): Promise<AccessJwk | undefined> {
+  const cached = (await getKeys(teamDomain)).find(key => key.kid === kid);
+  if (cached) return cached;
+  return (await getKeys(teamDomain, true)).find(key => key.kid === kid);
 }
 
 export async function verifyAccess(request: Request, env: Env): Promise<string | null> {
@@ -67,7 +82,7 @@ export async function verifyAccess(request: Request, env: Env): Promise<string |
       return null;
     }
 
-    const jwk = (await getKeys(env.ACCESS_TEAM_DOMAIN)).find(key => key.kid === header.kid);
+    const jwk = await findKey(env.ACCESS_TEAM_DOMAIN, header.kid);
     if (!jwk) return null;
     const key = await crypto.subtle.importKey(
       "jwk",
