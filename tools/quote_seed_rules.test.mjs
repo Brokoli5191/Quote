@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildSeed, cleanText, isProbablyEnglish, MAX_TAGS, pairQuoteMarks } from './quote_seed_rules.mjs';
+import {
+  authorKey, buildSeed, cleanAuthor, cleanText, isProbablyEnglish, MAX_TAGS, pairQuoteMarks,
+} from './quote_seed_rules.mjs';
 
 test('language check accepts short English quotes and rejects common non-English examples', () => {
   assert.equal(isProbablyEnglish('Stay hungry. Stay foolish.'), true);
@@ -79,4 +81,44 @@ test('cleanText repairs mojibake next to genuine quotation marks', () => {
     '“What day is it?” asked Pooh. “It’s today,” squeaked Piglet.',
   );
   assert.equal(cleanText('Café, naïve façade'), 'Café, naïve façade');
+});
+
+test('cleanAuthor maps misspelled and variant author names to one display name', () => {
+  for (const [raw, expected] of [
+    ['Confucious', 'Confucius'],
+    ['William Shakespear', 'William Shakespeare'],
+    ['Lewis Caroll', 'Lewis Carroll'],
+    ['Edgar Allen Poe', 'Edgar Allan Poe'],
+    ['Mother Theresa', 'Mother Teresa'],
+    ['Hemingway, Ernest', 'Ernest Hemingway'],
+    ['Tolstoy Leo', 'Leo Tolstoy'],
+    ['Oscar Wilde (attributed to)', 'Oscar Wilde'],
+    ['Herman Hesse', 'Hermann Hesse'],
+    ['Haruki Marukami', 'Haruki Murakami'],
+    ['haruki murakami', 'Haruki Murakami'],
+    ['Henry Ward Beecherr', 'Henry Ward Beecher'],
+    ['Cathy Guiswite', 'Cathy Guisewite'],
+    ['Winston S. Churchill', 'Winston Churchill'],
+    ['J.K. rowling', 'J.K. Rowling'],
+    ['J. K. Rowling', 'J.K. Rowling'],
+    ['J.K.Rowling', 'J.K. Rowling'],
+    ['JK Rowling', 'J.K. Rowling'],
+    ['e.e. cummings', 'E.E. Cummings'],
+    ['A. P. J. Abdul Kalam', 'A.P.J. Abdul Kalam'],
+    ['Martin Luther King, Jr.', 'Martin Luther King Jr.'],
+    ['Gabriel Garcia Marquez', 'Gabriel García Márquez'],
+  ]) assert.equal(cleanAuthor(raw), expected, raw);
+
+  for (const name of ['W. Somerset Maugham', 'Ursula K. Le Guin', 'C. JoyBell C.', 'Walter M. Miller Jr.', 'Alexandre Dumas']) {
+    assert.equal(cleanAuthor(name), name);
+  }
+  assert.equal(authorKey('Corrie Ten Boom'), authorKey('Corrie ten Boom'));
+  assert.equal(authorKey('Anais Nin'), authorKey('Anaïs Nin'));
+});
+
+test('seed builder stores the canonical author and drops tags that repeat it', () => {
+  const seed = buildSeed([
+    { quote: 'All the world’s a stage.', author: 'William Shakespear', tags: ['shakespeare', 'theatre'] },
+  ]);
+  assert.deepEqual(seed, [{ quote: 'All the world’s a stage.', author: 'William Shakespeare', tags: ['theatre'] }]);
 });

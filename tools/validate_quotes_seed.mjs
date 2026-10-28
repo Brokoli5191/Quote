@@ -1,11 +1,12 @@
 import fs from 'node:fs';
-import { isProbablyEnglish, MAX_QUOTE_LENGTH, MAX_TAGS, quoteKey } from './quote_seed_rules.mjs';
+import { authorKey, canonicalAuthor, isProbablyEnglish, MAX_QUOTE_LENGTH, MAX_TAGS, quoteKey } from './quote_seed_rules.mjs';
 
 const seedPath = process.argv[2] || 'app/src/main/res/raw/quotes_seed.json';
 const translationsPath = process.argv[3] || 'app/src/main/res/raw/quotes_de.json';
 const quotes = JSON.parse(fs.readFileSync(seedPath, 'utf8'));
 const errors = [];
 const seen = new Map();
+const authorSpellings = new Map();
 
 for (const [index, item] of quotes.entries()) {
   const label = `row ${index + 1}`;
@@ -16,6 +17,13 @@ for (const [index, item] of quotes.entries()) {
   if (!Array.isArray(item.tags)) errors.push(`${label}: tags must be an array`);
   if (Array.isArray(item.tags) && item.tags.length > MAX_TAGS) errors.push(`${label}: more than ${MAX_TAGS} tags`);
   if (Array.isArray(item.tags) && new Set(item.tags).size !== item.tags.length) errors.push(`${label}: duplicate tags`);
+
+  if (item.author && canonicalAuthor(item.author) !== item.author) {
+    errors.push(`${label}: author is not canonical: ${item.author} (expected ${canonicalAuthor(item.author)})`);
+  }
+  const spelling = authorSpellings.get(authorKey(item.author));
+  if (spelling && spelling !== item.author) errors.push(`${label}: author spelled differently elsewhere: ${item.author} / ${spelling}`);
+  else authorSpellings.set(authorKey(item.author), item.author);
 
   const key = quoteKey(item.quote);
   if (seen.has(key)) errors.push(`${label}: duplicate quote (first seen in row ${seen.get(key)}): ${item.quote}`);
@@ -42,4 +50,4 @@ if (errors.length > 0) {
   process.exit(1);
 }
 
-console.log(`Validated ${quotes.length} quotes: English-only, unique, <= ${MAX_TAGS} tags, ${translated.size} German translations.`);
+console.log(`Validated ${quotes.length} quotes by ${authorSpellings.size} authors: English-only, unique, canonical author names, <= ${MAX_TAGS} tags, ${translated.size} German translations.`);

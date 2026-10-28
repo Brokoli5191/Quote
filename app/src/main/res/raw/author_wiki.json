@@ -1,17 +1,17 @@
 {
- "A. P. J. Abdul Kalam": {
-  "de": "ehemaliger Präsident Indiens",
-  "dewiki": "A. P. J. Abdul Kalam",
-  "en": "President of India from 2002 to 2007",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6e/A._P._J._Abdul_Kalam.jpg/330px-A._P._J._Abdul_Kalam.jpg",
-  "title": "A. P. J. Abdul Kalam"
- },
  "A.A. Milne": {
   "de": "englischer Schriftsteller",
   "dewiki": "A. A. Milne",
   "en": "English writer (1882–1956)",
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e2/Milne-Shadowland-1922.jpg/330px-Milne-Shadowland-1922.jpg",
   "title": "A. A. Milne"
+ },
+ "A.P.J. Abdul Kalam": {
+  "de": "ehemaliger Präsident Indiens",
+  "dewiki": "A. P. J. Abdul Kalam",
+  "en": "President of India from 2002 to 2007",
+  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6e/A._P._J._Abdul_Kalam.jpg/330px-A._P._J._Abdul_Kalam.jpg",
+  "title": "A. P. J. Abdul Kalam"
  },
  "Abraham Lincoln": {
   "de": "16. Präsident der Vereinigten Staaten von 1861 bis 1865 (1809–1865)",
@@ -97,21 +97,14 @@
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f1/Nadar_-_Alexander_Dumas_p%C3%A8re_%281802-1870%29_-_Google_Art_Project_2.jpg/330px-Nadar_-_Alexander_Dumas_p%C3%A8re_%281802-1870%29_-_Google_Art_Project_2.jpg",
   "title": "Alexandre Dumas"
  },
- "Alexandre Dumas-fils": {
+ "Alexandre Dumas fils": {
   "de": "französischer Schriftsteller",
   "dewiki": "Alexandre Dumas der Jüngere",
   "en": "French writer and dramatist (1824–1895)",
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d1/Alexandre_Dumas_fils.jpg/330px-Alexandre_Dumas_fils.jpg",
   "title": "Alexandre Dumas fils"
  },
- "Alfred Lord Tennyson": {
-  "de": "britischer Dichter",
-  "dewiki": "Alfred Tennyson, 1. Baron Tennyson",
-  "en": "English poet (1809–1892)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Alfred%2C_Lord_Tennyson_by_Elliott_%26_Fry_-_Original.jpg/330px-Alfred%2C_Lord_Tennyson_by_Elliott_%26_Fry_-_Original.jpg",
-  "title": "Alfred, Lord Tennyson"
- },
- "Alfred Tennyson": {
+ "Alfred, Lord Tennyson": {
   "de": "britischer Dichter",
   "dewiki": "Alfred Tennyson, 1. Baron Tennyson",
   "en": "English poet (1809–1892)",
@@ -160,13 +153,6 @@
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/Amy_Bloom_at_the_English_Theatre_Berlin%2C_March_2015_%28crop%29.jpg/330px-Amy_Bloom_at_the_English_Theatre_Berlin%2C_March_2015_%28crop%29.jpg",
   "title": "Amy Bloom"
  },
- "Anais Nin": {
-  "de": "US-amerikanische Schriftstellerin",
-  "dewiki": "Anaïs Nin",
-  "en": "French-born American author (1903–1977)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6c/Anais_Nin.jpg/330px-Anais_Nin.jpg",
-  "title": "Anaïs Nin"
- },
  "Anaïs Nin": {
   "de": "US-amerikanische Schriftstellerin",
   "dewiki": "Anaïs Nin",
@@ -174,19 +160,19 @@
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6c/Anais_Nin.jpg/330px-Anais_Nin.jpg",
   "title": "Anaïs Nin"
  },
- "Andre Gide": {
-  "de": "französischer Schriftsteller; Literaturnobelpreisträger 1947 (1869–1951)",
-  "dewiki": "André Gide",
-  "en": "French author and Nobel laureate (1869–1951)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/42/Andr%C3%A9_Gide.jpg/330px-Andr%C3%A9_Gide.jpg",
-  "title": "André Gide"
- },
  "André Breton": {
   "de": "französischer Dichter und Schriftsteller (1896–1966)",
   "dewiki": "André Breton",
   "en": "French co-founder of Surrealism (1896–1966)",
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f2/Andr%C3%A9_Breton_-_photo_Henri_Manuel.jpg/330px-Andr%C3%A9_Breton_-_photo_Henri_Manuel.jpg",
   "title": "André Breton"
+ },
+ "André Gide": {
+  "de": "französischer Schriftsteller; Literaturnobelpreisträger 1947 (1869–1951)",
+  "dewiki": "André Gide",
+  "en": "French author and Nobel laureate (1869–1951)",
+  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/42/Andr%C3%A9_Gide.jpg/330px-Andr%C3%A9_Gide.jpg",
+  "title": "André Gide"
  },
  "Andy Warhol": {
   "de": "amerikanischer Grafiker, Künstler, Filmemacher und Verleger (1928–1987)",
@@ -202,7 +188,7 @@
   "image": null,
   "title": "Anita Desai"
  },
- "Anne Bronte": {
+ "Anne Brontë": {
   "de": "britische Schriftstellerin",
   "dewiki": "Anne Brontë",
   "en": "English novelist and poet (1820–1849)",
@@ -286,19 +272,19 @@
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bd/Arthur_Conan_Doyle_by_Walter_Benington%2C_1914.png/330px-Arthur_Conan_Doyle_by_Walter_Benington%2C_1914.png",
   "title": "Arthur Conan Doyle"
  },
+ "Arthur O'Shaughnessy": {
+  "de": "britischer Poet",
+  "dewiki": "Arthur O’Shaughnessy",
+  "en": "British poet (1844–1881)",
+  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Arthur_O%27Shaughnessy_-_portrait_2.jpg/330px-Arthur_O%27Shaughnessy_-_portrait_2.jpg",
+  "title": "Arthur O'Shaughnessy"
+ },
  "Arthur Schopenhauer": {
   "de": "deutscher Philosoph",
   "dewiki": "Arthur Schopenhauer",
   "en": "German philosopher (1788–1860)",
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/Arthur_Schopenhauer_by_J_Sch%C3%A4fer%2C_1859b.jpg/330px-Arthur_Schopenhauer_by_J_Sch%C3%A4fer%2C_1859b.jpg",
   "title": "Arthur Schopenhauer"
- },
- "Arthur William Edgar O'Shaughnessy": {
-  "de": "britischer Poet",
-  "dewiki": "Arthur O’Shaughnessy",
-  "en": "British poet (1844–1881)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Arthur_O%27Shaughnessy_-_portrait_2.jpg/330px-Arthur_O%27Shaughnessy_-_portrait_2.jpg",
-  "title": "Arthur O'Shaughnessy"
  },
  "Arundhati Roy": {
   "de": "indische Schriftstellerin, politische Aktivistin und Globalisierungskritikerin",
@@ -496,13 +482,6 @@
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/Bruce_Lee_as_Chen_Zhen_%284x5_cropped%29.jpg/330px-Bruce_Lee_as_Chen_Zhen_%284x5_cropped%29.jpg",
   "title": "Bruce Lee"
  },
- "C. S. Lewis": {
-  "de": "irischer Schriftsteller und Literaturwissenschaftler (1898-1963)",
-  "dewiki": "C. S. Lewis",
-  "en": "British writer, lay theologian, and scholar (1898–1963)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/27/CS_Lewis_photo_on_dust_jacket.jpg/330px-CS_Lewis_photo_on_dust_jacket.jpg",
-  "title": "C. S. Lewis"
- },
  "C.E.M. Joad": {
   "de": null,
   "dewiki": null,
@@ -523,13 +502,6 @@
   "en": "American author, journalist, and producer",
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/Candace_Bushnell_at_September_2025_Downton_Abbey_The_Grand_Finale_Premiere_in_New_York_%28cropped%29.jpg/330px-Candace_Bushnell_at_September_2025_Downton_Abbey_The_Grand_Finale_Premiere_in_New_York_%28cropped%29.jpg",
   "title": "Candace Bushnell"
- },
- "Carl Gustav Jung": {
-  "de": "Begründer der analytischen Psychologie (1875–1961)",
-  "dewiki": "Carl Gustav Jung",
-  "en": "Swiss psychiatrist and psychotherapist (1875–1961)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/ETH-BIB-Jung%2C_Carl_Gustav_%281875-1961%29-Portrait-Portr_14163_%28cropped%29.tif/lossy-page1-330px-ETH-BIB-Jung%2C_Carl_Gustav_%281875-1961%29-Portrait-Portr_14163_%28cropped%29.tif.jpg",
-  "title": "Carl Jung"
  },
  "Carl Jung": {
   "de": "Begründer der analytischen Psychologie (1875–1961)",
@@ -559,7 +531,7 @@
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/Cassandra_Clare_by_Gage_Skidmore%2C_2013_b.jpg/330px-Cassandra_Clare_by_Gage_Skidmore%2C_2013_b.jpg",
   "title": "Cassandra Clare"
  },
- "Cathy Guiswite": {
+ "Cathy Guisewite": {
   "de": "US-amerikanische Comiczeichnerin",
   "dewiki": "Cathy Guisewite",
   "en": "American cartoonist (born 1950)",
@@ -628,13 +600,6 @@
   "en": "English actor and filmmaker (1889–1977)",
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/Charlie_Chaplin_portrait_Getty_1739411952.jpg/330px-Charlie_Chaplin_portrait_Getty_1739411952.jpg",
   "title": "Charlie Chaplin"
- },
- "Charlotte Bronte": {
-  "de": "britische Schriftstellerin",
-  "dewiki": "Charlotte Brontë",
-  "en": "English novelist and poet (1816–1855)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/Charlotte_Bront%C3%AB_by_Patrick_Branwell_Bront%C3%AB_restored.jpg/330px-Charlotte_Bront%C3%AB_by_Patrick_Branwell_Bront%C3%AB_restored.jpg",
-  "title": "Charlotte Brontë"
  },
  "Charlotte Brontë": {
   "de": "britische Schriftstellerin",
@@ -741,13 +706,6 @@
   "image": "https://upload.wikimedia.org/wikipedia/commons/f/fa/Colleen_Hoover_Video_Call.png",
   "title": "Colleen Hoover"
  },
- "Confucious": {
-  "de": "chinesischer Lehrer, Politiker und Philosoph",
-  "dewiki": "Konfuzius",
-  "en": "Chinese philosopher (c. 551 – c. 479 BCE)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Confucius%2C_fresco_from_a_Western_Han_tomb_of_Dongping_County%2C_Shandong_province%2C_China_%28cropped%29.jpg/330px-Confucius%2C_fresco_from_a_Western_Han_tomb_of_Dongping_County%2C_Shandong_province%2C_China_%28cropped%29.jpg",
-  "title": "Confucius"
- },
  "Confucius": {
   "de": "chinesischer Lehrer, Politiker und Philosoph",
   "dewiki": "Konfuzius",
@@ -768,13 +726,6 @@
   "en": "German author of children's fiction (born 1958)",
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/Cornelia_Funke%2C_Frankfurter_Buchmesse_2023.jpg/330px-Cornelia_Funke%2C_Frankfurter_Buchmesse_2023.jpg",
   "title": "Cornelia Funke"
- },
- "Corrie Ten Boom": {
-  "de": "niederländische Christin, Gerechte unter den Völkern",
-  "dewiki": "Corrie ten Boom",
-  "en": "Dutch resistance hero and writer",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/CorrieTenBoom.jpg/330px-CorrieTenBoom.jpg",
-  "title": "Corrie ten Boom"
  },
  "Corrie ten Boom": {
   "de": "niederländische Christin, Gerechte unter den Völkern",
@@ -881,7 +832,7 @@
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f4/David_Sedaris-4724.jpg/330px-David_Sedaris-4724.jpg",
   "title": "David Sedaris"
  },
- "Desiderius Erasmus Roterodamus": {
+ "Desiderius Erasmus": {
   "de": "niederländischer Humanist",
   "dewiki": "Erasmus von Rotterdam",
   "en": "Dutch philosopher and theologian (c. 1466–1536)",
@@ -937,13 +888,6 @@
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/18/Theodor_Seuss_Geisel_%2801037v%29.jpg/330px-Theodor_Seuss_Geisel_%2801037v%29.jpg",
   "title": "Dr. Seuss"
  },
- "E. E. Cummings": {
-  "de": "US-amerikanischer Dichter und Schriftsteller",
-  "dewiki": "E. E. Cummings",
-  "en": "American poet and author (1894–1962)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/E._E._Cummings_NYWTS.jpg/330px-E._E._Cummings_NYWTS.jpg",
-  "title": "E. E. Cummings"
- },
  "E.E. Cummings": {
   "de": "US-amerikanischer Dichter und Schriftsteller",
   "dewiki": "E. E. Cummings",
@@ -973,13 +917,6 @@
   "title": "Eckhart Tolle"
  },
  "Edgar Allan Poe": {
-  "de": "US-amerikanischer Schriftsteller",
-  "dewiki": "Edgar Allan Poe",
-  "en": "American writer and critic (1809–1849)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/Edgar_Allan_Poe%2C_circa_1849%2C_restored%2C_squared_off.jpg/330px-Edgar_Allan_Poe%2C_circa_1849%2C_restored%2C_squared_off.jpg",
-  "title": "Edgar Allan Poe"
- },
- "Edgar Allen Poe": {
   "de": "US-amerikanischer Schriftsteller",
   "dewiki": "Edgar Allan Poe",
   "en": "American writer and critic (1809–1849)",
@@ -1168,13 +1105,6 @@
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5c/Somer_Francis_Bacon.jpg/330px-Somer_Francis_Bacon.jpg",
   "title": "Francis Bacon"
  },
- "Francois Mauriac": {
-  "de": "französischer Schriftsteller",
-  "dewiki": "François Mauriac",
-  "en": "French author (1885–1970)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/99/Fran%C3%A7ois_Mauriac_redux.jpg/330px-Fran%C3%A7ois_Mauriac_redux.jpg",
-  "title": "François Mauriac"
- },
  "Frank Herbert": {
   "de": "US-amerikanischer Science-Fiction- und Fantasyautor",
   "dewiki": "Frank Herbert",
@@ -1209,6 +1139,13 @@
   "en": "Austrian and Czech writer (1883–1924)",
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/26/Franz_Kafka%2C_1923.jpg/330px-Franz_Kafka%2C_1923.jpg",
   "title": "Franz Kafka"
+ },
+ "François Mauriac": {
+  "de": "französischer Schriftsteller",
+  "dewiki": "François Mauriac",
+  "en": "French author (1885–1970)",
+  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/99/Fran%C3%A7ois_Mauriac_redux.jpg/330px-Fran%C3%A7ois_Mauriac_redux.jpg",
+  "title": "François Mauriac"
  },
  "François Rabelais": {
   "de": "französischer Prosa-Autor",
@@ -1259,13 +1196,6 @@
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c6/Anton_Graff_-_Friedrich_Schiller.jpg/330px-Anton_Graff_-_Friedrich_Schiller.jpg",
   "title": "Friedrich Schiller"
  },
- "Friedrich Wilhelm Nietzsche": {
-  "de": "deutscher Philosoph und klassischer Philologe (1844–1900)",
-  "dewiki": "Friedrich Nietzsche",
-  "en": "German philosopher (1844–1900)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Nietzsche187a.jpg/330px-Nietzsche187a.jpg",
-  "title": "Friedrich Nietzsche"
- },
  "Fyodor Dostoevsky": {
   "de": "russischer Schriftsteller des 19. Jahrhunderts",
   "dewiki": "Fjodor Michailowitsch Dostojewski",
@@ -1279,13 +1209,6 @@
   "en": "English author and Christian apologist (1874–1936)",
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/75/Gilbert_Chesterton.jpg/330px-Gilbert_Chesterton.jpg",
   "title": "G. K. Chesterton"
- },
- "Gabriel Garcia Marquez": {
-  "de": "kolumbianischer Schriftsteller, Journalist und Literaturnobelpreisträger (1927-2014)",
-  "dewiki": "Gabriel García Márquez",
-  "en": "Colombian writer and Nobel laureate (1927–2014)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Gabriel_Garcia_Marquez.jpg/330px-Gabriel_Garcia_Marquez.jpg",
-  "title": "Gabriel García Márquez"
  },
  "Gabriel García Márquez": {
   "de": "kolumbianischer Schriftsteller, Journalist und Literaturnobelpreisträger (1927-2014)",
@@ -1363,13 +1286,6 @@
   "en": "English author and journalist (1903–1950)",
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/George_Orwell_press_photo.jpg/330px-George_Orwell_press_photo.jpg",
   "title": "George Orwell"
- },
- "George R. R. Martin": {
-  "de": "US-amerikanischer Schriftsteller (Game of Thrones)",
-  "dewiki": "George R. R. Martin",
-  "en": "American writer and television producer (born 1948)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/George_R._R._Martin_%2854743316729%29_%28cropped%29.jpg/330px-George_R._R._Martin_%2854743316729%29_%28cropped%29.jpg",
-  "title": "George R. R. Martin"
  },
  "George R.R. Martin": {
   "de": "US-amerikanischer Schriftsteller (Game of Thrones)",
@@ -1483,13 +1399,6 @@
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/Photo_portrait_of_Harper_Lee_%28To_Kill_a_Mockingbird_dust_jacket%2C_1960%29.jpg/330px-Photo_portrait_of_Harper_Lee_%28To_Kill_a_Mockingbird_dust_jacket%2C_1960%29.jpg",
   "title": "Harper Lee"
  },
- "Haruki Marukami": {
-  "de": "japanischer Autor",
-  "dewiki": "Haruki Murakami",
-  "en": "Japanese writer (born 1949)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/51/Conversatorio_Haruki_Murakami_%2812_de_12%29_%2845747009452%29_%28cropped%29.jpg/330px-Conversatorio_Haruki_Murakami_%2812_de_12%29_%2845747009452%29_%28cropped%29.jpg",
-  "title": "Haruki Murakami"
- },
  "Haruki Murakami": {
   "de": "japanischer Autor",
   "dewiki": "Haruki Murakami",
@@ -1517,13 +1426,6 @@
   "en": "American deafblind author and activist (1880–1968)",
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Helen_Keller_%28circa_1904%29.jpg/330px-Helen_Keller_%28circa_1904%29.jpg",
   "title": "Helen Keller"
- },
- "Hemingway, Ernest": {
-  "de": "US-amerikanischer Schriftsteller, Reporter und Kriegsberichterstatter",
-  "dewiki": "Ernest Hemingway",
-  "en": "American author and journalist (1899–1961)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/28/ErnestHemingway.jpg/330px-ErnestHemingway.jpg",
-  "title": "Ernest Hemingway"
  },
  "Henrik Ibsen": {
   "de": "norwegischer Schriftsteller (1828–1906)",
@@ -1567,7 +1469,7 @@
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/Henry_Wadsworth_Longfellow%2C_photographed_by_Julia_Margaret_Cameron_in_1868.jpg/330px-Henry_Wadsworth_Longfellow%2C_photographed_by_Julia_Margaret_Cameron_in_1868.jpg",
   "title": "Henry Wadsworth Longfellow"
  },
- "Henry Ward Beecherr": {
+ "Henry Ward Beecher": {
   "de": "US-amerikanischer Prediger",
   "dewiki": "Henry Ward Beecher",
   "en": "American clergyman and abolitionist (1813–1887)",
@@ -1588,13 +1490,6 @@
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/President_Hoover_portrait.jpg/330px-President_Hoover_portrait.jpg",
   "title": "Herbert Hoover"
  },
- "Herman Hesse": {
-  "de": "deutsch-schweizerischer Schriftsteller und Literatur-Nobelpreisträger (1877-1962)",
-  "dewiki": "Hermann Hesse",
-  "en": "German writer (1877–1962)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/da/Hermann_Hesse_2.jpg/330px-Hermann_Hesse_2.jpg",
-  "title": "Hermann Hesse"
- },
  "Herman Melville": {
   "de": "US-amerikanischer Schriftsteller, Dichter und Essayist",
   "dewiki": "Herman Melville",
@@ -1608,13 +1503,6 @@
   "en": "German writer (1877–1962)",
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/da/Hermann_Hesse_2.jpg/330px-Hermann_Hesse_2.jpg",
   "title": "Hermann Hesse"
- },
- "Honore de Balzac": {
-  "de": "französischer Schriftsteller",
-  "dewiki": "Honoré de Balzac",
-  "en": "French novelist and playwright (1799–1850)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/%E5%A5%A5%C2%B7%E5%B7%B4%E5%B0%94%E6%89%8E%E5%85%8B.png/330px-%E5%A5%A5%C2%B7%E5%B7%B4%E5%B0%94%E6%89%8E%E5%85%8B.png",
-  "title": "Honoré de Balzac"
  },
  "Honoré de Balzac": {
   "de": "französischer Schriftsteller",
@@ -1693,27 +1581,6 @@
   "image": "https://upload.wikimedia.org/wikipedia/commons/9/97/Italo-Calvino.jpg",
   "title": "Italo Calvino"
  },
- "J. D. Salinger": {
-  "de": "US-amerikanischer Schriftsteller",
-  "dewiki": "J. D. Salinger",
-  "en": "American writer (1919–2010)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/93/J._D._Salinger_%28Catcher_in_the_Rye_portrait%29.jpg/330px-J._D._Salinger_%28Catcher_in_the_Rye_portrait%29.jpg",
-  "title": "J. D. Salinger"
- },
- "J. K. Rowling": {
-  "de": "britische Schriftstellerin, Autorin der Harry-Potter-Romane",
-  "dewiki": "Joanne K. Rowling",
-  "en": "British author (born 1965)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5d/J._K._Rowling_2010.jpg/330px-J._K._Rowling_2010.jpg",
-  "title": "J. K. Rowling"
- },
- "J. M. Barrie": {
-  "de": "britischer Schriftsteller und Dramatiker",
-  "dewiki": "J. M. Barrie",
-  "en": "Scottish novelist and playwright (1860–1937)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9c/James_Matthew_Barrie00.jpg/330px-James_Matthew_Barrie00.jpg",
-  "title": "J. M. Barrie"
- },
  "J.D. Salinger": {
   "de": "US-amerikanischer Schriftsteller",
   "dewiki": "J. D. Salinger",
@@ -1722,20 +1589,6 @@
   "title": "J. D. Salinger"
  },
  "J.K. Rowling": {
-  "de": "britische Schriftstellerin, Autorin der Harry-Potter-Romane",
-  "dewiki": "Joanne K. Rowling",
-  "en": "British author (born 1965)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5d/J._K._Rowling_2010.jpg/330px-J._K._Rowling_2010.jpg",
-  "title": "J. K. Rowling"
- },
- "J.K. rowling": {
-  "de": "britische Schriftstellerin, Autorin der Harry-Potter-Romane",
-  "dewiki": "Joanne K. Rowling",
-  "en": "British author (born 1965)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5d/J._K._Rowling_2010.jpg/330px-J._K._Rowling_2010.jpg",
-  "title": "J. K. Rowling"
- },
- "J.K.Rowling": {
   "de": "britische Schriftstellerin, Autorin der Harry-Potter-Romane",
   "dewiki": "Joanne K. Rowling",
   "en": "British author (born 1965)",
@@ -1755,13 +1608,6 @@
   "en": "English writer and philologist (1892–1973)",
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/J._R._R._Tolkien%2C_ca._1925.jpg/330px-J._R._R._Tolkien%2C_ca._1925.jpg",
   "title": "J. R. R. Tolkien"
- },
- "JK Rowling": {
-  "de": "britische Schriftstellerin, Autorin der Harry-Potter-Romane",
-  "dewiki": "Joanne K. Rowling",
-  "en": "British author (born 1965)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5d/J._K._Rowling_2010.jpg/330px-J._K._Rowling_2010.jpg",
-  "title": "J. K. Rowling"
  },
  "Jack Kerouac": {
   "de": "US-amerikanischer Schriftsteller und Beatnik",
@@ -2232,13 +2078,6 @@
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Kurt_Vonnegut_by_Bernard_Gotfryd_%281965%29.jpg/330px-Kurt_Vonnegut_by_Bernard_Gotfryd_%281965%29.jpg",
   "title": "Kurt Vonnegut"
  },
- "L. M. Montgomery": {
-  "de": "kanadische Schriftstellerin",
-  "dewiki": "Lucy Maud Montgomery",
-  "en": "Canadian novelist (1874–1942)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1d/LMM_signed_photo.jpg/330px-LMM_signed_photo.jpg",
-  "title": "Lucy Maud Montgomery"
- },
  "L.M. Montgomery": {
   "de": "kanadische Schriftstellerin",
   "dewiki": "Lucy Maud Montgomery",
@@ -2252,13 +2091,6 @@
   "en": "American writer and social activist (1901–1967)",
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/08/Langston_Hughes_by_Carl_Van_Vechten_Trim.jpg/330px-Langston_Hughes_by_Carl_Van_Vechten_Trim.jpg",
   "title": "Langston Hughes"
- },
- "Lao Tsu": {
-  "de": "chinesischer Philosoph",
-  "dewiki": "Laozi",
-  "en": "Ancient Chinese philosopher associated with Taoism",
-  "image": null,
-  "title": "Laozi"
  },
  "Lao Tzu": {
   "de": "chinesischer Philosoph",
@@ -2344,13 +2176,6 @@
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/Lev_grossman_2011.jpg/330px-Lev_grossman_2011.jpg",
   "title": "Lev Grossman"
  },
- "Lewis Caroll": {
-  "de": "britischer Schriftsteller, Mathematiker und Fotograf",
-  "dewiki": "Lewis Carroll",
-  "en": "British author and scholar (1832–1898)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fb/LewisCarrollSelfPhoto.jpg/330px-LewisCarrollSelfPhoto.jpg",
-  "title": "Lewis Carroll"
- },
  "Lewis Carroll": {
   "de": "britischer Schriftsteller, Mathematiker und Fotograf",
   "dewiki": "Lewis Carroll",
@@ -2413,13 +2238,6 @@
   "en": "American novelist (1832–1888)",
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/Louisa_May_Alcott%2C_c._1870_-_Warren%27s_Portraits%2C_Boston.jpg/330px-Louisa_May_Alcott%2C_c._1870_-_Warren%27s_Portraits%2C_Boston.jpg",
   "title": "Louisa May Alcott"
- },
- "Lucius Annaeus Seneca": {
-  "de": "römischer Philosoph, Dramatiker, Naturforscher, Politiker und Stoiker (1–65)",
-  "dewiki": "Seneca",
-  "en": "Roman Stoic philosopher, statesman and dramatist (c. 4 BC–AD 65)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/Duble_herma_of_Socrates_and_Seneca_Antikensammlung_Berlin_07.jpg/330px-Duble_herma_of_Socrates_and_Seneca_Antikensammlung_Berlin_07.jpg",
-  "title": "Seneca the Younger"
  },
  "Lucretius": {
   "de": "Philosoph der Antike",
@@ -2491,12 +2309,12 @@
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/MSR-ra-61-b-1-DM.jpg/330px-MSR-ra-61-b-1-DM.jpg",
   "title": "Marcus Aurelius"
  },
- "Marcus Tullius Cicero": {
-  "de": "römischer Politiker, Anwalt, Schriftsteller und Philosoph",
-  "dewiki": "Marcus Tullius Cicero",
-  "en": "Roman statesman and lawyer (106–43 BC)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Bust_of_Cicero_%281st-cent._BC%29_-_Palazzo_Nuovo_-_Musei_Capitolini_-_Rome_2016.jpg/330px-Bust_of_Cicero_%281st-cent._BC%29_-_Palazzo_Nuovo_-_Musei_Capitolini_-_Rome_2016.jpg",
-  "title": "Cicero"
+ "Marcus Herz": {
+  "de": "deutscher Arzt und Hochschullehrer für Philosophie (1747–1803)",
+  "dewiki": "Marcus Herz",
+  "en": "German philosopher (1747–1803)",
+  "image": "https://upload.wikimedia.org/wikipedia/commons/5/5b/Marcus_Herz2.jpg",
+  "title": "Markus Herz"
  },
  "Margaret Atwood": {
   "de": "kanadische Schriftstellerin (* 1939)",
@@ -2575,13 +2393,6 @@
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7a/Mark_Twain_by_AF_Bradley_%28cropped_2%29.jpg/330px-Mark_Twain_by_AF_Bradley_%28cropped_2%29.jpg",
   "title": "Mark Twain"
  },
- "Markus Herz": {
-  "de": "deutscher Arzt und Hochschullehrer für Philosophie (1747–1803)",
-  "dewiki": "Marcus Herz",
-  "en": "German philosopher (1747–1803)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/5/5b/Marcus_Herz2.jpg",
-  "title": "Markus Herz"
- },
  "Markus Zusak": {
   "de": "deutsch-australischer Schriftsteller",
   "dewiki": "Markus Zusak",
@@ -2603,13 +2414,6 @@
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ce/Martin_Luther_King%2C_Jr._and_Lyndon_Johnson_%28cropped%29.jpg/330px-Martin_Luther_King%2C_Jr._and_Lyndon_Johnson_%28cropped%29.jpg",
   "title": "Martin Luther King Jr."
  },
- "Martin Luther King, Jr.": {
-  "de": "US-amerikanischer Baptistenpastor, Bürgerrechtler und Friedensnobelpreisträger (1929–1968)",
-  "dewiki": "Martin Luther King",
-  "en": "American minister and civil rights activist (1929–1968)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ce/Martin_Luther_King%2C_Jr._and_Lyndon_Johnson_%28cropped%29.jpg/330px-Martin_Luther_King%2C_Jr._and_Lyndon_Johnson_%28cropped%29.jpg",
-  "title": "Martin Luther King Jr."
- },
  "Mary Oliver": {
   "de": "US-amerikanische Schriftstellerin und Pulitzer-Preis.Trägerin",
   "dewiki": "Mary Oliver (Autorin)",
@@ -2617,7 +2421,7 @@
   "image": null,
   "title": "Mary Oliver"
  },
- "Mary Wollstonecraft Shelley": {
+ "Mary Shelley": {
   "de": "britische Schriftstellerin (1797–1851)",
   "dewiki": "Mary Shelley",
   "en": "English writer (1797–1851)",
@@ -2630,13 +2434,6 @@
   "en": "Japanese poet (1644–1694)",
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Basho_by_Morikawa_Kyoriku_%281656-1715%29.jpg/330px-Basho_by_Morikawa_Kyoriku_%281656-1715%29.jpg",
   "title": "Matsuo Bashō"
- },
- "Mawlana Jalal-al-Din Rumi": {
-  "de": "persischer Mystiker, Begründer des Mevlevi-Derwisch-Ordens",
-  "dewiki": "Rumi (Dichter)",
-  "en": "Sufi mystic and poet (1207–1273)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/%D9%85%D9%88%D9%84%D8%A7%D9%86%D8%A7_%D8%A7%D8%AB%D8%B1_%D8%AD%D8%B3%DB%8C%D9%86_%D8%A8%D9%87%D8%B2%D8%A7%D8%AF_%28cropped%29.jpg/330px-%D9%85%D9%88%D9%84%D8%A7%D9%86%D8%A7_%D8%A7%D8%AB%D8%B1_%D8%AD%D8%B3%DB%8C%D9%86_%D8%A8%D9%87%D8%B2%D8%A7%D8%AF_%28cropped%29.jpg",
-  "title": "Rumi"
  },
  "Max Frisch": {
   "de": "Schweizer Architekt und Schriftsteller (1911–1991)",
@@ -2729,7 +2526,7 @@
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/01/Mo_Willems_Mazza_Fall_Conference_2012.jpg/330px-Mo_Willems_Mazza_Fall_Conference_2012.jpg",
   "title": "Mo Willems"
  },
- "Moliere": {
+ "Molière": {
   "de": "französischer Schauspieler, Theaterdirektor und Dramatiker (1622–1673)",
   "dewiki": "Molière",
   "en": "French playwright and actor (1622–1673)",
@@ -2737,13 +2534,6 @@
   "title": "Molière"
  },
  "Mother Teresa": {
-  "de": "katholische Ordensschwester, Missionarin und Heilige; Friedensnobelpreisträgerin",
-  "dewiki": "Mutter Teresa",
-  "en": "Albanian-Indian Catholic saint (1910–1997)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d6/Mother_Teresa_1.jpg/330px-Mother_Teresa_1.jpg",
-  "title": "Mother Teresa"
- },
- "Mother Theresa": {
   "de": "katholische Ordensschwester, Missionarin und Heilige; Friedensnobelpreisträgerin",
   "dewiki": "Mutter Teresa",
   "en": "Albanian-Indian Catholic saint (1910–1997)",
@@ -2834,7 +2624,7 @@
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/79/Tesla_circa_1890.jpeg/330px-Tesla_circa_1890.jpeg",
   "title": "Nikola Tesla"
  },
- "Nikolai V. Gogol": {
+ "Nikolai Gogol": {
   "de": "russischer Schriftsteller ukrainischer Herkunft (1809–1852)",
   "dewiki": "Nikolai Wassiljewitsch Gogol",
   "en": "Ukrainian-Russian writer (1809–1852)",
@@ -2918,13 +2708,6 @@
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Oscar_Wilde_by_Napoleon_Sarony._Three-quarter-length_photograph%2C_seated_%28cropped%29.jpg/330px-Oscar_Wilde_by_Napoleon_Sarony._Three-quarter-length_photograph%2C_seated_%28cropped%29.jpg",
   "title": "Oscar Wilde"
  },
- "Oscar Wilde (attributed to)": {
-  "de": "irischer Schriftsteller",
-  "dewiki": "Oscar Wilde",
-  "en": "Irish writer (1854–1900)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Oscar_Wilde_by_Napoleon_Sarony._Three-quarter-length_photograph%2C_seated_%28cropped%29.jpg/330px-Oscar_Wilde_by_Napoleon_Sarony._Three-quarter-length_photograph%2C_seated_%28cropped%29.jpg",
-  "title": "Oscar Wilde"
- },
  "Otto von Bismarck": {
   "de": "deutscher Politiker und Staatsmann",
   "dewiki": "Otto von Bismarck",
@@ -3002,7 +2785,7 @@
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fe/Pearl_S._Buck_-_1960.jpg/330px-Pearl_S._Buck_-_1960.jpg",
   "title": "Pearl S. Buck"
  },
- "Pedro Calderon de la Barca": {
+ "Pedro Calderón de la Barca": {
   "de": "spanischer Dramatiker (1600-1681)",
   "dewiki": "Pedro Calderón de la Barca",
   "en": "Spanish playwright and poet (1600–1681)",
@@ -3142,13 +2925,6 @@
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7a/Robert_Louis_Stevenson_by_Henry_Walter_Barnett_bw.jpg/330px-Robert_Louis_Stevenson_by_Henry_Walter_Barnett_bw.jpg",
   "title": "Robert Louis Stevenson"
  },
- "Robert Marley": {
-  "de": "jamaikanischer Sänger, Gitarrist und Songwriter (1945–1981)",
-  "dewiki": "Bob Marley",
-  "en": "Jamaican reggae musician (1945–1981)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d6/Bob_Marley_circa_1976_%28cropped%29.jpg/330px-Bob_Marley_circa_1976_%28cropped%29.jpg",
-  "title": "Bob Marley"
- },
  "Robert Orben": {
   "de": null,
   "dewiki": null,
@@ -3164,13 +2940,6 @@
   "title": "Rudyard Kipling"
  },
  "Rumi": {
-  "de": "persischer Mystiker, Begründer des Mevlevi-Derwisch-Ordens",
-  "dewiki": "Rumi (Dichter)",
-  "en": "Sufi mystic and poet (1207–1273)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/%D9%85%D9%88%D9%84%D8%A7%D9%86%D8%A7_%D8%A7%D8%AB%D8%B1_%D8%AD%D8%B3%DB%8C%D9%86_%D8%A8%D9%87%D8%B2%D8%A7%D8%AF_%28cropped%29.jpg/330px-%D9%85%D9%88%D9%84%D8%A7%D9%86%D8%A7_%D8%A7%D8%AB%D8%B1_%D8%AD%D8%B3%DB%8C%D9%86_%D8%A8%D9%87%D8%B2%D8%A7%D8%AF_%28cropped%29.jpg",
-  "title": "Rumi"
- },
- "Rumi Jalalud-Din": {
   "de": "persischer Mystiker, Begründer des Mevlevi-Derwisch-Ordens",
   "dewiki": "Rumi (Dichter)",
   "en": "Sufi mystic and poet (1207–1273)",
@@ -3198,7 +2967,7 @@
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/Sally_Ride_%281984%29.jpg/330px-Sally_Ride_%281984%29.jpg",
   "title": "Sally Ride"
  },
- "Salvador Dali": {
+ "Salvador Dalí": {
   "de": "spanischer Maler, Grafiker, Schriftsteller, Bildhauer und Bühnenbildner (1904–1989)",
   "dewiki": "Salvador Dalí",
   "en": "Spanish surrealist artist (1904–1989)",
@@ -3317,13 +3086,6 @@
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Simone_De_Beauvoir_%28cropped%29.jpg/330px-Simone_De_Beauvoir_%28cropped%29.jpg",
   "title": "Simone de Beauvoir"
  },
- "Sir Francis Bacon": {
-  "de": "englischer Philosoph, Staatsmann und Naturwissenschaftler",
-  "dewiki": "Francis Bacon",
-  "en": "English philosopher and statesman (1561–1626)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5c/Somer_Francis_Bacon.jpg/330px-Somer_Francis_Bacon.jpg",
-  "title": "Francis Bacon"
- },
  "Socrates": {
   "de": "antiker griechischer Philosoph",
   "dewiki": "Sokrates",
@@ -3345,7 +3107,7 @@
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/Saint_Augustine_by_Philippe_de_Champaigne.jpg/330px-Saint_Augustine_by_Philippe_de_Champaigne.jpg",
   "title": "Augustine of Hippo"
  },
- "St. Francis Of Assisi": {
+ "St. Francis of Assisi": {
   "de": "Ordensgründer und Heiliger der römisch-katholischen Kirche",
   "dewiki": "Franz von Assisi",
   "en": "Italian Catholic saint (1181–1226)",
@@ -3555,13 +3317,6 @@
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Thich_Nhat_Hanh_12_%28cropped%29.jpg/330px-Thich_Nhat_Hanh_12_%28cropped%29.jpg",
   "title": "Thích Nhất Hạnh"
  },
- "Thomas A. Edison": {
-  "de": "US-amerikanischer Erfinder und Unternehmer",
-  "dewiki": "Thomas Alva Edison",
-  "en": "American inventor and businessman (1847–1931)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9d/Thomas_Edison2.jpg/330px-Thomas_Edison2.jpg",
-  "title": "Thomas Edison"
- },
  "Thomas Edison": {
   "de": "US-amerikanischer Erfinder und Unternehmer",
   "dewiki": "Thomas Alva Edison",
@@ -3632,13 +3387,6 @@
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/62/TinaFey-byPhilipRomano2.jpg/330px-TinaFey-byPhilipRomano2.jpg",
   "title": "Tina Fey"
  },
- "Tolstoy Leo": {
-  "de": "russischer Schriftsteller",
-  "dewiki": "Lew Nikolajewitsch Tolstoi",
-  "en": "Russian writer (1828–1910)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/be/Leo_Tolstoy_1908_Portrait_%283x4_cropped%29.jpg/330px-Leo_Tolstoy_1908_Portrait_%283x4_cropped%29.jpg",
-  "title": "Leo Tolstoy"
- },
  "Tom Robbins": {
   "de": "US-amerikanischer Autor",
   "dewiki": "Tom Robbins",
@@ -3695,33 +3443,12 @@
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e6/Victor_Hugo_by_%C3%89tienne_Carjat_1876_-_full.jpg/330px-Victor_Hugo_by_%C3%89tienne_Carjat_1876_-_full.jpg",
   "title": "Victor Hugo"
  },
- "Victor hugo": {
-  "de": "französischer Poet und Autor (1802–1885)",
-  "dewiki": "Victor Hugo",
-  "en": "French writer and politician (1802–1885)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e6/Victor_Hugo_by_%C3%89tienne_Carjat_1876_-_full.jpg/330px-Victor_Hugo_by_%C3%89tienne_Carjat_1876_-_full.jpg",
-  "title": "Victor Hugo"
- },
- "Viktor E. Frankl": {
-  "de": "österreichischer Neurologe und Psychiater, Begründer der Logotherapie und der Existenzanalyse",
-  "dewiki": "Viktor Frankl",
-  "en": "Austrian neurologist (1905–1997)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fe/Viktor_Frankl2.jpg/330px-Viktor_Frankl2.jpg",
-  "title": "Viktor Frankl"
- },
  "Viktor Frankl": {
   "de": "österreichischer Neurologe und Psychiater, Begründer der Logotherapie und der Existenzanalyse",
   "dewiki": "Viktor Frankl",
   "en": "Austrian neurologist (1905–1997)",
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fe/Viktor_Frankl2.jpg/330px-Viktor_Frankl2.jpg",
   "title": "Viktor Frankl"
- },
- "Vincent Willem van Gogh": {
-  "de": "niederländischer Maler und Zeichner (1853–1890)",
-  "dewiki": "Vincent van Gogh",
-  "en": "Dutch painter (1853–1890)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/Vincent_van_Gogh_-_Self-Portrait_-_Google_Art_Project_%28454045%29.jpg/330px-Vincent_van_Gogh_-_Self-Portrait_-_Google_Art_Project_%28454045%29.jpg",
-  "title": "Vincent van Gogh"
  },
  "Vincent van Gogh": {
   "de": "niederländischer Maler und Zeichner (1853–1890)",
@@ -3758,13 +3485,6 @@
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bf/Nicolas_de_Largilli%C3%A8re_-_Portrait_de_Voltaire_%281694-1778%29_en_1718_-_P208_-_mus%C3%A9e_Carnavalet_-_5_%28cropped%29.jpg/330px-Nicolas_de_Largilli%C3%A8re_-_Portrait_de_Voltaire_%281694-1778%29_en_1718_-_P208_-_mus%C3%A9e_Carnavalet_-_5_%28cropped%29.jpg",
   "title": "Voltaire"
  },
- "W. P. Kinsella": {
-  "de": null,
-  "dewiki": null,
-  "en": "Canadian author (1935–2016)",
-  "image": null,
-  "title": "W. P. Kinsella"
- },
  "W. Somerset Maugham": {
   "de": "englischer Dramatiker und Schriftsteller (1874–1965)",
   "dewiki": "W. Somerset Maugham",
@@ -3785,6 +3505,13 @@
   "en": "American comedian, actor, juggler and writer (1880–1946)",
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/37/W._C._Fields%2C_NPG_94_46.jpg/330px-W._C._Fields%2C_NPG_94_46.jpg",
   "title": "W. C. Fields"
+ },
+ "W.P. Kinsella": {
+  "de": null,
+  "dewiki": null,
+  "en": "Canadian author (1935–2016)",
+  "image": null,
+  "title": "W. P. Kinsella"
  },
  "Walt Disney": {
   "de": "US-amerikanischer Animator, Produzent, Regisseur, Drehbuchautor, Synchronsprecher und Unternehmer, Gründer der Walt Disney Company (1901–1966)",
@@ -3863,13 +3590,6 @@
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/Burroughs1983_crop_b.jpg/330px-Burroughs1983_crop_b.jpg",
   "title": "William S. Burroughs"
  },
- "William Shakespear": {
-  "de": "englischer Dramatiker, Lyriker und Schauspieler (1564–1616)",
-  "dewiki": "William Shakespeare",
-  "en": "English playwright and poet (1564–1616)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/21/William_Shakespeare_by_John_Taylor%2C_edited.jpg/330px-William_Shakespeare_by_John_Taylor%2C_edited.jpg",
-  "title": "William Shakespeare"
- },
  "William Shakespeare": {
   "de": "englischer Dramatiker, Lyriker und Schauspieler (1564–1616)",
   "dewiki": "William Shakespeare",
@@ -3892,13 +3612,6 @@
   "title": "Willy Brandt"
  },
  "Winston Churchill": {
-  "de": "britischer Staatsmann des 20. Jahrhunderts und Literaturnobelpreisträger",
-  "dewiki": "Winston Churchill",
-  "en": "British statesman and writer (1874–1965)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/Sir_Winston_Churchill_-_19086236948_%28restored%29.jpg/330px-Sir_Winston_Churchill_-_19086236948_%28restored%29.jpg",
-  "title": "Winston Churchill"
- },
- "Winston S. Churchill": {
   "de": "britischer Staatsmann des 20. Jahrhunderts und Literaturnobelpreisträger",
   "dewiki": "Winston Churchill",
   "en": "British statesman and writer (1874–1965)",
@@ -3953,33 +3666,5 @@
   "en": "American author, anthropologist, filmmaker (1891–1960)",
   "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/Hurston-Zora-Neale-LOC.jpg/330px-Hurston-Zora-Neale-LOC.jpg",
   "title": "Zora Neale Hurston"
- },
- "douglas adams": {
-  "de": "britischer Science-Fiction-Autor und Humorist (1952–2001)",
-  "dewiki": "Douglas Adams",
-  "en": "English writer and humourist (1952–2001)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c0/Douglas_adams_portrait_cropped.jpg/330px-Douglas_adams_portrait_cropped.jpg",
-  "title": "Douglas Adams"
- },
- "e.e. cummings": {
-  "de": "US-amerikanischer Dichter und Schriftsteller",
-  "dewiki": "E. E. Cummings",
-  "en": "American poet and author (1894–1962)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/E._E._Cummings_NYWTS.jpg/330px-E._E._Cummings_NYWTS.jpg",
-  "title": "E. E. Cummings"
- },
- "haruki murakami": {
-  "de": "japanischer Autor",
-  "dewiki": "Haruki Murakami",
-  "en": "Japanese writer (born 1949)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/51/Conversatorio_Haruki_Murakami_%2812_de_12%29_%2845747009452%29_%28cropped%29.jpg/330px-Conversatorio_Haruki_Murakami_%2812_de_12%29_%2845747009452%29_%28cropped%29.jpg",
-  "title": "Haruki Murakami"
- },
- "mahatma gandhi": {
-  "de": "indischer politischer sowie religiöser Führer und Rechtsanwalt (1869–1948)",
-  "dewiki": "Mohandas Karamchand Gandhi",
-  "en": "Indian independence activist (1869–1948)",
-  "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7a/Mahatma-Gandhi%2C_studio%2C_1931.jpg/330px-Mahatma-Gandhi%2C_studio%2C_1931.jpg",
-  "title": "Mahatma Gandhi"
  }
 }

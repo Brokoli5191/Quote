@@ -174,8 +174,85 @@ function spaceAfterClosingQuotes(text) {
   return result;
 }
 
+// Source spelling (after the generic fixes in canonicalAuthor) -> display name. Covers typos,
+// inverted names, missing diacritics, full-name variants and joined co-author credits.
+export const AUTHOR_ALIASES = new Map([
+  ['Alexandre Dumas-fils', 'Alexandre Dumas fils'],
+  ['Alfred Lord Tennyson', 'Alfred, Lord Tennyson'],
+  ['Alfred Tennyson', 'Alfred, Lord Tennyson'],
+  ['Anais Nin', 'Anaïs Nin'],
+  ['Andre Gide', 'André Gide'],
+  ['Anne Bronte', 'Anne Brontë'],
+  ['Arthur William Edgar O\'Shaughnessy', 'Arthur O\'Shaughnessy'],
+  ['Carl Gustav Jung', 'Carl Jung'],
+  ['Cathy Guiswite', 'Cathy Guisewite'],
+  ['Charlotte Bronte', 'Charlotte Brontë'],
+  ['Confucious', 'Confucius'],
+  ['Corrie Ten Boom', 'Corrie ten Boom'],
+  ['Desiderius Erasmus Roterodamus', 'Desiderius Erasmus'],
+  ['Edgar Allen Poe', 'Edgar Allan Poe'],
+  ['Francois Mauriac', 'François Mauriac'],
+  ['Friedrich Wilhelm Nietzsche', 'Friedrich Nietzsche'],
+  ['Gabriel Garcia Marquez', 'Gabriel García Márquez'],
+  ['Haruki Marukami', 'Haruki Murakami'],
+  ['Hemingway, Ernest', 'Ernest Hemingway'],
+  ['Henry Ward Beecherr', 'Henry Ward Beecher'],
+  ['Herman Hesse', 'Hermann Hesse'],
+  ['Honore de Balzac', 'Honoré de Balzac'],
+  ['J.K. rowling', 'J.K. Rowling'],
+  ['JK Rowling', 'J.K. Rowling'],
+  ['Lance Armstrong Sally Jenkins', 'Lance Armstrong and Sally Jenkins'],
+  ['Lao Tsu', 'Lao Tzu'],
+  ['Lewis Caroll', 'Lewis Carroll'],
+  ['Lucius Annaeus Seneca', 'Seneca'],
+  ['Marcus Tullius Cicero', 'Cicero'],
+  ['Markus Herz', 'Marcus Herz'],
+  ['Mary Wollstonecraft Shelley', 'Mary Shelley'],
+  ['Mawlana Jalal-al-Din Rumi', 'Rumi'],
+  ['Moliere', 'Molière'],
+  ['Mother Theresa', 'Mother Teresa'],
+  ['Nikolai V. Gogol', 'Nikolai Gogol'],
+  ['Oscar Wilde (attributed to)', 'Oscar Wilde'],
+  ['P.C. Cast Kristin Cast', 'P.C. Cast and Kristin Cast'],
+  ['Pedro Calderon de la Barca', 'Pedro Calderón de la Barca'],
+  ['Robert Marley', 'Bob Marley'],
+  ['Rumi Jalalud-Din', 'Rumi'],
+  ['Salvador Dali', 'Salvador Dalí'],
+  ['Sir Francis Bacon', 'Francis Bacon'],
+  ['St. Francis Of Assisi', 'St. Francis of Assisi'],
+  ['Thomas A. Edison', 'Thomas Edison'],
+  ['Tolstoy Leo', 'Leo Tolstoy'],
+  ['Victor hugo', 'Victor Hugo'],
+  ['Vincent Willem van Gogh', 'Vincent van Gogh'],
+  ['Viktor E. Frankl', 'Viktor Frankl'],
+  ['William Shakespear', 'William Shakespeare'],
+  ['Winston S. Churchill', 'Winston Churchill'],
+]);
+
+// Generic spelling fixes first ("douglas adams", "J. K. Rowling", "J.K.Rowling",
+// "Martin Luther King, Jr."), then the alias table.
+export function canonicalAuthor(value) {
+  let name = String(value || '').replace(/\s+/g, ' ').trim();
+  if (name === name.toLowerCase()) {
+    name = name.replace(/(^|[\s.-])(\p{Ll})/gu, (match, before, letter) => before + letter.toUpperCase());
+  }
+  name = name
+    .replace(/(?<=(?:^|[\s.])\p{Lu})\.\s+(?=\p{Lu}\.)/gu, '.')
+    .replace(/(\b\p{Lu}\.)(?=\p{Lu}\p{Ll})/gu, '$1 ')
+    .replace(/,\s*(Jr|Sr)\.?$/u, ' $1.');
+  return AUTHOR_ALIASES.get(name) ?? name;
+}
+
+// Key under which spelling variants of one author collide (case, diacritics, punctuation, spacing).
+export function authorKey(value) {
+  return String(value || '')
+    .normalize('NFKD')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '');
+}
+
 export function cleanAuthor(value) {
-  return cleanText(value).replace(/,+$/, '').trim();
+  return canonicalAuthor(cleanText(value).replace(/,+$/, '').trim());
 }
 
 export function quoteKey(value) {
