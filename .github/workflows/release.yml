@@ -5,9 +5,10 @@ on:
   push:
     tags:
       - "v*"
+      - "[0-9]+.[0-9]+.[0-9]+"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-release:
@@ -80,3 +81,31 @@ jobs:
           path: release/*
           if-no-files-found: error
           retention-days: 30
+
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.release_files.outputs.version }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if [ "${TAG#v}" != "$VERSION" ]; then
+            echo "Tag $TAG does not match versionName $VERSION"
+            exit 1
+          fi
+
+          notes="release-notes.md"
+          if [ -f ".github/release-notes/$VERSION.md" ]; then
+            cp ".github/release-notes/$VERSION.md" "$notes"
+          else
+            echo "## What's New in Quote $VERSION" > "$notes"
+          fi
+          printf '\n**SHA-256:** `%s`\n' "$(cut -d ' ' -f 1 "release/quote-$VERSION.apk.sha256")" >> "$notes"
+
+          gh release create "$TAG" \
+            "release/quote-$VERSION.apk" \
+            "release/quote-$VERSION.apk.sha256" \
+            --title "$VERSION" \
+            --notes-file "$notes" \
+            --verify-tag
