@@ -73,6 +73,20 @@ class QuoteSubmissionClientTest {
     }
 
     @Test
+    fun parseSubmissionStatusInfo_marksOldBackendAnswers() {
+        val legacy = parseSubmissionStatusInfo("""{"status":"approved","reviewedAt":1,"communityQuoteId":"c-1"}""")
+        assertTrue(legacy.legacy)
+        assertFalse(parseSubmissionStatusInfo("""{"id":"s","status":"approved"}""").legacy)
+    }
+
+    @Test
+    fun parseWithdrawError_bare404IsNotTreatedAsGone() {
+        assertEquals(WithdrawResult.NotFound, parseWithdrawError(404, SubmissionError.NOT_FOUND))
+        assertEquals(WithdrawResult.Error(SubmissionError.SERVER), parseWithdrawError(404, null))
+        assertEquals(WithdrawResult.Error(SubmissionError.ALREADY_REVIEWED), parseWithdrawError(409, "already_reviewed"))
+    }
+
+    @Test
     fun parseSubmitResponse_newSubmission() {
         val result = parseSubmitResponse(201, """{"id":"abc","status":"pending"}""")
         assertEquals(QuoteSubmissionResult.Success("abc", QuoteSubmissionStatus.PENDING), result)

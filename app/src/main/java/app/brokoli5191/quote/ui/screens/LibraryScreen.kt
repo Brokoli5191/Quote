@@ -903,8 +903,10 @@ fun QuoteBrowseItemCard(
     var showTranslation by rememberSaveable(quote.id) { mutableStateOf(false) }
     val displayedText = if (showTranslation && alternateText != null) alternateText else quote.text
     val appLanguage = LocalAppLanguage.current
-    // Quotation marks follow the language of the text on screen, not the app language.
+    // Quotation marks follow the language of the text on screen, not the app language. An own quote
+    // without a translation has no known text language, so it keeps neutral English marks.
     val displayedLanguage = when {
+        alternateLanguage == null && quote.isUserAdded -> QuoteLanguage.ENGLISH
         alternateLanguage == null -> appLanguage
         showTranslation -> alternateLanguage
         alternateLanguage == QuoteLanguage.GERMAN -> QuoteLanguage.ENGLISH

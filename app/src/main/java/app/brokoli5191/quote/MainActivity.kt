@@ -26,6 +26,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Settings
@@ -623,6 +624,7 @@ fun BottomNavigationBar(
 
                     Spacer(modifier = Modifier.height(6.dp))
 
+                    // One line only: long German labels at large font scales shrink instead of wrapping.
                     Text(
                         text = uiText(label),
                         style = MaterialTheme.typography.labelSmall.copy(
@@ -630,7 +632,14 @@ fun BottomNavigationBar(
                             fontSize = 11.sp,
                             color = if (isSelected) MaterialTheme.colorScheme.primary
                                     else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
-                        )
+                        ),
+                        maxLines = 1,
+                        autoSize = TextAutoSize.StepBased(
+                            minFontSize = 8.sp,
+                            maxFontSize = 11.sp,
+                            stepSize = 0.5.sp
+                        ),
+                        modifier = Modifier.padding(horizontal = 2.dp)
                     )
                 }
             }

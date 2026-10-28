@@ -17,6 +17,20 @@ class SavedScreenshotTest(configId: String) : ScreenshotTestBase(configId) {
     }
 
     @Test
+    fun favoritesLongAuthor() {
+        // A multi-word name whose words each fit beside the actions but need more than two lines there.
+        val app = launch(quotes = FakeQuotes.all.map {
+            if (it.author == "Johann Wolfgang von Goethe") {
+                it.copy(isFavorite = true, savedDate = (System.currentTimeMillis() + 60_000L).toString())
+            } else it
+        })
+        compose.setContent { TabFrame(app.viewModel, "Saved") }
+        compose.awaitCondition { app.viewModel.favorites.value.any { it.author.startsWith("Johann") } }
+        compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Johann", substring = true))
+        capture("saved", "favorites_long_author")
+    }
+
+    @Test
     fun myQuotes() {
         val app = launch()
         app.viewModel.selectSavedSubTab("My Quotes")

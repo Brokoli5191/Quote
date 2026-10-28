@@ -149,6 +149,9 @@ class CommunitySyncLinkingTest {
         assertTrue(QuoteSubmissionStatus.REMOVED to false in statuses)
         assertTrue(QuoteSubmissionStatus.APPROVED to false in statuses)
         assertFalse(QuoteSubmissionStatus.APPROVED to true in statuses)
+
+        // The one-time pass after the upgrade ignores the window.
+        assertEquals(5, repository.getSubmissionsToRefresh(now, since = 0L).size)
     }
 
     @Test

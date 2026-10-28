@@ -34,11 +34,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.sp
@@ -241,9 +244,11 @@ fun SavedScreen(viewModel: QuoteViewModel) {
                         }
                     }
                 } else {
+                    // The bottom padding clears the bottom bar and the FAB above it (104dp + 56dp), so the
+                    // last card's buttons can scroll out from under the FAB.
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 112.dp),
+                        contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 176.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         items(activeList, key = { it.id }) { quote ->
@@ -587,16 +592,18 @@ private fun SavedTabSwitcher(
             label = "SavedTabIndicator"
         )
 
+        // Matches the row height, which grows when a label needs two lines at large font scales.
         Box(
             modifier = Modifier
+                .matchParentSize()
+                .wrapContentWidth(Alignment.Start)
                 .offset { IntOffset(indicatorOffset.roundToPx(), 0) }
                 .width(segmentWidth)
-                .height(48.dp)
                 .clip(RoundedCornerShape(12.dp))
                 .background(MaterialTheme.colorScheme.primaryContainer)
         )
 
-        Row(modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
             listOf(
                 "Favorites" to "${uiText("Favorites")} ($favoritesCount)",
                 "My Quotes" to "${uiText("My Quotes")} ($myQuotesCount)"
@@ -605,7 +612,8 @@ private fun SavedTabSwitcher(
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .height(48.dp)
+                        .fillMaxHeight()
+                        .heightIn(min = 48.dp)
                         .selectable(
                             selected = selected,
                             role = Role.Tab,
@@ -625,7 +633,10 @@ private fun SavedTabSwitcher(
                         } else {
                             MaterialTheme.colorScheme.onSurfaceVariant
                         },
-                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        modifier = Modifier.padding(horizontal = 2.dp, vertical = 4.dp)
                     )
                 }
             }
@@ -690,6 +701,16 @@ fun PremiumCollectionQuoteCard(
     // Resets when the app language changes the display text.
     var showTranslation by rememberSaveable(quote.id, quote.text) { mutableStateOf(false) }
     val displayedText = if (showTranslation && alternateText != null) alternateText else quote.text
+    // Quotation marks follow the language of the text on screen, not the app language. An own quote
+    // without a translation stores the app language it was written in, not its own, so it keeps
+    // neutral English marks.
+    val displayedLanguage = when {
+        alternateLanguage == null && quote.isUserAdded -> QuoteLanguage.ENGLISH
+        alternateLanguage == null -> quote.language
+        showTranslation -> alternateLanguage
+        alternateLanguage == QuoteLanguage.GERMAN -> QuoteLanguage.ENGLISH
+        else -> QuoteLanguage.GERMAN
+    }
     val unknownAuthor = quote.hasUnknownAuthor
     val authorName = if (unknownAuthor) uiText("Unknown") else quote.author
     // Copy/share keep a blank author blank, like before.
@@ -714,17 +735,19 @@ fun PremiumCollectionQuoteCard(
             Column(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // If there's an active tags record, display tags and metadata
-                Row(
+                // Tags and saved date; skipped when both are empty so no blank row is left behind.
+                // Catalogue tags are English only, so like on Daily they're hidden in German; own tags stay.
+                val tagsSp = remember(quote.tags, quote.isAnonymous, quote.isUserAdded, language) {
+                    if (quote.isAnonymous || (!quote.isUserAdded && language == QuoteLanguage.GERMAN)) emptyList()
+                    else quote.tags.split(",").map { it.trim() }.filter { it.isNotBlank() }
+                }
+                val savedDateText = formatSavedDate(quote.savedDate, nowMillis, language)
+                if (tagsSp.isNotEmpty() || savedDateText.isNotEmpty()) Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        val tagsSp = remember(quote.tags, quote.isAnonymous, language) {
-                            if (quote.isAnonymous) emptyList()
-                            else quote.tags.split(",").map { it.trim() }.filter { it.isNotBlank() }
-                        }
                         tagsSp.take(2).forEach { tag ->
                             Box(
                                 modifier = Modifier
@@ -744,7 +767,7 @@ fun PremiumCollectionQuoteCard(
                     }
 
                     Text(
-                        text = formatSavedDate(quote.savedDate, nowMillis, language),
+                        text = savedDateText,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                     )
@@ -752,7 +775,7 @@ fun PremiumCollectionQuoteCard(
 
                 // Quote Content Text in Serif Medium italic
                 Text(
-                    text = "\"$displayedText\"",
+                    text = if (displayedLanguage == QuoteLanguage.GERMAN) "„$displayedText“" else "“$displayedText”",
                     style = MaterialTheme.typography.bodyLarge.copy(
                         fontFamily = SerifFontFamily,
                         fontStyle = FontStyle.Italic,
@@ -778,16 +801,11 @@ fun PremiumCollectionQuoteCard(
                     )
                 }
 
-                // Author Row with avatar and action buttons
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                // Author with avatar, then the actions. When the name can't fit in two lines beside the
+                // three actions (long names, large font scales), the actions move below the name.
+                val authorBlock: @Composable (Modifier) -> Unit = { rowModifier ->
                     Row(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(end = 8.dp),
+                        modifier = rowModifier.padding(end = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
@@ -807,11 +825,12 @@ fun PremiumCollectionQuoteCard(
                                 MaterialTheme.colorScheme.onSurface
                             },
                             modifier = Modifier.weight(1f),
-                            maxLines = 1,
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
-
+                }
+                val actionButtons: @Composable () -> Unit = {
                     Row(
                         modifier = Modifier.wrapContentWidth(),
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -879,6 +898,40 @@ fun PremiumCollectionQuoteCard(
                         }
                     }
                 }
+                BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                    val textMeasurer = rememberTextMeasurer()
+                    val nameStyle = MaterialTheme.typography.labelLarge
+                    // Avatar 36 + gap 10 + end padding 8, three 48dp actions with 4dp gaps.
+                    val nameRoom = with(LocalDensity.current) { (maxWidth - 206.dp).roundToPx() }.coerceAtLeast(0)
+                    val stackActions = remember(authorName, nameStyle, textMeasurer, nameRoom) {
+                        val longestWordWidth = authorName.split(' ').maxOfOrNull { word ->
+                            textMeasurer.measure(word, nameStyle, maxLines = 1).size.width
+                        } ?: 0
+                        // A word wider than the column would break mid-word; a name needing more
+                        // than two lines would be cut.
+                        longestWordWidth > nameRoom || textMeasurer.measure(
+                            authorName,
+                            nameStyle,
+                            maxLines = 2,
+                            constraints = Constraints(maxWidth = nameRoom)
+                        ).hasVisualOverflow
+                    }
+                    if (stackActions) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            authorBlock(Modifier.fillMaxWidth())
+                            Box(modifier = Modifier.align(Alignment.End)) { actionButtons() }
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            authorBlock(Modifier.weight(1f))
+                            actionButtons()
+                        }
+                    }
+                }
 
                 if (quote.isUserAdded) {
                     SubmissionSection(
@@ -933,6 +986,7 @@ private fun SubmissionSection(
                 } else {
                     TextButton(
                         onClick = onWithdraw,
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
                         colors = ButtonDefaults.textButtonColors(
                             contentColor = MaterialTheme.colorScheme.onTertiaryContainer
                         )
@@ -973,24 +1027,24 @@ private fun SubmissionSection(
                 QuoteReviewStatus(
                     label = uiText("No longer published"),
                     icon = Icons.Default.CloudOff,
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    uiText("This quote was removed from the community collection. You can submit it again."),
+                    uiText("This quote was removed from the community collection. To submit it again, change its text or author."),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 if (reviewNote != null) ReviewNote(reviewNote)
-                SubmissionProblem(problem)
+                // Like a rejected quote: the server does not accept the same text and author again.
                 SubmissionActions(
-                    label = uiText("Submit again"),
-                    icon = Icons.Default.CloudUpload,
+                    label = uiText("Edit and resubmit"),
+                    icon = Icons.Default.Edit,
                     isSubmitting = isSubmitting,
-                    submitEnabled = problem == null,
-                    showEditButton = true,
-                    onSubmit = onSubmit,
-                    onEdit = { onEdit(false) }
+                    submitEnabled = true,
+                    showEditButton = false,
+                    onSubmit = { onEdit(true) },
+                    onEdit = {}
                 )
             }
 
@@ -1102,6 +1156,7 @@ private fun ReviewNote(note: String) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun QuoteReviewStatus(
     label: String,
@@ -1116,25 +1171,46 @@ private fun QuoteReviewStatus(
         shape = RoundedCornerShape(14.dp),
         modifier = if (action != null) Modifier.fillMaxWidth() else Modifier
     ) {
-        Row(
-            modifier = Modifier
-                .heightIn(min = 40.dp)
-                .padding(
-                    start = 14.dp,
-                    end = if (action != null) 4.dp else 14.dp,
-                    top = if (action != null) 2.dp else 10.dp,
-                    bottom = if (action != null) 2.dp else 10.dp
-                ),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
-            Text(
-                label,
-                style = MaterialTheme.typography.labelLarge,
-                modifier = Modifier.weight(1f, fill = action != null)
-            )
-            action?.invoke()
+        if (action == null) {
+            Row(
+                modifier = Modifier
+                    .heightIn(min = 40.dp)
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                Text(label, style = MaterialTheme.typography.labelLarge)
+            }
+        } else {
+            // The action moves below the label when both don't fit, so long labels never break mid-word.
+            FlowRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 40.dp)
+                    .padding(start = 14.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.CenterVertically)
+                        .heightIn(min = 40.dp)
+                        .padding(end = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Text(label, style = MaterialTheme.typography.labelLarge)
+                }
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterVertically)
+                        .weight(1f),
+                    contentAlignment = Alignment.CenterEnd
+                ) {
+                    action()
+                }
+            }
         }
     }
 }

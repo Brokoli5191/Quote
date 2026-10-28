@@ -28,6 +28,7 @@ import app.brokoli5191.quote.data.dailyDateKey
 import app.brokoli5191.quote.data.isAvailableIn
 import app.brokoli5191.quote.data.localized
 import app.brokoli5191.quote.data.matchesSourceMode
+import app.brokoli5191.quote.data.normalizedText
 import app.brokoli5191.quote.data.quoteMatchKey
 import app.brokoli5191.quote.data.submissionValidationError
 import app.brokoli5191.quote.utils.NotificationHelper
@@ -42,6 +43,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.util.*
 import java.util.concurrent.atomic.AtomicBoolean
@@ -300,8 +302,11 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
             }
             if (!prefs.getBoolean("stored_quote_text_repaired_v2", false)) {
                 // Earlier versions dropped inner closing quotation marks; the bundled rows were
-                // just re-seeded, so only own and community rows need the repair.
-                repository.repairStoredText(setOf(QuoteOrigin.PERSONAL, QuoteOrigin.COMMUNITY))
+                // just re-seeded, so only own and community rows need the repair. Runs under the
+                // sync lock so it never interleaves with a sync writing the same rows.
+                CommunitySyncManager.mutex.withLock {
+                    repository.repairStoredText(setOf(QuoteOrigin.PERSONAL, QuoteOrigin.COMMUNITY))
+                }
                 prefs.edit().putBoolean("stored_quote_text_repaired_v2", true).apply()
                 loadDailyQuote()
             }
@@ -668,7 +673,8 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
 
     /**
      * Edits an own quote. Not allowed while a submission is pending (withdraw it first). A rejected
-     * or removed submission is cleared, so the edited quote can be submitted again.
+     * or removed submission is cleared when the text or author changed, so the edited quote can be
+     * submitted again; the server identifies a submission by those two, so other edits keep the review.
      */
     fun updateUserQuote(
         quote: QuoteEntity,
@@ -693,14 +699,15 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
                 onDone(false)
                 return@launch
             }
-            val resetSubmission = raw.submissionStatus == QuoteSubmissionStatus.REJECTED ||
-                raw.submissionStatus == QuoteSubmissionStatus.REMOVED
             val updated = raw.copy(
                 text = normalizedText,
                 author = normalizedAuthor.ifBlank { "Unknown" },
                 category = category.takeIf { it in CategoryMapper.categories } ?: raw.category,
                 tags = normalizedTags.distinctBy { it.lowercase() }.joinToString(", ")
             )
+            val resetSubmission = (raw.submissionStatus == QuoteSubmissionStatus.REJECTED ||
+                raw.submissionStatus == QuoteSubmissionStatus.REMOVED) &&
+                submissionContentKey(raw) != submissionContentKey(updated)
             repository.insertQuote(
                 if (!resetSubmission) updated else updated.copy(
                     submissionStatus = QuoteSubmissionStatus.NOT_SUBMITTED,
@@ -777,8 +784,12 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
                             result.submissionId,
                             SubmissionStatusInfo(result.status, result.reviewNote, result.communityQuoteId)
                         )
-                        if (result.duplicate && result.status == raw.submissionStatus) {
-                            // The server already reviewed this exact quote; nothing new was sent.
+                        if (result.duplicate && (
+                                result.status == QuoteSubmissionStatus.REJECTED ||
+                                    result.status == QuoteSubmissionStatus.REMOVED
+                                )
+                        ) {
+                            // The server already decided on this exact text and author; nothing new was sent.
                             onError(SubmissionError.ALREADY_REVIEWED)
                         } else {
                             onSuccess()
@@ -847,6 +858,15 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
             }
         }
         return null
+    }
+
+    // What the backend hashes to identify a submission: text and author, NFKC, lowercased, spacing collapsed.
+    private fun submissionContentKey(quote: QuoteEntity): String {
+        val stored = quote.normalizedText()
+        return listOf(stored.text, stored.author).joinToString("\n") {
+            java.text.Normalizer.normalize(it.trim().replace(Regex("\\s+"), " "), java.text.Normalizer.Form.NFKC)
+                .lowercase(Locale.US)
+        }
     }
 
     private fun installationId(): String =
@@ -986,6 +1006,8 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
 
                 var insertedCustom = 0
                 var updatedFavs = 0
+                // Community favorites whose quotes are not synced yet; favorited when the feed brings them.
+                val pendingFavorites = LinkedHashMap<String, String?>()
 
                 for (i in 0 until jsonArray.length()) {
                     val obj = jsonArray.getJSONObject(i)
@@ -1033,14 +1055,21 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
                             repository.markSubmitted(existing.id, obj.optString("submissionId"), submission)
                         }
                     } else if (isFavorite) {
-                        val match = obj.optString("serverId", "").takeIf { it.isNotBlank() }?.let(byServerId::get)
-                            ?: nonCustomByKey[key]
-                        if (match != null && !match.isFavorite) {
-                            repository.toggleFavorite(match.id, true)
+                        val serverId = obj.optString("serverId", "").takeIf { it.isNotBlank() }
+                        val savedDate = obj.optString("savedDate", "").ifEmpty { null }
+                        val match = serverId?.let(byServerId::get) ?: nonCustomByKey[key]
+                        if (match != null) {
+                            if (!match.isFavorite) {
+                                repository.setFavorite(match.id, savedDate)
+                                updatedFavs++
+                            }
+                        } else if (serverId != null) {
+                            pendingFavorites[serverId] = savedDate
                             updatedFavs++
                         }
                     }
                 }
+                communitySyncManager.rememberPendingFavorites(pendingFavorites)
 
                 val settingsRestored = settings?.let(::restoreSettingsBackup) ?: false
 

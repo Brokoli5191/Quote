@@ -1,6 +1,7 @@
 package app.brokoli5191.quote.ui.components
 
 import android.text.format.DateFormat
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Keyboard
 import androidx.compose.material.icons.outlined.Schedule
@@ -11,6 +12,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TimeInput
 import androidx.compose.material3.TimePicker
+import androidx.compose.material3.TimePickerDefaults
 import androidx.compose.material3.TimePickerDialog
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
@@ -19,7 +21,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import app.brokoli5191.quote.ui.uiText
 
 /**
@@ -42,13 +46,19 @@ fun QuoteTimePickerDialog(
         is24Hour = is24Hour
     )
     var showInput by rememberSaveable { mutableStateOf(false) }
+    // AM/PM follows the accent like the hour/minute fields; the default tertiary tone clashes with it.
+    val colors = TimePickerDefaults.colors(
+        periodSelectorSelectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+        periodSelectorSelectedContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+    )
 
     TimePickerDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
                 text = uiText(if (showInput) "Enter time" else "Select time"),
-                style = MaterialTheme.typography.labelMedium
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.padding(bottom = 16.dp)
             )
         },
         confirmButton = {
@@ -72,9 +82,9 @@ fun QuoteTimePickerDialog(
         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
     ) {
         if (showInput) {
-            TimeInput(state = state)
+            TimeInput(state = state, colors = colors)
         } else {
-            TimePicker(state = state)
+            TimePicker(state = state, colors = colors)
         }
     }
 }

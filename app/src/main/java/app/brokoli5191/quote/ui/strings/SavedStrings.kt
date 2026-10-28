@@ -8,7 +8,7 @@ internal val savedGermanUi: Map<String, String> = mapOf(
     "Submit again" to "Erneut einreichen",
     "Withdraw" to "Zurückziehen",
     "No longer published" to "Nicht mehr veröffentlicht",
-    "This quote was removed from the community collection. You can submit it again." to "Dieses Quote wurde aus der Community-Sammlung entfernt. Du kannst es erneut einreichen.",
+    "This quote was removed from the community collection. To submit it again, change its text or author." to "Dieses Quote wurde aus der Community-Sammlung entfernt. Um es erneut einzureichen, ändere Text oder Autor.",
     "Note from the reviewer" to "Hinweis aus der Prüfung",
 
     // Local submission checks (same limits as the server)

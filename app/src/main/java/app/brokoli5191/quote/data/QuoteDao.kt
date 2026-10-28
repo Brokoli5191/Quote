@@ -30,7 +30,7 @@ interface QuoteDao {
     // (a rejected quote approved later, an approved one unpublished or republished).
     @Query(
         "SELECT * FROM quotes WHERE isUserAdded = 1 AND submissionId IS NOT NULL AND (" +
-            "submissionStatus = 'pending' OR (submittedAt >= :since AND (" +
+            "submissionStatus = 'pending' OR (COALESCE(submittedAt, 0) >= :since AND (" +
             "submissionStatus IN ('rejected', 'removed') OR " +
             "(submissionStatus = 'approved' AND linkedServerId IS NULL))))"
     )
@@ -64,6 +64,9 @@ interface QuoteDao {
 
     @Query("UPDATE quotes SET isFavorite = :isFav, savedDate = :savedDate WHERE id = :id")
     suspend fun updateFavorite(id: Int, isFav: Boolean, savedDate: String?)
+
+    @Query("UPDATE quotes SET text = :text, author = :author, textDe = :textDe, textEn = :textEn WHERE id = :id")
+    suspend fun updateText(id: Int, text: String, author: String, textDe: String?, textEn: String?)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertQuote(quote: QuoteEntity): Long

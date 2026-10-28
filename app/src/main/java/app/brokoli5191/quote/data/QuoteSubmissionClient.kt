@@ -124,7 +124,8 @@ class QuoteSubmissionClient {
                     when (connection.responseCode) {
                         HttpURLConnection.HTTP_OK ->
                             parseSubmissionStatusInfo(connection.inputStream.bufferedReader().use { it.readText() })
-                        HttpURLConnection.HTTP_NOT_FOUND -> SubmissionStatusInfo(QuoteSubmissionStatus.REMOVED)
+                        HttpURLConnection.HTTP_NOT_FOUND ->
+                            SubmissionStatusInfo(QuoteSubmissionStatus.REMOVED, notFound = true)
                         else -> throw IllegalStateException("Status service returned ${connection.responseCode}")
                     }
                 } finally {
@@ -133,7 +134,11 @@ class QuoteSubmissionClient {
             }
         }
 
-    /** Withdraws a pending submission. 409 maps to [SubmissionError.ALREADY_REVIEWED]. */
+    /**
+     * Withdraws a pending submission. 409 maps to [SubmissionError.ALREADY_REVIEWED]. A 404 counts as
+     * [WithdrawResult.NotFound] only with the backend's "not_found" code: an old backend without the
+     * route answers a bare 404, and the submission is then still in review.
+     */
     suspend fun withdraw(submissionId: String, installationId: String): WithdrawResult =
         withContext(Dispatchers.IO) {
             try {
@@ -148,11 +153,9 @@ class QuoteSubmissionClient {
                     val responseCode = connection.responseCode
                     if (responseCode == HttpURLConnection.HTTP_NO_CONTENT || responseCode == HttpURLConnection.HTTP_OK) {
                         WithdrawResult.Success
-                    } else if (responseCode == HttpURLConnection.HTTP_NOT_FOUND) {
-                        WithdrawResult.NotFound
                     } else {
                         val body = connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
-                        WithdrawResult.Error(SubmissionError.fromResponse(responseCode, parseErrorCode(body)))
+                        parseWithdrawError(responseCode, parseErrorCode(body))
                     }
                 } finally {
                     connection.disconnect()
@@ -183,6 +186,12 @@ internal fun parseSubmitResponse(responseCode: Int, responseText: String): Quote
     )
 }
 
+internal fun parseWithdrawError(responseCode: Int, code: String?): WithdrawResult = when {
+    responseCode == HttpURLConnection.HTTP_NOT_FOUND && code == SubmissionError.NOT_FOUND -> WithdrawResult.NotFound
+    responseCode == HttpURLConnection.HTTP_NOT_FOUND -> WithdrawResult.Error(SubmissionError.SERVER)
+    else -> WithdrawResult.Error(SubmissionError.fromResponse(responseCode, code))
+}
+
 private fun parseErrorCode(body: String): String? =
     runCatching { JSONObject(body).optNullableString("code") }.getOrNull()
 
@@ -204,7 +213,9 @@ internal fun parseSubmissionStatusInfo(json: String): SubmissionStatusInfo {
     return SubmissionStatusInfo(
         status = status,
         reviewNote = root.optNullableString("reviewNote")?.takeIf { it.isNotBlank() },
-        communityQuoteId = root.optNullableString("communityQuoteId")?.takeIf { it.isNotBlank() }
+        communityQuoteId = root.optNullableString("communityQuoteId")?.takeIf { it.isNotBlank() },
+        // Every v2 answer carries the submission id.
+        legacy = !root.has("id")
     )
 }
 

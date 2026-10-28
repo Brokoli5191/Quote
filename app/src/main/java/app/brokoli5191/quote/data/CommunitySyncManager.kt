@@ -38,6 +38,10 @@ class CommunitySyncManager(
         var revision = prefs.getLong(KEY_REVISION, 0L)
         // A recreated database (or cleared rows) must not keep a cursor past rows it no longer has.
         if (revision > 0L && repository.getCommunityQuotesCount() == 0) revision = 0L
+        // Rows stored before the v2 feed lack submissionId, language and translation, and may hold
+        // text the old normalizer damaged: read the whole feed once more. Favorites are kept.
+        val fullResync = !prefs.getBoolean(KEY_FEED_V2_RESYNCED, false)
+        if (fullResync) revision = 0L
         val tombstones = loadFavoriteTombstones()
         var tombstonesChanged = false
         do {
@@ -55,6 +59,7 @@ class CommunitySyncManager(
             prefs.edit().putLong(KEY_REVISION, revision).apply()
         } while (page.hasMore)
         if (tombstonesChanged) saveFavoriteTombstones(tombstones)
+        if (fullResync) prefs.edit().putBoolean(KEY_FEED_V2_RESYNCED, true).apply()
         return true
     }
 
@@ -63,9 +68,27 @@ class CommunitySyncManager(
         val installationIds = submissionInstallationIds(prefs)
         if (installationIds.isEmpty()) return false
         var changed = false
-        repository.getSubmissionsToRefresh().forEach { quote ->
+        // Once after the v2 upgrade every submission is checked, so older approved quotes get their
+        // community id (and older unpublished ones their state) even outside the refresh window.
+        val fullPass = !prefs.getBoolean(KEY_STATUS_V2_REFRESHED, false)
+        var allFetched = true
+        val quotes = if (fullPass) repository.getSubmissionsToRefresh(since = 0L) else repository.getSubmissionsToRefresh()
+        quotes.forEach { quote ->
             val submissionId = quote.submissionId ?: return@forEach
-            val info = fetchStatus(submissionId, installationIds) ?: return@forEach
+            val fetched = fetchStatus(submissionId, installationIds)
+            if (fetched == null) {
+                allFetched = false
+                return@forEach
+            }
+            // A deleted rejected submission (404) stays rejected: it was never published.
+            if (fetched.notFound && quote.submissionStatus == QuoteSubmissionStatus.REJECTED) return@forEach
+            // An old backend has no "removed" state and still says "approved" for an unpublished
+            // quote; only the feed linking it again brings a removed quote back.
+            if (fetched.legacy && quote.submissionStatus == QuoteSubmissionStatus.REMOVED &&
+                fetched.status == QuoteSubmissionStatus.APPROVED
+            ) return@forEach
+            // A response without a note (404, old backend) keeps the stored one.
+            val info = if (fetched.reviewNote == null) fetched.copy(reviewNote = quote.reviewNote) else fetched
             val linked = info.communityQuoteId?.takeIf { info.status == QuoteSubmissionStatus.APPROVED }
                 // The feed may already have linked it; a status without the id keeps that link.
                 ?: quote.linkedServerId.takeIf { info.status == QuoteSubmissionStatus.APPROVED }
@@ -77,6 +100,7 @@ class CommunitySyncManager(
                 changed = true
             }
         }
+        if (fullPass && allFetched) prefs.edit().putBoolean(KEY_STATUS_V2_REFRESHED, true).apply()
         return changed
     }
 
@@ -90,6 +114,21 @@ class CommunitySyncManager(
             removed = info
         }
         return removed
+    }
+
+    /**
+     * Remembers favorites (community id to saved date) whose quotes are not stored yet, e.g. from a
+     * backup restored before the first sync; the feed favorites them when they arrive.
+     */
+    suspend fun rememberPendingFavorites(favorites: Map<String, String?>) {
+        if (favorites.isEmpty()) return
+        mutex.withLock {
+            val tombstones = loadFavoriteTombstones()
+            // Re-inserted so they count as the newest entries when the list is capped.
+            tombstones.keys.removeAll(favorites.keys)
+            tombstones.putAll(favorites)
+            saveFavoriteTombstones(tombstones)
+        }
     }
 
     private fun loadFavoriteTombstones(): MutableMap<String, String?> {
@@ -120,6 +159,8 @@ class CommunitySyncManager(
         private const val PREFS = "aura_prefs"
         private const val KEY_REVISION = "community_quote_revision"
         private const val KEY_FAVORITE_TOMBSTONES = "community_favorite_tombstones"
+        private const val KEY_FEED_V2_RESYNCED = "community_feed_v2_resynced"
+        private const val KEY_STATUS_V2_REFRESHED = "submission_status_v2_refreshed"
         private const val MAX_FAVORITE_TOMBSTONES = 200
         const val KEY_INSTALLATION_ID = "submission_installation_id"
         const val KEY_EXTRA_INSTALLATION_IDS = "submission_installation_ids_extra"

@@ -19,7 +19,11 @@ data class CommunityApplyResult(
 data class SubmissionStatusInfo(
     val status: String,
     val reviewNote: String? = null,
-    val communityQuoteId: String? = null
+    val communityQuoteId: String? = null,
+    /** The status endpoint answered 404 (withdrawn or deleted); [status] is then removed. */
+    val notFound: Boolean = false,
+    /** The answer came from a pre-v2 backend, which never reports "removed". */
+    val legacy: Boolean = false
 )
 
 /** Day key for daily selections. Fixed locale so the key never contains non-ASCII digits. */
@@ -161,18 +165,28 @@ class QuoteRepository(
         quoteDao.updateFavorite(id, isFav, savedString)
     }
 
+    /** Marks a quote as favorite with a given saved date (e.g. from a backup). */
+    suspend fun setFavorite(id: Int, savedDate: String?) {
+        quoteDao.updateFavorite(id, true, savedDate ?: System.currentTimeMillis().toString())
+    }
+
     suspend fun insertQuote(quote: QuoteEntity): Long {
         return quoteDao.insertQuote(quote.normalizedText())
     }
 
-    /** Re-applies text normalization to stored rows; [onlyOrigins] limits it to some origins. */
+    /**
+     * Re-applies text normalization to stored rows; [onlyOrigins] limits it to some origins.
+     * Only the text columns are written, so other changes made meanwhile are kept.
+     */
     suspend fun repairStoredText(onlyOrigins: Set<String>? = null) {
-        val repaired = quoteDao.getAllQuotesSync()
+        quoteDao.getAllQuotesSync()
             .filter { onlyOrigins == null || it.origin in onlyOrigins }
-            .mapNotNull { current ->
-                current.normalizedText().takeIf { normalized -> normalized != current }
+            .forEach { current ->
+                val normalized = current.normalizedText()
+                if (normalized != current) {
+                    quoteDao.updateText(current.id, normalized.text, normalized.author, normalized.textDe, normalized.textEn)
+                }
             }
-        if (repaired.isNotEmpty()) quoteDao.insertQuotes(repaired)
     }
 
     suspend fun getAllQuotesSync(): List<QuoteEntity> {
@@ -184,8 +198,11 @@ class QuoteRepository(
     }
 
     /** Submissions whose server state should be polled: pending ones and recently reviewed ones. */
-    suspend fun getSubmissionsToRefresh(now: Long = System.currentTimeMillis()): List<QuoteEntity> {
-        return quoteDao.getSubmissionsToRefresh(now - SUBMISSION_REFRESH_WINDOW_MS)
+    suspend fun getSubmissionsToRefresh(
+        now: Long = System.currentTimeMillis(),
+        since: Long = now - SUBMISSION_REFRESH_WINDOW_MS
+    ): List<QuoteEntity> {
+        return quoteDao.getSubmissionsToRefresh(since)
     }
 
     suspend fun deleteQuote(id: Int) {

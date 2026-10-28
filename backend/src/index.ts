@@ -218,14 +218,16 @@ function findSubmissionByContent(env: Env, contentHash: string): Promise<Existin
 }
 
 // A retry from the installation that already submitted this quote (lost response,
-// restored backup) gets the existing submission back instead of an error.
+// restored backup) gets the existing submission back instead of an error. The 1.7.0 app
+// treats every non-201 answer as a failure and shows `error`, so it is included for it.
 function ownDuplicate(request: Request, env: Env, existing: ExistingSubmission): Response {
   return json(request, env, {
     id: existing.id,
     status: existing.status,
     reviewNote: existing.reviewNote,
     communityQuoteId: existing.communityQuoteId,
-    duplicate: true
+    duplicate: true,
+    error: "This quote has already been submitted."
   });
 }
 
