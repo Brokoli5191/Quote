@@ -2,6 +2,7 @@ package app.brokoli5191.quote.ui.screens
 
 import android.content.Context
 import android.os.Build
+import android.text.format.DateFormat
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -14,14 +15,15 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,8 +34,11 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.brokoli5191.quote.BuildConfig
@@ -46,7 +51,9 @@ import app.brokoli5191.quote.ui.uiText
 import app.brokoli5191.quote.ui.components.ExpressiveButton
 import app.brokoli5191.quote.ui.components.ExpressiveOutlinedButton
 import app.brokoli5191.quote.ui.components.ExpressiveTextButton
+import app.brokoli5191.quote.ui.components.QuoteTimePickerDialog
 import app.brokoli5191.quote.utils.UpdateStatus
+import java.util.Calendar
 
 @Composable
 fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
@@ -138,7 +145,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                         viewModel.setThemeMode(mode)
                                     },
-                                    modifier = Modifier.weight(1f).height(48.dp),
+                                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                                     restingCorner = 12.dp,
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = if (isSelected)
@@ -149,12 +156,9 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                             else MaterialTheme.colorScheme.onSurfaceVariant
                                     ),
                                     border = if (isSelected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)) else null,
-                                    contentPadding = PaddingValues(0.dp)
+                                    contentPadding = PaddingValues(horizontal = 8.dp)
                                 ) {
-                                    Text(
-                                        text = uiText(label),
-                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
-                                    )
+                                    SettingsButtonText(uiText(label))
                                 }
                             }
                         }
@@ -291,7 +295,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 viewModel.setQuoteSourceMode(mode)
                             },
-                                modifier = Modifier.weight(1f).height(48.dp),
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                             restingCorner = 12.dp,
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer
@@ -303,9 +307,12 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                 1.dp,
                                 MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
                             ) else null,
-                            contentPadding = PaddingValues(horizontal = 2.dp)
+                            contentPadding = PaddingValues(horizontal = 6.dp)
                         ) {
-                            Text(uiText(title), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                            SettingsButtonText(
+                                uiText(title),
+                                MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
+                            )
                         }
                     }
                 }
@@ -342,7 +349,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 viewModel.setAppLanguage(language)
                             },
-                            modifier = Modifier.weight(1f).height(48.dp),
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                             restingCorner = 12.dp,
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer
@@ -350,9 +357,13 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                 contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
                                 else MaterialTheme.colorScheme.onSurfaceVariant
                             ),
-                            border = if (selected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)) else null
+                            border = if (selected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)) else null,
+                            contentPadding = PaddingValues(horizontal = 12.dp)
                         ) {
-                            Text(localizeUi(title, appLanguage), fontWeight = FontWeight.Bold)
+                            SettingsButtonText(
+                                localizeUi(title, appLanguage),
+                                MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+                            )
                         }
                     }
                 }
@@ -376,6 +387,29 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                         onCheckedChange = viewModel::setShowAnonymousQuotes
                     )
                 }
+
+                val authorImagesEnabled by viewModel.authorImagesEnabled.collectAsStateWithLifecycle()
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                        Text(uiText("Author pictures"), fontWeight = FontWeight.SemiBold)
+                        Text(
+                            uiText("Portraits are loaded from Wikipedia (Wikimedia) when enabled."),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = authorImagesEnabled,
+                        onCheckedChange = { isChecked ->
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            viewModel.setAuthorImagesEnabled(isChecked)
+                        }
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(28.dp))
@@ -397,6 +431,22 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                 val reminderEnabled by viewModel.dailyReminderEnabled.collectAsStateWithLifecycle()
                 val reminderHour by viewModel.dailyReminderHour.collectAsStateWithLifecycle()
                 val reminderMinute by viewModel.dailyReminderMinute.collectAsStateWithLifecycle()
+                val formattedReminderTime = formatReminderTime(context, reminderHour, reminderMinute)
+                var showTimePicker by rememberSaveable { mutableStateOf(false) }
+                val reduceMotion by viewModel.lowPerformanceMode.collectAsStateWithLifecycle()
+
+                if (showTimePicker) {
+                    QuoteTimePickerDialog(
+                        initialHour = reminderHour,
+                        initialMinute = reminderMinute,
+                        onConfirm = { hour, minute ->
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            viewModel.updateDailyReminderTime(hour, minute)
+                            showTimePicker = false
+                        },
+                        onDismiss = { showTimePicker = false }
+                    )
+                }
 
                 Card(
                     modifier = Modifier
@@ -476,8 +526,8 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
 
                         AnimatedVisibility(
                             visible = reminderEnabled,
-                            enter = expandVertically() + fadeIn(),
-                            exit = shrinkVertically() + fadeOut()
+                            enter = if (reduceMotion) EnterTransition.None else expandVertically() + fadeIn(),
+                            exit = if (reduceMotion) ExitTransition.None else shrinkVertically() + fadeOut()
                         ) {
                             Column(
                                 modifier = Modifier
@@ -493,86 +543,50 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                     color = MaterialTheme.colorScheme.primary
                                 )
 
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.Center,
-                                    modifier = Modifier.fillMaxWidth()
+                                val changeTimeLabel = uiText("Change time")
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
+                                        .clickable(onClickLabel = changeTimeLabel, role = Role.Button) {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            showTimePicker = true
+                                        }
+                                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    // Hour Column
-                                    Column(
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        modifier = Modifier.width(60.dp)
-                                    ) {
-                                        IconButton(onClick = {
-                                            val h = (reminderHour + 1) % 24
-                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            viewModel.updateDailyReminderTime(h, reminderMinute)
-                                        }) {
-                                            Icon(Icons.Default.KeyboardArrowUp, uiText("Increase hour"))
-                                        }
-
-                                        Text(
-                                            text = String.format("%02d", reminderHour),
-                                            style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-
-                                        IconButton(onClick = {
-                                            var h = reminderHour - 1
-                                            if (h < 0) h = 23
-                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            viewModel.updateDailyReminderTime(h, reminderMinute)
-                                        }) {
-                                            Icon(Icons.Default.KeyboardArrowDown, uiText("Decrease hour"))
-                                        }
-                                    }
-
                                     Text(
-                                        text = ":",
-                                        style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                                        modifier = Modifier.padding(horizontal = 12.dp)
+                                        text = formattedReminderTime,
+                                        style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        textAlign = TextAlign.Center
                                     )
-
-                                    // Minute Column
-                                    Column(
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        modifier = Modifier.width(60.dp)
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
-                                        IconButton(onClick = {
-                                            val m = (reminderMinute + 5) % 60
-                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            viewModel.updateDailyReminderTime(reminderHour, m)
-                                        }) {
-                                            Icon(Icons.Default.KeyboardArrowUp, uiText("Increase minute"))
-                                        }
-
-                                        Text(
-                                            text = String.format("%02d", reminderMinute),
-                                            style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
-                                            color = MaterialTheme.colorScheme.onSurface
+                                        Icon(
+                                            imageVector = Icons.Default.Schedule,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(16.dp)
                                         )
-
-                                        IconButton(onClick = {
-                                            var m = reminderMinute - 5
-                                            if (m < 0) m = 55
-                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            viewModel.updateDailyReminderTime(reminderHour, m)
-                                        }) {
-                                            Icon(Icons.Default.KeyboardArrowDown, uiText("Decrease minute"))
-                                        }
+                                        Text(
+                                            text = uiText("Tap to change"),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            textAlign = TextAlign.Center
+                                        )
                                     }
-
                                 }
 
                                 Text(
-                                    text = if (uiLanguage == QuoteLanguage.GERMAN) {
-                                        "Täglich um ${String.format("%02d:%02d", reminderHour, reminderMinute)} Uhr"
-                                    } else {
-                                        "Scheduled daily at ${if (reminderHour == 0) 12 else if (reminderHour > 12) reminderHour - 12 else reminderHour}:${String.format("%02d", reminderMinute)} ${if (reminderHour < 12) "AM" else "PM"}"
-                                    },
+                                    text = uiText("Scheduled daily at {time}").replace("{time}", formattedReminderTime),
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                                    textAlign = TextAlign.Center
                                 )
                             }
                         }
@@ -742,9 +756,9 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                             is UpdateStatus.Idle -> uiText("Check for app and community quote updates.")
                             is UpdateStatus.Checking -> uiText("Checking for updates…")
                             is UpdateStatus.UpToDate -> uiText("You're on the latest version.")
-                            is UpdateStatus.UpdateAvailable -> if (uiLanguage == "de") "Update verfügbar: v${s.version}" else "Update available: v${s.version}"
-                            is UpdateStatus.Downloading -> if (uiLanguage == "de") "Wird heruntergeladen … ${s.progress}%" else "Downloading… ${s.progress}%"
-                            is UpdateStatus.ReadyToInstall -> if (uiLanguage == "de") "v${s.version} ist installationsbereit." else "v${s.version} ready to install."
+                            is UpdateStatus.UpdateAvailable -> uiText("Update available: v{version}").replace("{version}", s.version)
+                            is UpdateStatus.Downloading -> uiText("Downloading… {progress}%").replace("{progress}", s.progress.toString())
+                            is UpdateStatus.ReadyToInstall -> uiText("v{version} ready to install.").replace("{version}", s.version)
                             is UpdateStatus.Error -> localizeUi(s.message, uiLanguage)
                         }
                         val statusColor = when (updateStatus) {
@@ -783,17 +797,15 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                     viewModel.checkForUpdatesManually()
                                 },
                                 enabled = !isChecking && !isDownloading,
-                            modifier = Modifier.weight(1f).height(48.dp),
+                                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                                 restingCorner = 12.dp,
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
                                 colors = ButtonDefaults.outlinedButtonColors(
                                     contentColor = MaterialTheme.colorScheme.primary
-                                )
+                                ),
+                                contentPadding = PaddingValues(horizontal = 12.dp)
                             ) {
-                                Text(
-                                    text = uiText("Check"),
-                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
-                                )
+                                SettingsButtonText(uiText("Check"))
                             }
 
                             when (val s = updateStatus) {
@@ -803,17 +815,15 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                             viewModel.downloadUpdate(s.downloadUrl, s.version)
                                         },
-                                modifier = Modifier.weight(1f).height(48.dp),
+                                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                                         restingCorner = 12.dp,
                                         colors = ButtonDefaults.buttonColors(
                                             containerColor = MaterialTheme.colorScheme.primaryContainer,
                                             contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                                        )
+                                        ),
+                                        contentPadding = PaddingValues(horizontal = 12.dp)
                                     ) {
-                                        Text(
-                                            text = uiText("Download"),
-                                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
-                                        )
+                                        SettingsButtonText(uiText("Download"))
                                     }
                                 }
                                 is UpdateStatus.ReadyToInstall -> {
@@ -822,17 +832,15 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                             viewModel.installUpdate(context, s.filePath)
                                         },
-                                        modifier = Modifier.weight(1f).height(48.dp),
+                                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                                         restingCorner = 12.dp,
                                         colors = ButtonDefaults.buttonColors(
                                             containerColor = MaterialTheme.colorScheme.primary,
                                             contentColor = MaterialTheme.colorScheme.onPrimary
-                                        )
+                                        ),
+                                        contentPadding = PaddingValues(horizontal = 12.dp)
                                     ) {
-                                        Text(
-                                            text = uiText("Install"),
-                                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
-                                        )
+                                        SettingsButtonText(uiText("Install"))
                                     }
                                 }
                                 else -> Spacer(modifier = Modifier.weight(1f))
@@ -868,7 +876,11 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                     Toast.makeText(context, localizeUi("Backup exported successfully! ✦", uiLanguage), Toast.LENGTH_LONG).show()
                                 },
                                 onError = { error ->
-                                    Toast.makeText(context, if (uiLanguage == "de") "Export fehlgeschlagen: $error" else "Export failed: $error", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(
+                                        context,
+                                        localizeUi("Export failed: {error}", uiLanguage).replace("{error}", localizeUi(error, uiLanguage)),
+                                        Toast.LENGTH_LONG
+                                    ).show()
                                 }
                             )
                         }
@@ -884,13 +896,16 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                 onSuccess = { customCount, favCount, settingsRestored ->
                                     Toast.makeText(
                                         context,
-                                        if (uiLanguage == "de") {
-                                            "Wiederherstellung abgeschlossen: $customCount eigene Quotes importiert, $favCount Favoriten aktualisiert" +
-                                                if (settingsRestored) " und Einstellungen wiederhergestellt." else "."
-                                        } else {
-                                            "Restore complete! Imported $customCount custom quotes, updated $favCount favorites" +
-                                                if (settingsRestored) ", and restored settings." else "."
-                                        },
+                                        localizeUi(
+                                            if (settingsRestored) {
+                                                "Restore complete! Imported {custom} custom quotes, updated {favorites} favorites, and restored settings."
+                                            } else {
+                                                "Restore complete! Imported {custom} custom quotes and updated {favorites} favorites."
+                                            },
+                                            uiLanguage
+                                        )
+                                            .replace("{custom}", customCount.toString())
+                                            .replace("{favorites}", favCount.toString()),
                                         Toast.LENGTH_LONG
                                     ).show()
                                     if (
@@ -910,7 +925,11 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                     viewModel.runVerification()
                                 },
                                 onError = { error ->
-                                    Toast.makeText(context, if (uiLanguage == "de") "Wiederherstellung fehlgeschlagen: $error" else "Restore failed: $error", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(
+                                        context,
+                                        localizeUi("Restore failed: {error}", uiLanguage).replace("{error}", localizeUi(error, uiLanguage)),
+                                        Toast.LENGTH_LONG
+                                    ).show()
                                 }
                             )
                         }
@@ -950,23 +969,21 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                 },
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(48.dp),
+                                    .heightIn(min = 48.dp),
                                 restingCorner = 12.dp,
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
+                                ),
+                                contentPadding = PaddingValues(horizontal = 12.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Share,
-                                    contentDescription = uiText("Export Backup"),
+                                    contentDescription = null,
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = uiText("Export"),
-                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
-                                )
+                                SettingsButtonText(uiText("Export"))
                             }
 
                             // Import Button
@@ -977,23 +994,21 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                 },
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(48.dp),
+                                    .heightIn(min = 48.dp),
                                 restingCorner = 12.dp,
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
                                 colors = ButtonDefaults.outlinedButtonColors(
                                     contentColor = MaterialTheme.colorScheme.primary
-                                )
+                                ),
+                                contentPadding = PaddingValues(horizontal = 12.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Add,
-                                    contentDescription = uiText("Import Backup"),
+                                    contentDescription = null,
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = uiText("Restore"),
-                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
-                                )
+                                SettingsButtonText(uiText("Restore"))
                             }
                         }
                     }
@@ -1046,7 +1061,8 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                     ) {
                         Text(
                             text = uiText("Developer Options"),
-                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            textAlign = TextAlign.Center
                         )
                     }
                 }
@@ -1055,4 +1071,38 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
             Spacer(modifier = Modifier.height(8.dp))
         }
     }
+}
+
+/**
+ * Single-line button label that shrinks instead of wrapping or clipping, so long German labels
+ * (e.g. "Wiederherstellen") still fit narrow side-by-side buttons.
+ */
+@Composable
+private fun SettingsButtonText(
+    text: String,
+    style: TextStyle = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+) {
+    val maxSize = style.fontSize.takeIf { it.isSp } ?: 14.sp
+    Text(
+        text = text,
+        style = style,
+        maxLines = 1,
+        textAlign = TextAlign.Center,
+        autoSize = TextAutoSize.StepBased(
+            minFontSize = minOf(9f, maxSize.value).sp,
+            maxFontSize = maxSize,
+            stepSize = 0.5.sp
+        )
+    )
+}
+
+/** Reminder time in the system's 12/24-hour format and locale (e.g. "08:00" or "8:00 AM"). */
+internal fun formatReminderTime(context: Context, hour: Int, minute: Int): String {
+    val calendar = Calendar.getInstance().apply {
+        set(Calendar.HOUR_OF_DAY, hour.coerceIn(0, 23))
+        set(Calendar.MINUTE, minute.coerceIn(0, 59))
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+    }
+    return DateFormat.getTimeFormat(context).format(calendar.time)
 }

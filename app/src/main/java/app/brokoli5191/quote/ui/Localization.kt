@@ -3,12 +3,18 @@ package app.brokoli5191.quote.ui
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
 import app.brokoli5191.quote.data.QuoteLanguage
+import app.brokoli5191.quote.ui.strings.commonGermanUi
+import app.brokoli5191.quote.ui.strings.dailyGermanUi
+import app.brokoli5191.quote.ui.strings.libraryGermanUi
+import app.brokoli5191.quote.ui.strings.mainGermanUi
+import app.brokoli5191.quote.ui.strings.onboardingGermanUi
+import app.brokoli5191.quote.ui.strings.savedGermanUi
+import app.brokoli5191.quote.ui.strings.settingsGermanUi
 
 val LocalAppLanguage = staticCompositionLocalOf { QuoteLanguage.ENGLISH }
 
 private val germanUi = mapOf(
     "Daily" to "Heute",
-    "Daily Quote" to "Zitat des Tages",
     "Today" to "Heute",
     "A thought worth keeping" to "Ein Gedanke, den es zu bewahren lohnt",
     "Library" to "Bibliothek",
@@ -245,8 +251,24 @@ private val germanCategories = mapOf(
     "Uncategorized" to "Ohne Kategorie"
 )
 
+// Per-area string maps (ui/strings). Consulted after the shared germanUi map, in this order.
+private val areaGermanUi: List<Map<String, String>> by lazy {
+    listOf(
+        mainGermanUi,
+        onboardingGermanUi,
+        dailyGermanUi,
+        libraryGermanUi,
+        savedGermanUi,
+        settingsGermanUi,
+        commonGermanUi
+    )
+}
+
+private fun germanUiText(english: String): String? =
+    germanUi[english] ?: areaGermanUi.firstNotNullOfOrNull { it[english] }
+
 fun localizeUi(english: String, language: String): String =
-    if (language == QuoteLanguage.GERMAN) germanUi[english] ?: english else english
+    if (language == QuoteLanguage.GERMAN) germanUiText(english) ?: english else english
 
 @Composable
 fun uiText(english: String): String = localizeUi(english, LocalAppLanguage.current)

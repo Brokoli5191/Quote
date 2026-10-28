@@ -25,12 +25,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontStyle
@@ -43,18 +45,38 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.brokoli5191.quote.data.CategoryMapper
 import app.brokoli5191.quote.data.QuoteEntity
+import app.brokoli5191.quote.data.QuoteLanguage
 import app.brokoli5191.quote.data.QuoteSubmissionStatus
+import app.brokoli5191.quote.data.SubmissionError
+import app.brokoli5191.quote.data.alternateLanguage
+import app.brokoli5191.quote.data.alternateText
+import app.brokoli5191.quote.data.hasUnknownAuthor
 import app.brokoli5191.quote.ui.QuoteViewModel
 import app.brokoli5191.quote.ui.LocalAppLanguage
+import app.brokoli5191.quote.ui.categoryText
 import app.brokoli5191.quote.ui.formattedQuote
 import app.brokoli5191.quote.ui.localizeUi
 import app.brokoli5191.quote.ui.uiText
+import app.brokoli5191.quote.ui.components.AuthorAvatar
+import app.brokoli5191.quote.ui.components.ExpressiveButton
 import app.brokoli5191.quote.ui.components.ExpressiveIconButton
+import app.brokoli5191.quote.ui.components.TranslationToggle
 import app.brokoli5191.quote.ui.components.rememberExpressiveShape
+import app.brokoli5191.quote.ui.strings.submissionErrorText
 import app.brokoli5191.quote.ui.theme.SerifFontFamily
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+
+// Same limits as the submission backend (validateSubmission).
+private const val MIN_SUBMISSION_TEXT = 3
+private const val MAX_SUBMISSION_TEXT = 500
+private const val MAX_SUBMISSION_AUTHOR = 100
+private const val MAX_SUBMISSION_TAGS = 8
+private const val MAX_SUBMISSION_TAG_LENGTH = 30
+
+private data class EditRequest(val quote: QuoteEntity, val resubmit: Boolean)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,8 +86,12 @@ fun SavedScreen(viewModel: QuoteViewModel) {
     val submittingQuoteIds by viewModel.submittingQuoteIds.collectAsStateWithLifecycle()
     val activeSubTab by viewModel.savedSubTab.collectAsStateWithLifecycle()
     val lowPerformanceMode by viewModel.lowPerformanceMode.collectAsStateWithLifecycle()
-    
+    val authorImagesEnabled by viewModel.authorImagesEnabled.collectAsStateWithLifecycle()
+
     var quoteToSubmit by remember { mutableStateOf<QuoteEntity?>(null) }
+    var quoteToDelete by remember { mutableStateOf<QuoteEntity?>(null) }
+    var quoteToWithdraw by remember { mutableStateOf<QuoteEntity?>(null) }
+    var editRequest by remember { mutableStateOf<EditRequest?>(null) }
 
     val context = LocalContext.current
     val shareTitle = uiText("Share Wisdom")
@@ -81,6 +107,31 @@ fun SavedScreen(viewModel: QuoteViewModel) {
         while (true) {
             delay(30_000)
             timestampTick = System.currentTimeMillis()
+        }
+    }
+
+    // The ViewModel re-reads the stored row by id, so Undo restores the raw entity (including its
+    // submission state), never this localized display copy.
+    val deleteWithUndo: (QuoteEntity) -> Unit = { quote ->
+        viewModel.deleteQuote(quote.id)
+        scope.launch {
+            val result = snackbarHostState.showSnackbar(
+                message = deletedMessage,
+                actionLabel = undoLabel,
+                duration = SnackbarDuration.Short
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                viewModel.restoreDeletedQuote(quote)
+            }
+        }
+    }
+
+    val requestSubmit: (QuoteEntity) -> Unit = { quote ->
+        val problem = quote.submissionProblem()
+        if (problem != null) {
+            Toast.makeText(context, localizeUi(problem, uiLanguage), Toast.LENGTH_LONG).show()
+        } else {
+            quoteToSubmit = quote
         }
     }
 
@@ -174,7 +225,8 @@ fun SavedScreen(viewModel: QuoteViewModel) {
                             Text(
                                 text = if (subTab == "Favorites") uiText("No favorites yet") else uiText("No custom quotes yet"),
                                 style = MaterialTheme.typography.headlineMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
                             )
                             Text(
                                 text = if (subTab == "Favorites") {
@@ -195,30 +247,42 @@ fun SavedScreen(viewModel: QuoteViewModel) {
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         items(activeList, key = { it.id }) { quote ->
+                            // Own quotes are stored locally only, so their author is never looked up
+                            // online; bundled names still resolve from the offline map elsewhere.
+                            val lookUpAuthor = authorImagesEnabled && !quote.isUserAdded && !quote.hasUnknownAuthor
+                            val authorInfoFlow = remember(quote.author, lookUpAuthor) {
+                                if (lookUpAuthor) viewModel.authorInfo(quote.author) else null
+                            }
+                            val authorImageUrl = authorInfoFlow?.let { it.collectAsStateWithLifecycle().value }?.imageUrl
+                            val isSubmitting = quote.id in submittingQuoteIds
+
                             PremiumCollectionQuoteCard(
                                 quote = quote,
                                 nowMillis = timestampTick,
+                                authorImageUrl = authorImageUrl,
                                 onToggleFavorite = { viewModel.toggleFavorite(quote) },
                                 onDelete = {
-                                    viewModel.deleteQuote(quote.id)
-                                    scope.launch {
-                                        val result = snackbarHostState.showSnackbar(
-                                            message = deletedMessage,
-                                            actionLabel = undoLabel,
-                                            duration = SnackbarDuration.Short
+                                    // Pending quotes are withdrawn on delete, approved ones stay published:
+                                    // both get a dialog that says so.
+                                    val needsConfirmation = quote.isUserAdded && (
+                                        quote.submissionStatus == QuoteSubmissionStatus.PENDING ||
+                                            quote.submissionStatus == QuoteSubmissionStatus.APPROVED
                                         )
-                                        if (result == SnackbarResult.ActionPerformed) {
-                                            viewModel.restoreDeletedQuote(quote)
-                                        }
+                                    when {
+                                        isSubmitting -> Unit
+                                        needsConfirmation -> quoteToDelete = quote
+                                        else -> deleteWithUndo(quote)
                                     }
                                 },
-                                isSubmitting = quote.id in submittingQuoteIds,
+                                isSubmitting = isSubmitting,
                                 lowPerformanceMode = lowPerformanceMode,
-                                onSubmit = { quoteToSubmit = quote },
-                                onShare = {
+                                onSubmit = { requestSubmit(quote) },
+                                onEdit = { resubmit -> editRequest = EditRequest(quote, resubmit) },
+                                onWithdraw = { quoteToWithdraw = quote },
+                                onShare = { shareText ->
                                     val intent = Intent(Intent.ACTION_SEND).apply {
                                         type = "text/plain"
-                                        putExtra(Intent.EXTRA_TEXT, formattedQuote(quote.text, quote.author))
+                                        putExtra(Intent.EXTRA_TEXT, shareText)
                                     }
                                     context.startActivity(Intent.createChooser(intent, shareTitle))
                                 }
@@ -232,7 +296,7 @@ fun SavedScreen(viewModel: QuoteViewModel) {
         // Floating creator button
         FloatingActionButton(
             onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 viewModel.openNewQuoteScreen()
             },
             modifier = Modifier
@@ -259,86 +323,237 @@ fun SavedScreen(viewModel: QuoteViewModel) {
         )
 
         quoteToSubmit?.let { quote ->
-            Dialog(
-                onDismissRequest = { quoteToSubmit = null },
-                properties = DialogProperties(usePlatformDefaultWidth = false)
+            val resubmit = quote.submissionStatus == QuoteSubmissionStatus.REJECTED ||
+                quote.submissionStatus == QuoteSubmissionStatus.REMOVED
+            SubmissionConsentDialog(
+                resubmit = resubmit,
+                onDismiss = { quoteToSubmit = null },
+                onOpenPolicy = {
+                    context.startActivity(
+                        Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://quote.cowsay.win/privacy"))
+                    )
+                },
+                onConfirm = {
+                    quoteToSubmit = null
+                    val onSuccess = {
+                        Toast.makeText(context, localizeUi("Submitted for review", uiLanguage), Toast.LENGTH_SHORT).show()
+                    }
+                    val onError = { code: String ->
+                        Toast.makeText(context, submitErrorMessage(code, uiLanguage), Toast.LENGTH_LONG).show()
+                    }
+                    if (resubmit) {
+                        viewModel.resubmitQuote(quote, onSuccess, onError)
+                    } else {
+                        viewModel.submitQuoteForReview(quote, onSuccess, onError)
+                    }
+                }
+            )
+        }
+
+        quoteToDelete?.let { quote ->
+            val pending = quote.submissionStatus == QuoteSubmissionStatus.PENDING
+            AlertDialog(
+                onDismissRequest = { quoteToDelete = null },
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                tonalElevation = 0.dp,
+                title = { Text(uiText(if (pending) "Delete and withdraw?" else "Delete quote?")) },
+                text = {
+                    Text(
+                        uiText(
+                            if (pending) {
+                                "This quote is still waiting for review. Deleting it also withdraws the submission, so it won't be published. Without an internet connection, the submission can't be withdrawn and stays in review."
+                            } else {
+                                "This only deletes your own copy. The published quote stays in the community collection."
+                            }
+                        )
+                    )
+                },
+                dismissButton = {
+                    TextButton(onClick = { quoteToDelete = null }) {
+                        Text(uiText("Cancel"))
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        quoteToDelete = null
+                        deleteWithUndo(quote)
+                    }) {
+                        Text(uiText("Delete"), color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            )
+        }
+
+        quoteToWithdraw?.let { quote ->
+            AlertDialog(
+                onDismissRequest = { quoteToWithdraw = null },
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                tonalElevation = 0.dp,
+                title = { Text(uiText("Withdraw submission?")) },
+                text = {
+                    Text(uiText("The quote leaves the review queue and stays in My Quotes. You can submit it again later."))
+                },
+                dismissButton = {
+                    TextButton(onClick = { quoteToWithdraw = null }) {
+                        Text(uiText("Cancel"))
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        quoteToWithdraw = null
+                        viewModel.withdrawSubmission(
+                            quote = quote,
+                            onSuccess = {
+                                Toast.makeText(context, localizeUi("Submission withdrawn", uiLanguage), Toast.LENGTH_SHORT).show()
+                            },
+                            onError = { code ->
+                                Toast.makeText(context, submissionErrorText(code, uiLanguage), Toast.LENGTH_LONG).show()
+                            }
+                        )
+                    }) {
+                        Text(uiText("Withdraw"))
+                    }
+                }
+            )
+        }
+
+        editRequest?.let { request ->
+            EditQuoteSheet(
+                quote = request.quote,
+                resubmit = request.resubmit,
+                onDismiss = { editRequest = null },
+                onSave = { text, author, category, tags ->
+                    viewModel.updateUserQuote(request.quote, text, author, category, tags) { saved ->
+                        if (!saved) {
+                            Toast.makeText(context, localizeUi("Changes could not be saved.", uiLanguage), Toast.LENGTH_LONG).show()
+                        } else if (request.resubmit) {
+                            // The edit cleared the old review; the consent dialog sends the stored row.
+                            quoteToSubmit = request.quote.copy(submissionStatus = QuoteSubmissionStatus.NOT_SUBMITTED)
+                        }
+                    }
+                }
+            )
+        }
+    }
+}
+
+private fun submitErrorMessage(code: String, language: String): String =
+    if (code == SubmissionError.ALREADY_REVIEWED) {
+        // On submit this means the server already decided on exactly this text.
+        localizeUi("This exact quote was already reviewed. Edit it before submitting it again.", language)
+    } else {
+        submissionErrorText(code, language)
+    }
+
+@Composable
+private fun SubmissionConsentDialog(
+    resubmit: Boolean,
+    onDismiss: () -> Unit,
+    onOpenPolicy: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 24.dp)
+                .widthIn(max = 420.dp),
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            tonalElevation = 0.dp,
+            border = BorderStroke(
+                1.dp,
+                MaterialTheme.colorScheme.outline.copy(alpha = 0.28f)
+            )
+        ) {
+            Column(
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp)
-                        .widthIn(max = 420.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    color = MaterialTheme.colorScheme.background,
-                    contentColor = MaterialTheme.colorScheme.onBackground,
-                    tonalElevation = 0.dp,
-                    border = BorderStroke(
-                        1.dp,
-                        MaterialTheme.colorScheme.outline.copy(alpha = 0.28f)
-                    )
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                        ) {
-                            Icon(
-                                Icons.Default.CloudUpload,
-                                contentDescription = null,
-                                modifier = Modifier.padding(10.dp).size(22.dp)
+                    Icon(
+                        Icons.Default.CloudUpload,
+                        contentDescription = null,
+                        modifier = Modifier.padding(10.dp).size(22.dp)
+                    )
+                }
+                Text(
+                    uiText(if (resubmit) "Submit again?" else "Submit for review?"),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    uiText("A moderator reviews the quote. If approved, it is published in the community collection under the author's name and may be slightly corrected."),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        uiText("What is sent"),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    listOf(
+                        "Quote text",
+                        "Author",
+                        "Category",
+                        "Tags",
+                        "Language of the quote",
+                        "App version",
+                        "A random installation ID (used for the review status and spam limits)"
+                    ).forEach { item ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                "•",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                uiText(item),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f)
                             )
                         }
+                    }
+                }
+                Text(
+                    uiText("Your IP address is processed for spam protection. Its hash is deleted after 30 days. Nothing else from your device is sent."),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                TextButton(
+                    onClick = onOpenPolicy,
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Text(uiText("Privacy & submission policy"), modifier = Modifier.weight(1f, fill = false))
+                    Spacer(Modifier.width(6.dp))
+                    Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text(uiText("Cancel"), textAlign = TextAlign.Center, maxLines = 2)
+                    }
+                    TextButton(onClick = onConfirm) {
                         Text(
-                            uiText("Submit for review?"),
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
+                            uiText(if (resubmit) "Submit again" else "Submit"),
+                            textAlign = TextAlign.Center,
+                            maxLines = 2
                         )
-                        Text(
-                            uiText("This quote, its author, category, and tags will be sent to Quote for review. If approved, it may be included in the public quote collection."),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        TextButton(
-                            onClick = {
-                                context.startActivity(
-                                    Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://quote.cowsay.win/privacy"))
-                                )
-                            },
-                            contentPadding = PaddingValues(0.dp)
-                        ) {
-                            Text(uiText("Privacy & submission policy"))
-                            Spacer(Modifier.width(6.dp))
-                            Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
-                        }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            TextButton(onClick = { quoteToSubmit = null }) {
-                                Text(uiText("Cancel"))
-                            }
-                            TextButton(
-                                onClick = {
-                                    quoteToSubmit = null
-                                    viewModel.submitQuoteForReview(
-                                        quote = quote,
-                                        onSuccess = {
-                                            Toast.makeText(context, localizeUi("Submitted for review", uiLanguage), Toast.LENGTH_SHORT).show()
-                                        },
-                                        onError = { message ->
-                                            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
-                                        }
-                                    )
-                                }
-                            ) {
-                                Text(uiText("Submit"))
-                            }
-                        }
                     }
                 }
             }
@@ -422,12 +637,15 @@ private fun SavedTabSwitcher(
 fun PremiumCollectionQuoteCard(
     quote: QuoteEntity,
     nowMillis: Long,
+    authorImageUrl: String?,
     onToggleFavorite: () -> Unit,
     onDelete: () -> Unit,
     isSubmitting: Boolean,
     lowPerformanceMode: Boolean,
     onSubmit: () -> Unit,
-    onShare: () -> Unit
+    onEdit: (resubmit: Boolean) -> Unit,
+    onWithdraw: () -> Unit,
+    onShare: (String) -> Unit
 ) {
     val language = LocalAppLanguage.current
     val haptic = LocalHapticFeedback.current
@@ -466,6 +684,16 @@ fun PremiumCollectionQuoteCard(
         finishedListener = { favoritePulse = false },
         label = "SavedFavoritePulse"
     )
+
+    val alternateText = remember(quote) { quote.alternateText() }
+    val alternateLanguage = remember(quote) { quote.alternateLanguage() }
+    // Resets when the app language changes the display text.
+    var showTranslation by rememberSaveable(quote.id, quote.text) { mutableStateOf(false) }
+    val displayedText = if (showTranslation && alternateText != null) alternateText else quote.text
+    val unknownAuthor = quote.hasUnknownAuthor
+    val authorName = if (unknownAuthor) uiText("Unknown") else quote.author
+    // Copy/share keep a blank author blank, like before.
+    val shareText = formattedQuote(displayedText, if (quote.author.isBlank()) "" else authorName)
 
     Card(
         modifier = Modifier
@@ -524,7 +752,7 @@ fun PremiumCollectionQuoteCard(
 
                 // Quote Content Text in Serif Medium italic
                 Text(
-                    text = "\"${quote.text}\"",
+                    text = "\"$displayedText\"",
                     style = MaterialTheme.typography.bodyLarge.copy(
                         fontFamily = SerifFontFamily,
                         fontStyle = FontStyle.Italic,
@@ -533,49 +761,51 @@ fun PremiumCollectionQuoteCard(
                     color = MaterialTheme.colorScheme.onSurface
                 )
 
-                // Author Row with Monogram and action buttons
+                if (alternateText != null && alternateLanguage != null) {
+                    // The chip names the language the quote switches to.
+                    val targetLanguage = when {
+                        !showTranslation -> alternateLanguage
+                        alternateLanguage == QuoteLanguage.GERMAN -> QuoteLanguage.ENGLISH
+                        else -> QuoteLanguage.GERMAN
+                    }
+                    TranslationToggle(
+                        showingTranslation = showTranslation,
+                        targetLanguage = targetLanguage,
+                        onToggle = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            showTranslation = !showTranslation
+                        }
+                    )
+                }
+
+                // Author Row with avatar and action buttons
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (quote.author.isNotBlank()) Row(
+                    Row(
                         modifier = Modifier
                             .weight(1f)
                             .padding(end = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        // Initials Monogram Bubble (e.g. "SJ" for Steve Jobs, "TR" etc. in mockup!)
-                        val initials = getInitials(quote.author)
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    Brush.linearGradient(
-                                        listOf(
-                                            MaterialTheme.colorScheme.primaryContainer,
-                                            MaterialTheme.colorScheme.tertiaryContainer
-                                        )
-                                    )
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = initials,
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp
-                                ),
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
+                        AuthorAvatar(
+                            name = authorName,
+                            imageUrl = authorImageUrl,
+                            unknown = unknownAuthor,
+                            size = 36.dp
+                        )
 
                         Text(
-                            text = quote.author,
+                            text = authorName,
                             style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            color = if (unknownAuthor) {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
                             modifier = Modifier.weight(1f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -588,9 +818,9 @@ fun PremiumCollectionQuoteCard(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         ExpressiveIconButton(onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            clipboard.setPrimaryClip(ClipData.newPlainText("quote", formattedQuote(quote.text, quote.author)))
+                            clipboard.setPrimaryClip(ClipData.newPlainText("quote", shareText))
                             copyConfirmed = true
                             cardScope.launch {
                                 delay(1200)
@@ -605,8 +835,8 @@ fun PremiumCollectionQuoteCard(
                         }
 
                         ExpressiveIconButton(onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onShare()
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onShare(shareText)
                         }) {
                             Icon(
                                 imageVector = Icons.Default.Share,
@@ -616,14 +846,18 @@ fun PremiumCollectionQuoteCard(
                         }
 
                         if (quote.isUserAdded) {
-                            ExpressiveIconButton(onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onDelete()
-                            }) {
+                            // A running submission or withdrawal must finish before the row can go.
+                            ExpressiveIconButton(
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onDelete()
+                                },
+                                enabled = !isSubmitting
+                            ) {
                                 Icon(
                                     imageVector = Icons.Default.Delete,
                                     contentDescription = uiText("Delete"),
-                                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
+                                    tint = MaterialTheme.colorScheme.error.copy(alpha = if (isSubmitting) 0.3f else 0.8f)
                                 )
                             }
                         } else {
@@ -647,45 +881,22 @@ fun PremiumCollectionQuoteCard(
                 }
 
                 if (quote.isUserAdded) {
-                    when (quote.submissionStatus) {
-                        QuoteSubmissionStatus.PENDING -> QuoteReviewStatus(
-                            label = uiText("Pending review"),
-                            icon = Icons.Default.Schedule,
-                            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-                        )
-                        QuoteSubmissionStatus.APPROVED -> QuoteReviewStatus(
-                            label = uiText("Approved for community"),
-                            icon = Icons.Default.CheckCircle,
-                            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-                        )
-                        QuoteSubmissionStatus.REJECTED -> QuoteReviewStatus(
-                            label = uiText("Not approved"),
-                            icon = Icons.Default.Cancel,
-                            containerColor = MaterialTheme.colorScheme.errorContainer,
-                            contentColor = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                        else -> {
-                            FilledTonalButton(
-                                onClick = onSubmit,
-                                enabled = !isSubmitting,
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(14.dp)
-                            ) {
-                                if (isSubmitting) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(18.dp),
-                                        strokeWidth = 2.dp
-                                    )
-                                } else {
-                                    Icon(Icons.Default.CloudUpload, contentDescription = null)
-                                }
-                                Spacer(Modifier.width(8.dp))
-                                Text(if (isSubmitting) uiText("Submitting...") else uiText("Submit for review"))
-                            }
+                    SubmissionSection(
+                        quote = quote,
+                        isSubmitting = isSubmitting,
+                        onSubmit = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onSubmit()
+                        },
+                        onEdit = { resubmit ->
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onEdit(resubmit)
+                        },
+                        onWithdraw = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onWithdraw()
                         }
-                    }
+                    )
                 }
             }
         }
@@ -693,25 +904,470 @@ fun PremiumCollectionQuoteCard(
 }
 
 @Composable
+private fun SubmissionSection(
+    quote: QuoteEntity,
+    isSubmitting: Boolean,
+    onSubmit: () -> Unit,
+    onEdit: (resubmit: Boolean) -> Unit,
+    onWithdraw: () -> Unit
+) {
+    val problem = remember(quote) { quote.submissionProblem() }
+    val reviewNote = quote.reviewNote?.trim()?.takeIf { it.isNotEmpty() }
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        when (quote.submissionStatus) {
+            QuoteSubmissionStatus.PENDING -> QuoteReviewStatus(
+                label = uiText("Pending review"),
+                icon = Icons.Default.Schedule,
+                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+            ) {
+                if (isSubmitting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier
+                            .padding(horizontal = 12.dp)
+                            .size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                } else {
+                    TextButton(
+                        onClick = onWithdraw,
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    ) {
+                        Text(uiText("Withdraw"), textAlign = TextAlign.Center, maxLines = 2)
+                    }
+                }
+            }
+
+            QuoteSubmissionStatus.APPROVED -> QuoteReviewStatus(
+                label = uiText("Approved for community"),
+                icon = Icons.Default.CheckCircle,
+                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+            )
+
+            QuoteSubmissionStatus.REJECTED -> {
+                QuoteReviewStatus(
+                    label = uiText("Not approved"),
+                    icon = Icons.Default.Cancel,
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                )
+                if (reviewNote != null) ReviewNote(reviewNote)
+                // The server keeps its decision for this exact text, so a rejected quote is revised first.
+                SubmissionActions(
+                    label = uiText("Edit and resubmit"),
+                    icon = Icons.Default.Edit,
+                    isSubmitting = isSubmitting,
+                    submitEnabled = true,
+                    showEditButton = false,
+                    onSubmit = { onEdit(true) },
+                    onEdit = {}
+                )
+            }
+
+            QuoteSubmissionStatus.REMOVED -> {
+                QuoteReviewStatus(
+                    label = uiText("No longer published"),
+                    icon = Icons.Default.CloudOff,
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+                Text(
+                    uiText("This quote was removed from the community collection. You can submit it again."),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (reviewNote != null) ReviewNote(reviewNote)
+                SubmissionProblem(problem)
+                SubmissionActions(
+                    label = uiText("Submit again"),
+                    icon = Icons.Default.CloudUpload,
+                    isSubmitting = isSubmitting,
+                    submitEnabled = problem == null,
+                    showEditButton = true,
+                    onSubmit = onSubmit,
+                    onEdit = { onEdit(false) }
+                )
+            }
+
+            else -> {
+                SubmissionProblem(problem)
+                SubmissionActions(
+                    label = uiText(if (isSubmitting) "Submitting..." else "Submit for review"),
+                    icon = Icons.Default.CloudUpload,
+                    isSubmitting = isSubmitting,
+                    submitEnabled = problem == null,
+                    showEditButton = true,
+                    onSubmit = onSubmit,
+                    onEdit = { onEdit(false) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SubmissionActions(
+    label: String,
+    icon: ImageVector,
+    isSubmitting: Boolean,
+    submitEnabled: Boolean,
+    showEditButton: Boolean,
+    onSubmit: () -> Unit,
+    onEdit: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (showEditButton) {
+            FilledTonalIconButton(
+                onClick = onEdit,
+                enabled = !isSubmitting,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.size(48.dp)
+            ) {
+                Icon(Icons.Default.Edit, contentDescription = uiText("Edit"))
+            }
+        }
+        FilledTonalButton(
+            onClick = onSubmit,
+            enabled = submitEnabled && !isSubmitting,
+            modifier = Modifier
+                .weight(1f)
+                .heightIn(min = 48.dp),
+            shape = RoundedCornerShape(14.dp)
+        ) {
+            if (isSubmitting) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Icon(icon, contentDescription = null)
+            }
+            Spacer(Modifier.width(8.dp))
+            Text(label, textAlign = TextAlign.Center, maxLines = 2)
+        }
+    }
+}
+
+@Composable
+private fun SubmissionProblem(problem: String?) {
+    if (problem == null) return
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Icon(
+            Icons.Default.ErrorOutline,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.error,
+            modifier = Modifier.size(18.dp)
+        )
+        Text(
+            "${uiText(problem)} ${uiText("Edit the quote to fix this.")}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+private fun ReviewNote(note: String) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.7f),
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = RoundedCornerShape(14.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                uiText("Note from the reviewer"),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(note, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+@Composable
 private fun QuoteReviewStatus(
     label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     containerColor: Color,
-    contentColor: Color
+    contentColor: Color,
+    action: (@Composable () -> Unit)? = null
 ) {
     Surface(
         color = containerColor.copy(alpha = 0.55f),
         contentColor = contentColor,
-        shape = RoundedCornerShape(14.dp)
+        shape = RoundedCornerShape(14.dp),
+        modifier = if (action != null) Modifier.fillMaxWidth() else Modifier
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            modifier = Modifier
+                .heightIn(min = 40.dp)
+                .padding(
+                    start = 14.dp,
+                    end = if (action != null) 4.dp else 14.dp,
+                    top = if (action != null) 2.dp else 10.dp,
+                    bottom = if (action != null) 2.dp else 10.dp
+                ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
-            Text(label, style = MaterialTheme.typography.labelLarge)
+            Text(
+                label,
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.weight(1f, fill = action != null)
+            )
+            action?.invoke()
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EditQuoteSheet(
+    quote: QuoteEntity,
+    resubmit: Boolean,
+    onDismiss: () -> Unit,
+    onSave: (text: String, author: String, category: String, tags: String) -> Unit
+) {
+    val haptic = LocalHapticFeedback.current
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
+    val originalText = remember(quote.id) { quote.originalText() }
+    val originalAuthor = remember(quote.id) { quote.editableAuthor() }
+    var text by rememberSaveable(quote.id) { mutableStateOf(originalText) }
+    var author by rememberSaveable(quote.id) { mutableStateOf(originalAuthor) }
+    var category by rememberSaveable(quote.id) { mutableStateOf(quote.category) }
+    var tags by rememberSaveable(quote.id) { mutableStateOf(quote.tags) }
+
+    val textLength = text.trim().length
+    val textTooShort = textLength < MIN_SUBMISSION_TEXT
+    val textTooLong = textLength > MAX_SUBMISSION_TEXT
+    val authorTooLong = author.trim().length > MAX_SUBMISSION_AUTHOR
+    val parsedTags = tags.split(',').map(String::trim).filter(String::isNotEmpty)
+    val tagsInvalid = parsedTags.size > MAX_SUBMISSION_TAGS || parsedTags.any { it.length > MAX_SUBMISSION_TAG_LENGTH }
+    // The server identifies a submission by its text and author, so a resubmission must change one of them.
+    val contentChanged = comparisonKey(text) != comparisonKey(originalText) ||
+        comparisonKey(author.ifBlank { "Unknown" }) != comparisonKey(originalAuthor.ifBlank { "Unknown" })
+    val needsChange = resubmit && !contentChanged
+    val canSave = !textTooShort && !textTooLong && !authorTooLong && !tagsInvalid && !needsChange
+    val resetsReview = quote.submissionStatus == QuoteSubmissionStatus.REJECTED ||
+        quote.submissionStatus == QuoteSubmissionStatus.REMOVED
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = 0.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(start = 20.dp, end = 20.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    uiText("Edit quote"),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                if (resubmit) {
+                    Text(
+                        uiText("Revise the quote, then submit it again."),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else if (resetsReview) {
+                    Text(
+                        uiText("Saving resets the review status so you can submit the quote again."),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            quote.reviewNote?.trim()?.takeIf { resubmit && it.isNotEmpty() }?.let { ReviewNote(it) }
+
+            OutlinedTextField(
+                value = text,
+                // Longer imported text can still be shortened, but never grow past the limit.
+                onValueChange = { if (it.length <= MAX_SUBMISSION_TEXT || it.length < text.length) text = it },
+                label = { Text(uiText("Quote or affirmation")) },
+                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                    fontFamily = SerifFontFamily,
+                    lineHeight = 27.sp
+                ),
+                minLines = 1,
+                maxLines = 6,
+                isError = textTooShort || textTooLong,
+                supportingText = {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(
+                            text = when {
+                                textTooShort -> uiText("Enter at least 3 characters.")
+                                textTooLong -> uiText("At most 500 characters.")
+                                else -> ""
+                            },
+                            modifier = Modifier.weight(1f).padding(end = 8.dp)
+                        )
+                        Text("${text.length}/$MAX_SUBMISSION_TEXT")
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp)
+            )
+
+            OutlinedTextField(
+                value = author,
+                onValueChange = { if (it.length <= MAX_SUBMISSION_AUTHOR || it.length < author.length) author = it },
+                label = { Text(uiText("Author")) },
+                placeholder = { Text(uiText("Unknown")) },
+                isError = authorTooLong,
+                supportingText = {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(
+                            text = if (authorTooLong) uiText("At most 100 characters.") else "",
+                            modifier = Modifier.weight(1f).padding(end = 8.dp)
+                        )
+                        Text("${author.length}/$MAX_SUBMISSION_AUTHOR")
+                    }
+                },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp)
+            )
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = uiText("Shelf"),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    CategoryMapper.categories.forEach { categoryName ->
+                        val interactionSource = remember(categoryName) { MutableInteractionSource() }
+                        FilterChip(
+                            selected = category == categoryName,
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                category = categoryName
+                            },
+                            label = { Text(categoryText(categoryName)) },
+                            shape = rememberExpressiveShape(interactionSource, 18.dp, 8.dp),
+                            interactionSource = interactionSource,
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                            )
+                        )
+                    }
+                }
+            }
+
+            OutlinedTextField(
+                value = tags,
+                onValueChange = { tags = it },
+                label = { Text(uiText("Tags")) },
+                supportingText = {
+                    Text(
+                        if (tagsInvalid) uiText("Maximum 8 tags, 30 characters each.")
+                        else uiText("Separate tags with commas")
+                    )
+                },
+                isError = tagsInvalid,
+                placeholder = { Text(uiText("wisdom, courage, morning")) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp)
+            )
+
+            if (needsChange) {
+                Text(
+                    uiText("Change the text or author to submit it again."),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            ExpressiveButton(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onSave(text.trim(), author.trim(), category, tags.trim())
+                    scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
+                },
+                enabled = canSave,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 54.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                ),
+                restingCorner = 18.dp,
+                contentPadding = PaddingValues(horizontal = 20.dp)
+            ) {
+                Icon(if (resubmit) Icons.Default.CloudUpload else Icons.Default.Check, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    uiText(if (resubmit) "Save and submit" else "Save"),
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2
+                )
+            }
+        }
+    }
+}
+
+// The quote in the language it was written in; a personal row's display copy may show a translation.
+private fun QuoteEntity.originalText(): String =
+    if (alternateLanguage() == language) alternateText() ?: text else text
+
+// A blank field stands for "Unknown"; the localized copy may say "Unbekannt".
+private fun QuoteEntity.editableAuthor(): String = if (hasUnknownAuthor) "" else author
+
+private fun comparisonKey(value: String): String = value.trim().replace(Regex("\\s+"), " ").lowercase()
+
+/**
+ * Why the backend would reject this own quote, as an English UI key, or null when it can be sent.
+ * Mirrors the server's limits so the user sees the reason before the consent dialog.
+ */
+private fun QuoteEntity.submissionProblem(): String? {
+    val textLength = originalText().trim().length
+    val tagList = tags.split(',').map(String::trim).filter(String::isNotEmpty)
+    return when {
+        textLength < MIN_SUBMISSION_TEXT -> "Too short to submit: a quote needs at least 3 characters."
+        textLength > MAX_SUBMISSION_TEXT -> "Too long to submit: a quote can have at most 500 characters."
+        editableAuthor().trim().length > MAX_SUBMISSION_AUTHOR -> "The author name is too long to submit (max. 100 characters)."
+        tagList.distinctBy { it.lowercase() }.size > MAX_SUBMISSION_TAGS -> "Too many tags to submit (max. 8)."
+        tagList.any { it.length > MAX_SUBMISSION_TAG_LENGTH } -> "A tag is too long to submit (max. 30 characters each)."
+        else -> null
     }
 }
 
@@ -730,17 +1386,5 @@ private fun formatSavedDate(savedDate: String?, now: Long = System.currentTimeMi
             "d MMM yyyy",
             if (language == "de") Locale.GERMAN else Locale.ENGLISH
         ).format(Date(millis))
-    }
-}
-
-private fun getInitials(name: String): String {
-    val parts = name.trim()
-        .split(Regex("\\s+"))
-        .map { part -> part.filter(Char::isLetter) }
-        .filter { it.isNotBlank() }
-    return when {
-        parts.isEmpty() -> "U"
-        parts.size == 1 -> parts[0].take(2).uppercase()
-        else -> (parts[0].take(1) + parts[1].take(1)).uppercase()
     }
 }

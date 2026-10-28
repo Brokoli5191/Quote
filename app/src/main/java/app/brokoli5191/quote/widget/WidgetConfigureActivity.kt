@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -72,6 +73,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -192,17 +194,17 @@ class WidgetConfigureActivity : ComponentActivity() {
                 )
             },
             bottomBar = {
-                Surface(color = MaterialTheme.colorScheme.background, tonalElevation = 8.dp) {
+                Surface(color = MaterialTheme.colorScheme.background, tonalElevation = 0.dp) {
                     ExpressiveButton(
                         onClick = { saveAndFinish(config) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .navigationBarsPadding()
                             .padding(16.dp)
-                            .height(54.dp),
+                            .heightIn(min = 54.dp),
                         restingCorner = 18.dp
                     ) {
-                        Text(uiText("Create Widget"), fontWeight = FontWeight.Bold)
+                        Text(uiText("Create Widget"), fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                     }
                 }
             }
@@ -217,9 +219,21 @@ class WidgetConfigureActivity : ComponentActivity() {
                     Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         SectionTitle("Live Preview")
-                        Text(uiText("Drag elements to move"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            uiText("Drag elements to move"),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.End,
+                            modifier = Modifier
+                                .weight(1f, fill = false)
+                                .padding(start = 12.dp)
+                        )
                     }
                     WidgetPreview(
                         config = config,
@@ -281,7 +295,10 @@ class WidgetConfigureActivity : ComponentActivity() {
                                 uiText(preset.name),
                                 color = if (preset.name == "Paper") Color.Black else Color.White,
                                 style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center,
+                                maxLines = 2,
+                                modifier = Modifier.padding(horizontal = 6.dp)
                             )
                         }
                     }
@@ -341,7 +358,13 @@ class WidgetConfigureActivity : ComponentActivity() {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(uiText(label), fontWeight = FontWeight.SemiBold)
+            Text(
+                uiText(label),
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 12.dp)
+            )
             Switch(checked = checked, onCheckedChange = onChecked)
         }
     }
@@ -356,7 +379,13 @@ class WidgetConfigureActivity : ComponentActivity() {
     ) {
         Column {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(uiText(label), fontWeight = FontWeight.SemiBold)
+                Text(
+                    uiText(label),
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 12.dp)
+                )
                 Text(valueText, color = MaterialTheme.colorScheme.primary)
             }
             Slider(value = value, onValueChange = onValue, valueRange = range)

@@ -15,11 +15,11 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.ui.input.pointer.pointerInput
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -47,11 +48,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import app.brokoli5191.quote.data.AuthorInfo
 import app.brokoli5191.quote.data.QuoteEntity
+import app.brokoli5191.quote.data.alternateLanguage
+import app.brokoli5191.quote.data.alternateText
+import app.brokoli5191.quote.data.hasUnknownAuthor
 import app.brokoli5191.quote.data.QuoteSourceMode
 import app.brokoli5191.quote.data.QuoteLanguage
 import app.brokoli5191.quote.ui.QuoteViewModel
@@ -60,6 +67,8 @@ import app.brokoli5191.quote.ui.formattedQuote
 import app.brokoli5191.quote.ui.uiText
 import app.brokoli5191.quote.ui.components.ExpressiveButton
 import app.brokoli5191.quote.ui.components.ExpressiveTonalButton
+import app.brokoli5191.quote.ui.components.AuthorAvatar
+import app.brokoli5191.quote.ui.components.TranslationToggle
 import app.brokoli5191.quote.ui.theme.SerifFontFamily
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -71,6 +80,7 @@ fun DailyScreen(viewModel: QuoteViewModel) {
     val lowPerformanceMode by viewModel.lowPerformanceMode.collectAsStateWithLifecycle()
     val sourceMode by viewModel.quoteSourceMode.collectAsStateWithLifecycle()
     val communitySyncFinished by viewModel.communitySyncFinished.collectAsStateWithLifecycle()
+    val authorImagesEnabled by viewModel.authorImagesEnabled.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val uiLanguage = LocalAppLanguage.current
@@ -140,6 +150,30 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                             finishedListener = { favoritePulse = false },
                             label = "DailyFavoritePulse"
                         )
+                        val unknownAuthor = quote.hasUnknownAuthor
+                        val authorName = if (unknownAuthor) uiText("Unknown") else quote.author
+                        // Copy/share keep a blank author blank, like before.
+                        val shareAuthor = if (quote.author.isBlank()) "" else authorName
+                        val authorInfoFlow = remember(quote.author, unknownAuthor) {
+                            if (unknownAuthor) null else viewModel.authorInfo(quote.author)
+                        }
+                        val authorInfo = authorInfoFlow?.let { it.collectAsStateWithLifecycle().value }
+                        val authorImageUrl = authorInfo?.imageUrl?.takeIf { authorImagesEnabled }
+                        val authorDescription = authorInfo?.description?.takeIf { it.isNotBlank() }
+                        var showAuthorSheet by rememberSaveable(quote.id) { mutableStateOf(false) }
+
+                        val alternateText = remember(quote) { quote.alternateText() }
+                        val alternateLanguage = remember(quote) { quote.alternateLanguage() }
+                        // Resets when another quote is shown or the app language changes the display text.
+                        var showTranslation by remember(quote.id, quote.text) { mutableStateOf(false) }
+                        val displayedText =
+                            if (showTranslation && alternateText != null) alternateText else quote.text
+                        val tags = remember(quote.tags) {
+                            quote.tags.split(",")
+                                .map { it.trim() }
+                                .filter { it.isNotEmpty() }
+                                .take(4)
+                        }
                         Column(
                             modifier = Modifier.padding(horizontal = 20.dp)
                         ) {
@@ -172,53 +206,73 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                                             color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
                                             modifier = Modifier.align(Alignment.BottomEnd)
                                         )
-                                        Text(
-                                            text = quote.text,
-                                            style = MaterialTheme.typography.headlineMedium,
-                                            fontFamily = SerifFontFamily,
-                                            lineHeight = 36.sp,
-                                            color = MaterialTheme.colorScheme.onSurface,
-                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 30.dp)
-                                        )
+                                        if (lowPerformanceMode) {
+                                            DailyQuoteText(displayedText)
+                                        } else {
+                                            AnimatedContent(
+                                                targetState = displayedText,
+                                                transitionSpec = {
+                                                    fadeIn(tween(220)) togetherWith fadeOut(tween(150)) using
+                                                        SizeTransform(clip = false)
+                                                },
+                                                label = "DailyTranslationTransition"
+                                            ) { text ->
+                                                DailyQuoteText(text)
+                                            }
+                                        }
                                     }
-                                    if (quote.author.isNotBlank()) {
-                                      Spacer(Modifier.height(24.dp))
-                                      Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Box(
-                                            Modifier.size(42.dp).background(
-                                                MaterialTheme.colorScheme.primaryContainer,
-                                                CircleShape
-                                            ),
-                                            contentAlignment = Alignment.Center
+                                    if (alternateText != null && alternateLanguage != null) {
+                                        val originalLanguage =
+                                            if (alternateLanguage == QuoteLanguage.GERMAN) QuoteLanguage.ENGLISH
+                                            else QuoteLanguage.GERMAN
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.End
                                         ) {
-                                            Text(
-                                                quote.author.take(1).uppercase(),
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                                            TranslationToggle(
+                                                showingTranslation = showTranslation,
+                                                targetLanguage = if (showTranslation) originalLanguage else alternateLanguage,
+                                                onToggle = {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                    showTranslation = !showTranslation
+                                                }
                                             )
                                         }
+                                        Spacer(Modifier.height(12.dp))
+                                    } else {
+                                        Spacer(Modifier.height(24.dp))
+                                    }
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        AuthorAvatar(
+                                            name = authorName,
+                                            imageUrl = authorImageUrl,
+                                            unknown = unknownAuthor
+                                        )
                                         Spacer(Modifier.width(12.dp))
                                         Column(Modifier.weight(1f)) {
                                             Text(
-                                                quote.author,
+                                                authorName,
                                                 style = MaterialTheme.typography.titleMedium,
                                                 fontWeight = FontWeight.SemiBold,
                                                 color = MaterialTheme.colorScheme.onSurface
                                             )
+                                            if (authorDescription != null) {
+                                                Text(
+                                                    authorDescription,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    maxLines = 2,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
                                         }
-                                      }
                                     }
                                 }
                             }
 
                             Spacer(Modifier.height(12.dp))
                             if (!quote.isAnonymous && uiLanguage == QuoteLanguage.ENGLISH) {
-                                QuoteTags(
-                                    tags = quote.tags.split(",")
-                                        .map { it.trim() }
-                                        .filter { it.isNotEmpty() }
-                                        .take(4)
-                                )
+                                QuoteTags(tags = tags)
                             }
 
                             Spacer(Modifier.height(8.dp))
@@ -237,7 +291,7 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                                     uiText(if (copyConfirmed) "Copied" else "Copy")
                                 ) {
                                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                    clipboard.setPrimaryClip(ClipData.newPlainText("quote", formattedQuote(quote.text, quote.author)))
+                                    clipboard.setPrimaryClip(ClipData.newPlainText("quote", formattedQuote(displayedText, shareAuthor)))
                                     copyConfirmed = true
                                     feedbackScope.launch {
                                         delay(1200)
@@ -247,27 +301,33 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                                 DailyActionButton(Icons.Default.Share, uiText("Share")) {
                                     context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
                                         type = "text/plain"
-                                        putExtra(Intent.EXTRA_TEXT, formattedQuote(quote.text, quote.author))
+                                        putExtra(Intent.EXTRA_TEXT, formattedQuote(displayedText, shareAuthor))
                                     }, null))
                                 }
                             }
-                            if (quote.author.isNotBlank()) {
+                            if (!unknownAuthor) {
                               Spacer(Modifier.height(10.dp))
                               ExpressiveButton(
                                 onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    val wikipediaLanguage = if (uiLanguage == QuoteLanguage.GERMAN) "de" else "en"
-                                    val url = "https://$wikipediaLanguage.wikipedia.org/wiki/" +
-                                        quote.author.replace(" ", "_")
-                                    context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+                                    showAuthorSheet = true
                                 },
-                                modifier = Modifier.fillMaxWidth().height(52.dp),
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
                                 restingCorner = 18.dp
                             ) {
                                 Icon(Icons.Default.Language, contentDescription = null)
                                 Spacer(Modifier.width(8.dp))
-                                Text(uiText("Explore this author"))
+                                Text(uiText("Explore this author"), maxLines = 2, textAlign = TextAlign.Center)
                               }
+                            }
+                            if (showAuthorSheet && !unknownAuthor) {
+                                AuthorSheet(
+                                    name = authorName,
+                                    info = authorInfo,
+                                    imageUrl = authorImageUrl,
+                                    language = uiLanguage,
+                                    onDismiss = { showAuthorSheet = false }
+                                )
                             }
                         }
                     }
@@ -373,23 +433,128 @@ private fun RowScope.DailyActionButton(
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             onClick()
         },
-        modifier = Modifier.weight(1f).height(52.dp),
+        modifier = Modifier.weight(1f).heightIn(min = 64.dp),
         restingCorner = 18.dp,
         colors = ButtonDefaults.filledTonalButtonColors(
             containerColor = MaterialTheme.colorScheme.primaryContainer,
             contentColor = MaterialTheme.colorScheme.onPrimaryContainer
         ),
-        contentPadding = PaddingValues(horizontal = 8.dp)
+        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp)
     ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            modifier = Modifier.size(18.dp).graphicsLayer {
-                scaleX = iconScale
-                scaleY = iconScale
+        // Icon on top gives the label the full button width; German labels ("Gespeichert")
+        // shrink slightly instead of being cut off on narrow screens or with large fonts.
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp).graphicsLayer {
+                    scaleX = iconScale
+                    scaleY = iconScale
+                }
+            )
+            val labelStyle = MaterialTheme.typography.labelLarge
+            val labelSize = labelStyle.fontSize.takeIf { it.isSp } ?: 14.sp
+            Text(
+                label,
+                style = labelStyle,
+                maxLines = 1,
+                textAlign = TextAlign.Center,
+                autoSize = TextAutoSize.StepBased(
+                    minFontSize = minOf(10f, labelSize.value).sp,
+                    maxFontSize = labelSize,
+                    stepSize = 0.5.sp
+                )
+            )
+        }
+    }
+}
+
+@Composable
+private fun DailyQuoteText(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.headlineMedium,
+        fontFamily = SerifFontFamily,
+        lineHeight = 36.sp,
+        color = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.padding(horizontal = 12.dp, vertical = 30.dp)
+    )
+}
+
+private fun wikipediaSearchUrl(author: String, language: String): String {
+    val wikipediaLanguage = if (language == QuoteLanguage.GERMAN) "de" else "en"
+    return "https://$wikipediaLanguage.wikipedia.org/w/index.php?search=" +
+        java.net.URLEncoder.encode(author, "UTF-8")
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AuthorSheet(
+    name: String,
+    info: AuthorInfo?,
+    imageUrl: String?,
+    language: String,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
+    val description = info?.description?.takeIf { it.isNotBlank() }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = 0.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            AuthorAvatar(name = name, imageUrl = imageUrl, unknown = false, size = 112.dp)
+            Spacer(Modifier.height(16.dp))
+            Text(
+                name,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center
+            )
+            if (description != null) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    description,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
             }
-        )
-        Spacer(Modifier.width(6.dp))
-        Text(label, maxLines = 1)
+            Spacer(Modifier.height(24.dp))
+            ExpressiveButton(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    val url = info?.wikiUrl ?: wikipediaSearchUrl(name, language)
+                    runCatching {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+                    }
+                    scope.launch { sheetState.hide() }.invokeOnCompletion {
+                        if (!sheetState.isVisible) onDismiss()
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                restingCorner = 18.dp
+            ) {
+                Icon(Icons.Default.Language, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(uiText("Read on Wikipedia"), maxLines = 2, textAlign = TextAlign.Center)
+            }
+        }
     }
 }

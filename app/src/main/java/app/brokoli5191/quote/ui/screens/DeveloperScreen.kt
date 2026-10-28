@@ -1,5 +1,6 @@
 package app.brokoli5191.quote.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -14,21 +15,26 @@ import androidx.compose.material.icons.filled.FactCheck
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Rule
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.brokoli5191.quote.BuildConfig
 import app.brokoli5191.quote.data.QuoteOrigin
 import app.brokoli5191.quote.data.QuoteSubmissionStatus
+import app.brokoli5191.quote.ui.LocalAppLanguage
 import app.brokoli5191.quote.ui.QuoteViewModel
 import app.brokoli5191.quote.ui.categoryText
+import app.brokoli5191.quote.ui.localizeUi
 import app.brokoli5191.quote.ui.uiText
 import app.brokoli5191.quote.ui.components.ExpressiveButton
 import app.brokoli5191.quote.ui.components.ExpressiveOutlinedButton
@@ -36,6 +42,8 @@ import app.brokoli5191.quote.ui.components.ExpressiveOutlinedButton
 @Composable
 fun DeveloperScreen(viewModel: QuoteViewModel, modifier: Modifier = Modifier) {
     val haptic = LocalHapticFeedback.current
+    val context = LocalContext.current
+    val uiLanguage = LocalAppLanguage.current
 
     val dailyQuote by viewModel.dailyQuote.collectAsStateWithLifecycle()
     val allQuotes by viewModel.allQuotes.collectAsStateWithLifecycle()
@@ -107,12 +115,18 @@ fun DeveloperScreen(viewModel: QuoteViewModel, modifier: Modifier = Modifier) {
                 DebugRow("DB Quotes", "${allQuotes.size}")
                 DebugRow(
                     "Theme",
-                    "${uiText(themeMode.lowercase().replaceFirstChar { it.uppercase() })} / ${uiText(themeAccent)}"
+                    "${uiText(
+                        when (themeMode) {
+                            "DYNAMIC" -> "System"
+                            "AMOLED" -> "AMOLED"
+                            else -> themeMode.lowercase().replaceFirstChar { it.uppercase() }
+                        }
+                    )} / ${uiText(themeAccent)}"
                 )
                 DebugRow("Low Perf Mode", if (lowPerf) uiText("On") else uiText("Off"))
                 DebugRow(
                     "Notification",
-                    if (reminderEnabled) "${uiText("On")} • ${String.format("%02d", reminderHour)}:${String.format("%02d", reminderMinute)}"
+                    if (reminderEnabled) "${uiText("On")} • ${formatReminderTime(context, reminderHour, reminderMinute)}"
                     else uiText("Off")
                 )
             }
@@ -222,6 +236,24 @@ fun DeveloperScreen(viewModel: QuoteViewModel, modifier: Modifier = Modifier) {
                     Spacer(Modifier.width(8.dp))
                     Text(uiText("Verify Quote Database"))
                 }
+
+                ExpressiveOutlinedButton(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        viewModel.resetOnboarding()
+                        Toast.makeText(
+                            context,
+                            localizeUi("Onboarding will be shown again", uiLanguage),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    restingCorner = 12.dp
+                ) {
+                    Icon(Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(uiText("Show onboarding again"))
+                }
             }
         }
     }
@@ -263,12 +295,15 @@ private fun DebugRow(label: String, value: String) {
         Text(
             text = uiText(label),
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            modifier = Modifier.padding(end = 12.dp)
         )
         Text(
             text = value,
             style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(1f)
         )
     }
 }

@@ -2,6 +2,7 @@ package app.brokoli5191.quote
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -17,6 +18,7 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -63,6 +65,7 @@ import app.brokoli5191.quote.ui.screens.DailyScreen
 import app.brokoli5191.quote.ui.screens.DeveloperScreen
 import app.brokoli5191.quote.ui.screens.LibraryScreen
 import app.brokoli5191.quote.ui.screens.NewQuoteScreen
+import app.brokoli5191.quote.ui.screens.OnboardingScreen
 import app.brokoli5191.quote.ui.screens.SavedScreen
 import app.brokoli5191.quote.ui.screens.WidgetSettingsScreen
 import app.brokoli5191.quote.ui.theme.MyApplicationTheme
@@ -70,12 +73,11 @@ import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
-    @OptIn(ExperimentalLayoutApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
@@ -93,13 +95,13 @@ class MainActivity : ComponentActivity() {
                 viewModel.checkAndSeedDatabase()
             }
 
+            // Once per resume: picks up a new day and (throttled) syncs community quotes and
+            // submission states. Replaces the old 60-second polling loop.
             val lifecycleOwner = LocalLifecycleOwner.current
             LaunchedEffect(lifecycleOwner) {
                 lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-                    while (true) {
-                        viewModel.refreshSubmissionStatuses()
-                        delay(60_000L)
-                    }
+                    viewModel.onAppResumed()
+                    awaitCancellation()
                 }
             }
 
@@ -108,318 +110,380 @@ class MainActivity : ComponentActivity() {
             val amoledBlack by viewModel.amoledBlack.collectAsStateWithLifecycle()
             val lowPerformanceMode by viewModel.lowPerformanceMode.collectAsStateWithLifecycle()
             val blurNavigationSurfaces by viewModel.blurNavigationSurfaces.collectAsStateWithLifecycle()
-            val showDevScreen by viewModel.showDevScreen.collectAsStateWithLifecycle()
-            val showNewQuoteScreen by viewModel.showNewQuoteScreen.collectAsStateWithLifecycle()
             val appLanguage by viewModel.appLanguage.collectAsStateWithLifecycle()
+            val showOnboarding by viewModel.showOnboarding.collectAsStateWithLifecycle()
 
             MyApplicationTheme(themeMode = themeMode, themeAccent = themeAccent, amoledBlack = amoledBlack) {
+              // System bar icons follow the app theme, not the system one (e.g. Light theme on a
+              // dark system), so they stay readable in every theme.
+              val appDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+              LaunchedEffect(appDark) {
+                  enableEdgeToEdge(
+                      statusBarStyle = SystemBarStyle.auto(
+                          android.graphics.Color.TRANSPARENT,
+                          android.graphics.Color.TRANSPARENT
+                      ) { appDark },
+                      navigationBarStyle = SystemBarStyle.auto(LightNavigationScrim, DarkNavigationScrim) { appDark }
+                  )
+              }
               CompositionLocalProvider(LocalAppLanguage provides appLanguage) {
-                val activeTab by viewModel.selectedTab.collectAsStateWithLifecycle()
-                val blurActive = blurNavigationSurfaces && !lowPerformanceMode
-                val navigationHazeState = rememberHazeState(blurEnabled = blurActive)
-
-                val hasBackStack by viewModel.hasBackStack.collectAsStateWithLifecycle()
-                val selectedCategories by viewModel.selectedCategories.collectAsStateWithLifecycle()
-                val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
-                val savedSubTab by viewModel.savedSubTab.collectAsStateWithLifecycle()
-                val imeVisible = WindowInsets.isImeVisible
-
-                val backProgressAnim = remember { Animatable(0f) }
-                val backProgress = backProgressAnim.value
-                val newQuoteProgressAnim = remember { Animatable(1f) }
-                val newQuoteProgress = newQuoteProgressAnim.value
-                val animationScope = rememberCoroutineScope()
-
-                var isCompletingPredictiveBack by remember { mutableStateOf(false) }
-                var isCompletingDevBack by remember { mutableStateOf(false) }
-                var completionPreviewTab by remember { mutableStateOf<String?>(null) }
-                var newQuoteBackInProgress by remember { mutableStateOf(false) }
-
-                LaunchedEffect(showNewQuoteScreen) {
-                    if (showNewQuoteScreen && !newQuoteBackInProgress) {
-                        newQuoteProgressAnim.animateTo(
-                            0f,
-                            animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing)
-                        )
-                    }
-                }
-
-                PredictiveBackHandler(enabled = showNewQuoteScreen) { progress ->
-                    newQuoteBackInProgress = true
-                    var completed = false
-                    try {
-                        newQuoteProgressAnim.stop()
-                        progress.collect { event ->
-                            newQuoteProgressAnim.snapTo(event.progress)
-                        }
-                        newQuoteProgressAnim.animateTo(
-                            1f,
-                            animationSpec = spring(dampingRatio = 0.9f, stiffness = 500f)
-                        )
-                        completed = true
-                        viewModel.closeNewQuoteScreen()
-                    } finally {
-                        kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
-                            if (completed) {
-                                kotlinx.coroutines.delay(32L)
-                            } else {
-                                newQuoteProgressAnim.animateTo(
-                                    0f,
-                                    animationSpec = spring(dampingRatio = 0.82f, stiffness = 420f)
-                                )
-                            }
-                            newQuoteBackInProgress = false
-                        }
-                    }
-                }
-
-                PredictiveBackHandler(
-                    enabled = hasBackStack && !showNewQuoteScreen && !newQuoteBackInProgress
-                ) { progress ->
-                    var capturedIsFilterClear = false
-                    var capturedIsDevBack = false
-                    var capturedPreviewTab: String? = null
-                    try {
-                        progress.collect { event ->
-                            backProgressAnim.snapTo(event.progress)
-                            capturedIsDevBack = showDevScreen
-                            capturedIsFilterClear = !showDevScreen && !showNewQuoteScreen && activeTab == "Library"
-                                && (selectedCategories.isNotEmpty() || searchQuery.isNotBlank())
-                            capturedPreviewTab = if (!capturedIsFilterClear && !showDevScreen && !showNewQuoteScreen && activeTab != "Daily") "Daily" else null
-                        }
-                        if (capturedIsFilterClear) {
-                            backProgressAnim.snapTo(0f)
-                            viewModel.popBackStack()
-                            return@PredictiveBackHandler
-                        }
-                        completionPreviewTab = capturedPreviewTab
-                        isCompletingPredictiveBack = true
-                        if (capturedIsDevBack) isCompletingDevBack = true
-                        backProgressAnim.animateTo(1f, animationSpec = spring(dampingRatio = 0.9f, stiffness = 500f))
-                        viewModel.popBackStack()
-                        kotlinx.coroutines.delay(50L)
-                    } finally {
-                        isCompletingPredictiveBack = false
-                        isCompletingDevBack = false
-                        completionPreviewTab = null
-                        kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
-                            kotlinx.coroutines.delay(32L)
-                            backProgressAnim.snapTo(0f)
-                        }
-                    }
-                }
-
-                // Which tab to preview on the left during back gesture / completion
-                val isFilterClearBack = !showDevScreen && !showNewQuoteScreen && !isCompletingPredictiveBack
-                    && backProgress > 0f && activeTab == "Library"
-                    && (selectedCategories.isNotEmpty() || searchQuery.isNotBlank())
-
-                val backPreviewTab: String? = when {
-                    isCompletingPredictiveBack -> completionPreviewTab
-                    showDevScreen || showNewQuoteScreen -> null
-                    isFilterClearBack -> null
-                    backProgress > 0f && activeTab != "Daily" -> "Daily"
-                    else -> null
-                }
-
-                val tabOrder = listOf("Daily", "Library", "Saved", "Settings")
-                var swipeDeltaX by remember { mutableFloatStateOf(0f) }
-
-                fun closeNewQuoteScreen(afterClose: () -> Unit = {}) {
-                    if (newQuoteBackInProgress) return
-                    animationScope.launch {
-                        newQuoteBackInProgress = true
-                        newQuoteProgressAnim.animateTo(
-                            1f,
-                            animationSpec = tween(
-                                durationMillis = 220,
-                                easing = FastOutSlowInEasing
-                            )
-                        )
-                        viewModel.closeNewQuoteScreen()
-                        afterClose()
-                        newQuoteBackInProgress = false
-                    }
-                }
-
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .pointerInput(activeTab, showDevScreen, showNewQuoteScreen) {
-                            if (showDevScreen || showNewQuoteScreen) return@pointerInput
-                            detectHorizontalDragGestures(
-                                onDragEnd = {
-                                    val idx = tabOrder.indexOf(activeTab)
-                                    when {
-                                        swipeDeltaX < -80f && activeTab == "Saved" && savedSubTab == "Favorites" ->
-                                            viewModel.selectSavedSubTab("My Quotes")
-                                        swipeDeltaX > 80f && activeTab == "Saved" && savedSubTab == "My Quotes" ->
-                                            viewModel.selectSavedSubTab("Favorites")
-                                        swipeDeltaX < -80f && idx < tabOrder.lastIndex ->
-                                            viewModel.selectTab(tabOrder[idx + 1])
-                                        swipeDeltaX > 80f && idx > 0 ->
-                                            viewModel.selectTab(tabOrder[idx - 1])
-                                    }
-                                    swipeDeltaX = 0f
-                                },
-                                onDragCancel = { swipeDeltaX = 0f },
-                                onHorizontalDrag = { _, delta -> swipeDeltaX += delta }
-                            )
-                        }
-                ) {
-                    // Nav bar stays fixed — only the content area animates
-                    Scaffold(
-                        modifier = Modifier.fillMaxSize(),
-                        bottomBar = {
-                            if (!showDevScreen && !imeVisible) {
-                                BottomNavigationBar(
-                                    activeTab = activeTab,
-                                    lowPerformanceMode = lowPerformanceMode,
-                                    blurEnabled = blurActive,
-                                    hazeState = navigationHazeState,
-                                    onTabSelected = { tab ->
-                                        if (showNewQuoteScreen) {
-                                            closeNewQuoteScreen { viewModel.selectTab(tab) }
-                                        } else {
-                                            viewModel.selectTab(tab)
-                                        }
-                                    }
-                                )
-                            }
-                        },
-                        contentWindowInsets = WindowInsets(0, 0, 0, 0)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .hazeSource(navigationHazeState, zIndex = 0f)
-                        ) {
-                            // Previous page peeks in from the left during back gesture
-                            if (backPreviewTab != null && !lowPerformanceMode) {
-                                Box(
-                                    Modifier
-                                        .fillMaxSize()
-                                        .graphicsLayer {
-                                            translationX = -(size.width * (1f - backProgress) * 0.25f)
-                                            scaleX = 0.93f + backProgress * 0.07f
-                                            scaleY = 0.93f + backProgress * 0.07f
-                                        }
-                                ) {
-                                    // Lightweight static peek — avoids composing the full
-                                    // DailyScreen on every predictive-back gesture frame.
-                                    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                                        Text(
-                                            text = uiText("Daily Quote"),
-                                            style = MaterialTheme.typography.headlineLarge,
-                                            color = MaterialTheme.colorScheme.onBackground,
-                                            fontWeight = FontWeight.Bold,
-                                            modifier = Modifier
-                                                .statusBarsPadding()
-                                                .padding(start = 20.dp, top = 16.dp)
-                                        )
-                                    }
-                                }
-                            }
-
-                            // Current content slides right (not for filter-clear back)
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .graphicsLayer {
-                                        if (!showDevScreen && !showNewQuoteScreen && backProgress > 0f && !isFilterClearBack && !lowPerformanceMode) {
-                                            translationX = size.width * backProgress
-                                        }
-                                    }
-                            ) {
-                                AnimatedContent(
-                                    targetState = activeTab,
-                                    transitionSpec = {
-                                        if (isCompletingPredictiveBack || initialState == targetState) {
-                                            ContentTransform(
-                                                targetContentEnter = EnterTransition.None,
-                                                initialContentExit = ExitTransition.None
-                                            )
-                                        } else {
-                                            val isForward = tabIndex(targetState) > tabIndex(initialState)
-                                            if (lowPerformanceMode) {
-                                                // Low-performance mode: no motion at all.
-                                                ContentTransform(
-                                                    targetContentEnter = EnterTransition.None,
-                                                    initialContentExit = ExitTransition.None
-                                                )
-                                            } else {
-                                                val floatSpring = spring<Float>(dampingRatio = 0.76f, stiffness = 180f)
-                                                val offsetSpring = spring<androidx.compose.ui.unit.IntOffset>(dampingRatio = 0.76f, stiffness = 180f)
-                                                // Scale dropped: slide + fade only — scaling a
-                                                // full-screen subtree was the costliest property.
-                                                if (isForward) {
-                                                    (slideInHorizontally(offsetSpring) { (it * 0.15f).toInt() } +
-                                                     fadeIn(floatSpring))
-                                                    .togetherWith(
-                                                     slideOutHorizontally(offsetSpring) { -(it * 0.15f).toInt() } +
-                                                     fadeOut(floatSpring))
-                                                } else {
-                                                    (slideInHorizontally(offsetSpring) { -(it * 0.15f).toInt() } +
-                                                     fadeIn(floatSpring))
-                                                    .togetherWith(
-                                                     slideOutHorizontally(offsetSpring) { (it * 0.15f).toInt() } +
-                                                     fadeOut(floatSpring))
-                                                }
-                                            }
-                                        }
-                                    },
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentAlignment = Alignment.Center,
-                                    label = "MainTabsTransition"
-                                ) { tab ->
-                                    when (tab) {
-                                        "Daily" -> DailyScreen(viewModel)
-                                        "Library" -> LibraryScreen(viewModel)
-                                        "Saved" -> SavedScreen(viewModel)
-                                        "Settings" -> WidgetSettingsScreen(viewModel)
-                                    }
-                                }
-                            }
-
-                            if (showNewQuoteScreen || newQuoteBackInProgress) {
-                                NewQuoteScreen(
-                                    viewModel = viewModel,
-                                    onBack = { closeNewQuoteScreen() },
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(bottom = 80.dp)
-                                        .graphicsLayer {
-                                            translationX = size.width * newQuoteProgress
-                                            alpha = 1f - newQuoteProgress * 0.15f
-                                        }
-                                )
-                            }
-                        }
-                    }
-
-                    // Developer screen — exit is instant so predictive back graphicsLayer is authoritative
-                    AnimatedVisibility(
-                        visible = showDevScreen || isCompletingDevBack,
-                        enter = slideInVertically { it } + fadeIn(),
-                        exit = ExitTransition.None
-                    ) {
-                        DeveloperScreen(
+                Crossfade(
+                    targetState = showOnboarding,
+                    animationSpec = if (lowPerformanceMode) snap() else tween(durationMillis = 360),
+                    label = "OnboardingTransition"
+                ) { onboarding ->
+                    if (onboarding) {
+                        OnboardingScreen(viewModel = viewModel)
+                    } else {
+                        MainContent(
                             viewModel = viewModel,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .graphicsLayer {
-                                    if (backProgress > 0f) {
-                                        translationX = size.width * backProgress
-                                        alpha = 1f - backProgress * 0.15f
-                                    }
-                                }
+                            lowPerformanceMode = lowPerformanceMode,
+                            blurNavigationSurfaces = blurNavigationSurfaces
                         )
                     }
-
                 }
               }
             }
         }
+    }
+}
+
+// Same scrims enableEdgeToEdge() uses by default (only visible on API < 29 with button navigation).
+private val LightNavigationScrim = android.graphics.Color.argb(0xe6, 0xFF, 0xFF, 0xFF)
+private val DarkNavigationScrim = android.graphics.Color.argb(0x80, 0x1b, 0x1b, 0x1b)
+
+// Height of the bottom navigation bar above the system navigation inset (1dp divider + 80dp row).
+private val BottomNavigationBarHeight = 81.dp
+
+/**
+ * Tabs, overlays and predictive back. Search text, filters and gesture progress are read lazily
+ * (at gesture time, in graphicsLayer blocks or through derivedStateOf) so typing and back-gesture
+ * frames don't recompose this whole tree.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun MainContent(
+    viewModel: QuoteViewModel,
+    lowPerformanceMode: Boolean,
+    blurNavigationSurfaces: Boolean
+) {
+    val showDevScreen by viewModel.showDevScreen.collectAsStateWithLifecycle()
+    val showNewQuoteScreen by viewModel.showNewQuoteScreen.collectAsStateWithLifecycle()
+    val activeTab by viewModel.selectedTab.collectAsStateWithLifecycle()
+    val blurActive = blurNavigationSurfaces && !lowPerformanceMode
+    val navigationHazeState = rememberHazeState(blurEnabled = blurActive)
+
+    val hasBackStack by viewModel.hasBackStack.collectAsStateWithLifecycle()
+
+    val backProgressAnim = remember { Animatable(0f) }
+    val newQuoteProgressAnim = remember { Animatable(1f) }
+    // Only flips when a back gesture starts or ends, not on every progress frame.
+    val backGestureActive by remember { derivedStateOf { backProgressAnim.value > 0f } }
+    val animationScope = rememberCoroutineScope()
+
+    var isCompletingPredictiveBack by remember { mutableStateOf(false) }
+    var isCompletingDevBack by remember { mutableStateOf(false) }
+    var completionPreviewTab by remember { mutableStateOf<String?>(null) }
+    var newQuoteBackInProgress by remember { mutableStateOf(false) }
+    // Whether the running back gesture only clears the Library search/filter.
+    var backGestureIsFilterClear by remember { mutableStateOf(false) }
+
+    LaunchedEffect(showNewQuoteScreen) {
+        if (showNewQuoteScreen && !newQuoteBackInProgress) {
+            newQuoteProgressAnim.animateTo(
+                0f,
+                animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing)
+            )
+        }
+    }
+
+    PredictiveBackHandler(enabled = showNewQuoteScreen) { progress ->
+        newQuoteBackInProgress = true
+        var completed = false
+        try {
+            newQuoteProgressAnim.stop()
+            progress.collect { event ->
+                newQuoteProgressAnim.snapTo(event.progress)
+            }
+            newQuoteProgressAnim.animateTo(
+                1f,
+                animationSpec = spring(dampingRatio = 0.9f, stiffness = 500f)
+            )
+            completed = true
+            viewModel.closeNewQuoteScreen()
+        } finally {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                if (completed) {
+                    kotlinx.coroutines.delay(32L)
+                } else {
+                    newQuoteProgressAnim.animateTo(
+                        0f,
+                        animationSpec = spring(dampingRatio = 0.82f, stiffness = 420f)
+                    )
+                }
+                newQuoteBackInProgress = false
+            }
+        }
+    }
+
+    PredictiveBackHandler(
+        enabled = hasBackStack && !showNewQuoteScreen && !newQuoteBackInProgress
+    ) { progress ->
+        var capturedIsFilterClear = false
+        var capturedIsDevBack = false
+        var capturedPreviewTab: String? = null
+        try {
+            progress.collect { event ->
+                // Read at gesture time instead of collecting search/filter state in composition.
+                val devScreen = viewModel.showDevScreen.value
+                val newQuoteScreen = viewModel.showNewQuoteScreen.value
+                val tab = viewModel.selectedTab.value
+                capturedIsDevBack = devScreen
+                capturedIsFilterClear = !devScreen && !newQuoteScreen && tab == "Library"
+                    && (viewModel.selectedCategories.value.isNotEmpty() || viewModel.searchQuery.value.isNotBlank())
+                capturedPreviewTab = if (!capturedIsFilterClear && !devScreen && !newQuoteScreen && tab != "Daily") "Daily" else null
+                backGestureIsFilterClear = capturedIsFilterClear
+                backProgressAnim.snapTo(event.progress)
+            }
+            if (capturedIsFilterClear) {
+                backProgressAnim.snapTo(0f)
+                viewModel.popBackStack()
+                return@PredictiveBackHandler
+            }
+            completionPreviewTab = capturedPreviewTab
+            isCompletingPredictiveBack = true
+            if (capturedIsDevBack) isCompletingDevBack = true
+            backProgressAnim.animateTo(1f, animationSpec = spring(dampingRatio = 0.9f, stiffness = 500f))
+            viewModel.popBackStack()
+            kotlinx.coroutines.delay(50L)
+        } finally {
+            isCompletingPredictiveBack = false
+            isCompletingDevBack = false
+            completionPreviewTab = null
+            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                kotlinx.coroutines.delay(32L)
+                backProgressAnim.snapTo(0f)
+                backGestureIsFilterClear = false
+            }
+        }
+    }
+
+    // Which tab to preview on the left during back gesture / completion
+    val isFilterClearBack = !showDevScreen && !showNewQuoteScreen && !isCompletingPredictiveBack
+        && backGestureActive && backGestureIsFilterClear
+
+    val backPreviewTab: String? = when {
+        isCompletingPredictiveBack -> completionPreviewTab
+        showDevScreen || showNewQuoteScreen -> null
+        isFilterClearBack -> null
+        backGestureActive && activeTab != "Daily" -> "Daily"
+        else -> null
+    }
+
+    val tabOrder = listOf("Daily", "Library", "Saved", "Settings")
+    var swipeDeltaX by remember { mutableFloatStateOf(0f) }
+
+    fun closeNewQuoteScreen(afterClose: () -> Unit = {}) {
+        if (newQuoteBackInProgress) return
+        animationScope.launch {
+            newQuoteBackInProgress = true
+            newQuoteProgressAnim.animateTo(
+                1f,
+                animationSpec = tween(
+                    durationMillis = 220,
+                    easing = FastOutSlowInEasing
+                )
+            )
+            viewModel.closeNewQuoteScreen()
+            afterClose()
+            newQuoteBackInProgress = false
+        }
+    }
+
+    Box(
+        Modifier
+            .fillMaxSize()
+            .pointerInput(activeTab, showDevScreen, showNewQuoteScreen) {
+                if (showDevScreen || showNewQuoteScreen) return@pointerInput
+                detectHorizontalDragGestures(
+                    onDragEnd = {
+                        val idx = tabOrder.indexOf(activeTab)
+                        val savedSubTab = viewModel.savedSubTab.value
+                        when {
+                            swipeDeltaX < -80f && activeTab == "Saved" && savedSubTab == "Favorites" ->
+                                viewModel.selectSavedSubTab("My Quotes")
+                            swipeDeltaX > 80f && activeTab == "Saved" && savedSubTab == "My Quotes" ->
+                                viewModel.selectSavedSubTab("Favorites")
+                            swipeDeltaX < -80f && idx < tabOrder.lastIndex ->
+                                viewModel.selectTab(tabOrder[idx + 1])
+                            swipeDeltaX > 80f && idx > 0 ->
+                                viewModel.selectTab(tabOrder[idx - 1])
+                        }
+                        swipeDeltaX = 0f
+                    },
+                    onDragCancel = { swipeDeltaX = 0f },
+                    onHorizontalDrag = { _, delta -> swipeDeltaX += delta }
+                )
+            }
+    ) {
+        // Nav bar stays fixed — only the content area animates
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            bottomBar = {
+                // Read here so keyboard visibility changes only recompose the bar slot.
+                if (!showDevScreen && !WindowInsets.isImeVisible) {
+                    BottomNavigationBar(
+                        activeTab = activeTab,
+                        lowPerformanceMode = lowPerformanceMode,
+                        blurEnabled = blurActive,
+                        hazeState = navigationHazeState,
+                        onTabSelected = { tab ->
+                            if (showNewQuoteScreen) {
+                                closeNewQuoteScreen { viewModel.selectTab(tab) }
+                            } else {
+                                viewModel.selectTab(tab)
+                            }
+                        }
+                    )
+                }
+            },
+            contentWindowInsets = WindowInsets(0, 0, 0, 0)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .hazeSource(navigationHazeState, zIndex = 0f)
+            ) {
+                // Previous page peeks in from the left during back gesture
+                if (backPreviewTab != null && !lowPerformanceMode) {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                val backProgress = backProgressAnim.value
+                                translationX = -(size.width * (1f - backProgress) * 0.25f)
+                                scaleX = 0.93f + backProgress * 0.07f
+                                scaleY = 0.93f + backProgress * 0.07f
+                            }
+                    ) {
+                        // Lightweight static peek — avoids composing the full
+                        // DailyScreen on every predictive-back gesture frame.
+                        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                            Text(
+                                text = uiText("Daily Quote"),
+                                style = MaterialTheme.typography.headlineLarge,
+                                color = MaterialTheme.colorScheme.onBackground,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier
+                                    .statusBarsPadding()
+                                    .padding(start = 20.dp, top = 16.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Current content slides right (not for filter-clear back)
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            val backProgress = backProgressAnim.value
+                            if (!showDevScreen && !showNewQuoteScreen && backProgress > 0f && !isFilterClearBack && !lowPerformanceMode) {
+                                translationX = size.width * backProgress
+                            }
+                        }
+                ) {
+                    AnimatedContent(
+                        targetState = activeTab,
+                        transitionSpec = {
+                            if (isCompletingPredictiveBack || initialState == targetState) {
+                                ContentTransform(
+                                    targetContentEnter = EnterTransition.None,
+                                    initialContentExit = ExitTransition.None
+                                )
+                            } else {
+                                val isForward = tabIndex(targetState) > tabIndex(initialState)
+                                if (lowPerformanceMode) {
+                                    // Low-performance mode: no motion at all.
+                                    ContentTransform(
+                                        targetContentEnter = EnterTransition.None,
+                                        initialContentExit = ExitTransition.None
+                                    )
+                                } else {
+                                    val floatSpring = spring<Float>(dampingRatio = 0.76f, stiffness = 180f)
+                                    val offsetSpring = spring<androidx.compose.ui.unit.IntOffset>(dampingRatio = 0.76f, stiffness = 180f)
+                                    // Scale dropped: slide + fade only — scaling a
+                                    // full-screen subtree was the costliest property.
+                                    if (isForward) {
+                                        (slideInHorizontally(offsetSpring) { (it * 0.15f).toInt() } +
+                                         fadeIn(floatSpring))
+                                        .togetherWith(
+                                         slideOutHorizontally(offsetSpring) { -(it * 0.15f).toInt() } +
+                                         fadeOut(floatSpring))
+                                    } else {
+                                        (slideInHorizontally(offsetSpring) { -(it * 0.15f).toInt() } +
+                                         fadeIn(floatSpring))
+                                        .togetherWith(
+                                         slideOutHorizontally(offsetSpring) { (it * 0.15f).toInt() } +
+                                         fadeOut(floatSpring))
+                                    }
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                        label = "MainTabsTransition"
+                    ) { tab ->
+                        when (tab) {
+                            "Daily" -> DailyScreen(viewModel)
+                            "Library" -> LibraryScreen(viewModel)
+                            "Saved" -> SavedScreen(viewModel)
+                            "Settings" -> WidgetSettingsScreen(viewModel)
+                        }
+                    }
+                }
+
+                if (showNewQuoteScreen || newQuoteBackInProgress) {
+                    NewQuoteScreen(
+                        viewModel = viewModel,
+                        onBack = { closeNewQuoteScreen() },
+                        // Keeps the form above the bottom bar (and the system navigation
+                        // under it); while typing the bar hides and the keyboard takes over.
+                        bottomInsets = WindowInsets.ime.union(
+                            WindowInsets.navigationBars.add(WindowInsets(bottom = BottomNavigationBarHeight))
+                        ),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                val newQuoteProgress = newQuoteProgressAnim.value
+                                translationX = size.width * newQuoteProgress
+                                alpha = 1f - newQuoteProgress * 0.15f
+                            }
+                    )
+                }
+            }
+        }
+
+        // Developer screen — exit is instant so predictive back graphicsLayer is authoritative
+        AnimatedVisibility(
+            visible = showDevScreen || isCompletingDevBack,
+            enter = slideInVertically { it } + fadeIn(),
+            exit = ExitTransition.None
+        ) {
+            DeveloperScreen(
+                viewModel = viewModel,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        val backProgress = backProgressAnim.value
+                        if (backProgress > 0f) {
+                            translationX = size.width * backProgress
+                            alpha = 1f - backProgress * 0.15f
+                        }
+                    }
+            )
+        }
+
     }
 }
 
@@ -519,7 +583,7 @@ fun BottomNavigationBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .height(80.dp),
+                .height(BottomNavigationBarHeight - 1.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceAround
         ) {

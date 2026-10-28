@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Same colors the launcher uses for the themed (monochrome) icon in light mode. -->
+    <color name="splash_themed_background">@android:color/system_accent1_100</color>
+    <color name="splash_themed_foreground">@android:color/system_neutral2_700</color>
+</resources>
