@@ -1,21 +1,18 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# Project specific R8 rules. Room, WorkManager, Compose, Coil, Haze and
+# kotlinx.coroutines ship their own consumer rules; activities, receivers and
+# providers are kept through the manifest.
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Keep line numbers for readable crash reports; the mapping file restores names.
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# BuildConfig fields are read at runtime (version, debug flags).
+-keep class app.brokoli5191.quote.BuildConfig { *; }
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# WorkManager instantiates workers by class name through reflection, using the
+# (Context, WorkerParameters) constructor. Persisted work requests store the
+# class name, so it must stay stable across updates.
+-keep class * extends androidx.work.ListenableWorker {
+    public <init>(android.content.Context, androidx.work.WorkerParameters);
+}
+

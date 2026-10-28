@@ -1,0 +1,33 @@
+# Hand-written baseline profile: app startup, main screens, widget, workers.
+# Compose and other AndroidX libraries ship their own profiles; the rules below
+# make sure the hot paths used by this app are precompiled as well.
+
+# App code
+HSPLapp/brokoli5191/quote/**->**(**)**
+Lapp/brokoli5191/quote/**;
+
+# Compose
+HSPLandroidx/compose/runtime/**->**(**)**
+Landroidx/compose/runtime/**;
+HSPLandroidx/compose/ui/**->**(**)**
+Landroidx/compose/ui/**;
+HSPLandroidx/compose/foundation/**->**(**)**
+Landroidx/compose/foundation/**;
+HSPLandroidx/compose/animation/**->**(**)**
+Landroidx/compose/animation/**;
+HSPLandroidx/compose/material3/**->**(**)**
+Landroidx/compose/material3/**;
+
+# Navigation, lifecycle and activity integration used during startup
+HSPLandroidx/navigation/compose/**->**(**)**
+Landroidx/navigation/compose/**;
+HSPLandroidx/lifecycle/**->**(**)**
+Landroidx/lifecycle/**;
+HSPLandroidx/activity/compose/**->**(**)**
+Landroidx/activity/compose/**;
+
+# Room and coroutines on the first database read
+HSPLandroidx/room/**->**(**)**
+Landroidx/room/**;
+HSPLkotlinx/coroutines/**->**(**)**
+Lkotlinx/coroutines/**;
