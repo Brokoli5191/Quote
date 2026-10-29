@@ -1,12 +1,23 @@
 import fs from 'node:fs';
+import { CATEGORIES } from './category_mapper.mjs';
 import { authorKey, canonicalAuthor, isProbablyEnglish, MAX_QUOTE_LENGTH, MAX_TAGS, quoteKey } from './quote_seed_rules.mjs';
 
 const seedPath = process.argv[2] || 'app/src/main/res/raw/quotes_seed.json';
 const translationsPath = process.argv[3] || 'app/src/main/res/raw/quotes_de.json';
+const anonymousPath = process.argv[4] || 'app/src/main/res/raw/anonymous_quotes.json';
+const vocabulary = new Set(JSON.parse(fs.readFileSync(new URL('./tag_vocabulary.json', import.meta.url), 'utf8')).map((entry) => entry.en));
+const MIN_TAGS = 3;
 const quotes = JSON.parse(fs.readFileSync(seedPath, 'utf8'));
 const errors = [];
 const seen = new Map();
 const authorSpellings = new Map();
+
+function checkTags(item, label) {
+  if (!Array.isArray(item.tags)) return errors.push(`${label}: tags must be an array`);
+  if (item.tags.length < MIN_TAGS || item.tags.length > MAX_TAGS) errors.push(`${label}: needs ${MIN_TAGS}-${MAX_TAGS} tags, has ${item.tags.length}`);
+  if (new Set(item.tags).size !== item.tags.length) errors.push(`${label}: duplicate tags`);
+  for (const tag of item.tags) if (!vocabulary.has(tag)) errors.push(`${label}: tag not in tools/tag_vocabulary.json: ${tag}`);
+}
 
 for (const [index, item] of quotes.entries()) {
   const label = `row ${index + 1}`;
@@ -14,9 +25,8 @@ for (const [index, item] of quotes.entries()) {
   if (!item.author?.trim()) errors.push(`${label}: missing author`);
   if (!isProbablyEnglish(item.quote)) errors.push(`${label}: quote is not confidently English: ${item.quote}`);
   if (item.quote.length > MAX_QUOTE_LENGTH) errors.push(`${label}: quote exceeds ${MAX_QUOTE_LENGTH} characters`);
-  if (!Array.isArray(item.tags)) errors.push(`${label}: tags must be an array`);
-  if (Array.isArray(item.tags) && item.tags.length > MAX_TAGS) errors.push(`${label}: more than ${MAX_TAGS} tags`);
-  if (Array.isArray(item.tags) && new Set(item.tags).size !== item.tags.length) errors.push(`${label}: duplicate tags`);
+  checkTags(item, label);
+  if (!CATEGORIES.includes(item.category)) errors.push(`${label}: missing or unknown category: ${item.category}`);
 
   if (item.author && canonicalAuthor(item.author) !== item.author) {
     errors.push(`${label}: author is not canonical: ${item.author} (expected ${canonicalAuthor(item.author)})`);
@@ -29,6 +39,9 @@ for (const [index, item] of quotes.entries()) {
   if (seen.has(key)) errors.push(`${label}: duplicate quote (first seen in row ${seen.get(key)}): ${item.quote}`);
   else seen.set(key, index + 1);
 }
+
+const anonymous = JSON.parse(fs.readFileSync(anonymousPath, 'utf8'));
+for (const [index, item] of anonymous.entries()) checkTags(item, `anonymous row ${index + 1}`);
 
 const translated = new Map();
 for (const [index, item] of JSON.parse(fs.readFileSync(translationsPath, 'utf8')).entries()) {
@@ -50,4 +63,4 @@ if (errors.length > 0) {
   process.exit(1);
 }
 
-console.log(`Validated ${quotes.length} quotes by ${authorSpellings.size} authors: English-only, unique, canonical author names, <= ${MAX_TAGS} tags, ${translated.size} German translations.`);
+console.log(`Validated ${quotes.length} quotes by ${authorSpellings.size} authors: English-only, unique, canonical author names, ${MIN_TAGS}-${MAX_TAGS} vocabulary tags and a category each, ${translated.size} German translations, ${anonymous.length} tagged anonymous quotes.`);

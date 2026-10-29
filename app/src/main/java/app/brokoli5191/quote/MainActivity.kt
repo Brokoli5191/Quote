@@ -41,6 +41,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -62,6 +63,8 @@ import app.brokoli5191.quote.ui.QuoteViewModel
 import app.brokoli5191.quote.ui.QuoteViewModelFactory
 import app.brokoli5191.quote.ui.LocalAppLanguage
 import app.brokoli5191.quote.ui.uiText
+import app.brokoli5191.quote.ui.components.BottomNavigationBarFade
+import app.brokoli5191.quote.ui.components.BottomNavigationBarHeight
 import app.brokoli5191.quote.ui.screens.DailyScreen
 import app.brokoli5191.quote.ui.screens.DeveloperScreen
 import app.brokoli5191.quote.ui.screens.LibraryScreen
@@ -152,9 +155,6 @@ class MainActivity : ComponentActivity() {
 // Same scrims enableEdgeToEdge() uses by default (only visible on API < 29 with button navigation).
 private val LightNavigationScrim = android.graphics.Color.argb(0xe6, 0xFF, 0xFF, 0xFF)
 private val DarkNavigationScrim = android.graphics.Color.argb(0x80, 0x1b, 0x1b, 0x1b)
-
-// Height of the bottom navigation bar above the system navigation inset (1dp divider + 80dp row).
-private val BottomNavigationBarHeight = 81.dp
 
 /**
  * Tabs, overlays and predictive back. Search text, filters and gesture progress are read lazily
@@ -566,25 +566,22 @@ fun BottomNavigationBar(
     onTabSelected: (String) -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .hazeEffect(hazeState)
-            .background(
-                MaterialTheme.colorScheme.background.copy(alpha = if (blurEnabled) 0.72f else 1f)
-            )
-    ) {
+    val barColor = MaterialTheme.colorScheme.background.copy(alpha = if (blurEnabled) 0.72f else 1f)
+    Column(modifier = Modifier.fillMaxWidth()) {
+        // Soft top edge instead of a divider line: content scrolling under the bar fades into it.
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(1.dp)
-                .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.16f))
+                .height(BottomNavigationBarFade)
+                .background(Brush.verticalGradient(listOf(Color.Transparent, barColor)))
         )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .hazeEffect(hazeState)
+                .background(barColor)
                 .navigationBarsPadding()
-                .height(BottomNavigationBarHeight - 1.dp),
+                .height(BottomNavigationBarHeight),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceAround
         ) {

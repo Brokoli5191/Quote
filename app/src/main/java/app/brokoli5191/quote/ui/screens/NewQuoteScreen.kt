@@ -52,7 +52,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
@@ -69,6 +68,17 @@ import app.brokoli5191.quote.ui.components.AuthorAvatar
 import app.brokoli5191.quote.ui.components.ExpressiveButton
 import app.brokoli5191.quote.ui.components.ExpressiveIconButton
 import app.brokoli5191.quote.ui.components.rememberExpressiveShape
+import app.brokoli5191.quote.ui.components.FloatingChromeBackdrop
+import app.brokoli5191.quote.ui.components.bleedHorizontally
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.exclude
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import app.brokoli5191.quote.ui.theme.SerifFontFamily
 import app.brokoli5191.quote.data.CategoryMapper
 import kotlinx.coroutines.delay
@@ -76,6 +86,8 @@ import kotlinx.coroutines.launch
 
 private val customQuoteCategories = CategoryMapper.categories
 private val FormHorizontalPadding = 20.dp
+private val HeaderContentGap = 8.dp
+private val HeaderFallbackHeight = 68.dp
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
@@ -84,7 +96,8 @@ fun NewQuoteScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     // Bottom space the form must keep clear: the keyboard, or whatever sits below it (the app's
-    // bottom bar plus the system navigation bar).
+    // bottom bar plus the system navigation bar). The form ends at the keyboard; anything else
+    // floats over it, so the form scrolls underneath and only gets matching end padding.
     bottomInsets: WindowInsets = WindowInsets.ime.union(WindowInsets.navigationBars)
 ) {
     var text by rememberSaveable { mutableStateOf("") }
@@ -98,6 +111,13 @@ fun NewQuoteScreen(
     val formScrollState = rememberScrollState()
     val density = LocalDensity.current
     val saveButtonScrollOffsetPx = with(density) { 72.dp.roundToPx() }
+    val lowPerformanceMode by viewModel.lowPerformanceMode.collectAsStateWithLifecycle()
+    val blurNavigationSurfaces by viewModel.blurNavigationSurfaces.collectAsStateWithLifecycle()
+    val formHazeState = rememberHazeState(blurEnabled = blurNavigationSurfaces && !lowPerformanceMode)
+    // The header floats over the form, which starts below its measured height and scrolls under it.
+    val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    var headerHeightPx by remember { mutableIntStateOf(0) }
+    val headerHeight = if (headerHeightPx > 0) with(density) { headerHeightPx.toDp() } else statusBarTop + HeaderFallbackHeight
     val trimmedTextLength = text.trim().length
     val quoteInvalid = text.isNotEmpty() && trimmedTextLength < 3
     val parsedTags = tags.split(',').map(String::trim).filter(String::isNotEmpty)
@@ -114,47 +134,22 @@ fun NewQuoteScreen(
         color = MaterialTheme.colorScheme.background,
         contentColor = MaterialTheme.colorScheme.onBackground
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .windowInsetsPadding(
-                    bottomInsets.only(WindowInsetsSides.Bottom)
-                        .union(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
-                )
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                ExpressiveIconButton(onClick = requestBack) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = uiText("Back")
-                    )
-                }
-                Spacer(Modifier.width(8.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        text = uiText("New quote"),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = uiText("Stored locally; only sent when you submit it"),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
             Column(
                 modifier = Modifier
-                    .weight(1f)
+                    .fillMaxSize()
+                    .hazeSource(formHazeState)
+                    .windowInsetsPadding(WindowInsets.ime.only(WindowInsetsSides.Bottom))
                     .verticalScroll(formScrollState)
-                    .padding(horizontal = FormHorizontalPadding),
+                    .padding(
+                        start = FormHorizontalPadding,
+                        top = headerHeight + HeaderContentGap,
+                        end = FormHorizontalPadding
+                    ),
                 verticalArrangement = Arrangement.spacedBy(18.dp)
             ) {
                 Box {
@@ -221,18 +216,7 @@ fun NewQuoteScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .layout { measurable, constraints ->
-                                val bleed = FormHorizontalPadding.roundToPx()
-                                val placeable = measurable.measure(
-                                    constraints.copy(
-                                        minWidth = constraints.minWidth + bleed * 2,
-                                        maxWidth = constraints.maxWidth + bleed * 2
-                                    )
-                                )
-                                layout(placeable.width - bleed * 2, placeable.height) {
-                                    placeable.place(-bleed, 0)
-                                }
-                            }
+                            .bleedHorizontally(FormHorizontalPadding)
                             .horizontalScroll(rememberScrollState())
                             .padding(horizontal = FormHorizontalPadding),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -317,6 +301,44 @@ fun NewQuoteScreen(
                     )
                 }
                 Spacer(Modifier.height(8.dp))
+                // Lets the button scroll out from under the floating bottom bar.
+                Spacer(Modifier.windowInsetsBottomHeight(bottomInsets.exclude(WindowInsets.ime)))
+            }
+
+            FloatingChromeBackdrop(
+                hazeState = formHazeState,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(headerHeight + HeaderContentGap)
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onSizeChanged { headerHeightPx = it.height }
+                    .statusBarsPadding()
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                ExpressiveIconButton(onClick = requestBack) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = uiText("Back")
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = uiText("New quote"),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = uiText("Stored locally; only sent when you submit it"),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }

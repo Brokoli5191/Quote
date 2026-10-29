@@ -16,7 +16,6 @@ val LocalAppLanguage = staticCompositionLocalOf { QuoteLanguage.ENGLISH }
 private val germanUi = mapOf(
     "Daily" to "Heute",
     "Today" to "Heute",
-    "A thought worth keeping" to "Ein Gedanke, den es zu bewahren lohnt",
     "Library" to "Bibliothek",
     "Saved" to "Gespeichert",
     "Settings" to "Einstellungen",

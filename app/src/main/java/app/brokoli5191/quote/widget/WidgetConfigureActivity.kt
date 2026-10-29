@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -41,13 +43,11 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
@@ -55,6 +55,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -68,6 +69,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.text.font.FontFamily
@@ -89,6 +92,8 @@ import app.brokoli5191.quote.ui.uiText
 import app.brokoli5191.quote.ui.localizeUi
 import app.brokoli5191.quote.ui.theme.MyApplicationTheme
 import app.brokoli5191.quote.ui.components.ExpressiveButton
+import app.brokoli5191.quote.ui.components.FloatingChromeBackdrop
+import app.brokoli5191.quote.ui.components.bleedHorizontally
 import app.brokoli5191.quote.ui.components.rememberExpressiveShape
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -190,150 +195,185 @@ class WidgetConfigureActivity : ComponentActivity() {
                         containerColor = MaterialTheme.colorScheme.background
                     )
                 )
-            },
-            bottomBar = {
-                Surface(color = MaterialTheme.colorScheme.background, tonalElevation = 0.dp) {
+            }
+        ) { padding ->
+            // The settings scroll under the preview and the floating Create button and fade out
+            // there instead of ending at a hard edge.
+            val layoutDirection = LocalLayoutDirection.current
+            var createBarHeightPx by remember { mutableIntStateOf(0) }
+            val createBarHeight = with(LocalDensity.current) { createBarHeightPx.toDp() }
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .padding(
+                        start = padding.calculateStartPadding(layoutDirection),
+                        top = padding.calculateTopPadding(),
+                        end = padding.calculateEndPadding(layoutDirection)
+                    )
+                    .background(MaterialTheme.colorScheme.background)
+            ) {
+                Column(Modifier.fillMaxSize()) {
+                    Column(
+                        Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            SectionTitle("Live Preview")
+                            Text(
+                                uiText("Drag elements to move"),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.End,
+                                modifier = Modifier
+                                    .weight(1f, fill = false)
+                                    .padding(start = 12.dp)
+                            )
+                        }
+                        WidgetPreview(
+                            config = config,
+                            onLabelPosition = { labelX = it.first; labelY = it.second },
+                            onIconPosition = { iconX = it.first; iconY = it.second },
+                            onQuotePosition = { quoteX = it.first; quoteY = it.second },
+                            onAuthorPosition = { authorX = it.first; authorY = it.second }
+                        )
+                    }
+
+                    Box(Modifier.weight(1f)) {
+                        Column(
+                            Modifier
+                                .fillMaxSize()
+                                .verticalScroll(rememberScrollState())
+                                .padding(start = 20.dp, top = 20.dp, end = 20.dp, bottom = 12.dp + createBarHeight),
+                            verticalArrangement = Arrangement.spacedBy(22.dp)
+                        ) {
+                            SectionTitle("Visible Elements")
+                            WidgetToggle("Author", showAuthor) { showAuthor = it }
+                            WidgetToggle("Decorative Icon", showIcon) { showIcon = it }
+                            WidgetToggle("Quote Label", showLabel) { showLabel = it }
+                            WidgetToggle("Background Blur", blurBackground) { blurBackground = it }
+
+                            ExpressiveValueSlider("Visual Widget Size", visualScale, 0.65f..1f, "${(visualScale * 100).toInt()}%") { visualScale = it }
+                            ExpressiveValueSlider("Corner Radius", cornerRadius, 0f..48f, "${cornerRadius.toInt()} dp") { cornerRadius = it }
+                            WidgetToggle("Border", borderEnabled) { borderEnabled = it }
+                            if (borderEnabled) ColorPicker("Border", borderColor) { borderColor = it }
+
+                            SectionTitle("Background Presets")
+                            Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .bleedHorizontally(20.dp)
+                                .horizontalScroll(rememberScrollState())
+                                .padding(horizontal = 20.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                            widgetBackgroundPresets.forEach { preset ->
+                                val selected = bgStart == preset.start && bgEnd == preset.end
+                                Box(
+                                    Modifier
+                                        .width(104.dp)
+                                        .height(58.dp)
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(
+                                            Brush.linearGradient(
+                                                listOf(parseColor(preset.start), parseColor(preset.end))
+                                            )
+                                        )
+                                        .border(
+                                            if (selected) 3.dp else 1.dp,
+                                            if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                                            RoundedCornerShape(14.dp)
+                                        )
+                                        .clickable {
+                                            bgStart = preset.start
+                                            bgEnd = preset.end
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        uiText(preset.name),
+                                        color = if (preset.name == "Paper") Color.Black else Color.White,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        textAlign = TextAlign.Center,
+                                        maxLines = 2,
+                                        modifier = Modifier.padding(horizontal = 6.dp)
+                                    )
+                                }
+                            }
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            ColorTextField("Start", bgStart, { bgStart = it }, Modifier.weight(1f))
+                            ColorTextField("End", bgEnd, { bgEnd = it }, Modifier.weight(1f))
+                            }
+
+                            SectionTitle("Widget Font")
+                            Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .bleedHorizontally(20.dp)
+                                .horizontalScroll(rememberScrollState())
+                                .padding(horizontal = 20.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                            listOf("Serif", "Serif Bold", "Sans", "Monospace").forEach { option ->
+                                val interactionSource = remember(option) { MutableInteractionSource() }
+                                FilterChip(
+                                    selected = font == option,
+                                    onClick = { font = option },
+                                    label = { Text(uiText(option)) },
+                                    shape = rememberExpressiveShape(interactionSource, 20.dp, 9.dp),
+                                    interactionSource = interactionSource,
+                                    leadingIcon = if (font == option) {
+                                        { Icon(Icons.Default.Check, null, Modifier.size(16.dp)) }
+                                    } else null
+                                )
+                            }
+                            }
+
+                            ExpressiveValueSlider("Quote Font Size", quoteScale, 0.7f..1.4f, "${(quoteScale * 100).toInt()}%") { quoteScale = it }
+                            ExpressiveValueSlider("Author Font Size", authorScale, 0.7f..1.4f, "${(authorScale * 100).toInt()}%") { authorScale = it }
+
+                            SectionTitle("Colors")
+                            ColorPicker("Quote Label", labelColor) { labelColor = it }
+                            ColorPicker("Quote Text", quoteColor) { quoteColor = it }
+                            ColorPicker("Author", authorColor) { authorColor = it }
+                            Spacer(Modifier.height(12.dp))
+                        }
+                        FloatingChromeBackdrop(
+                            hazeState = null,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(20.dp)
+                        )
+                    }
+                }
+
+                Box(
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .onSizeChanged { createBarHeightPx = it.height }
+                ) {
+                    FloatingChromeBackdrop(
+                        hazeState = null,
+                        modifier = Modifier.matchParentSize(),
+                        fadeDown = false
+                    )
                     ExpressiveButton(
                         onClick = { saveAndFinish(config) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .navigationBarsPadding()
-                            .padding(16.dp)
+                            .padding(start = 16.dp, top = 28.dp, end = 16.dp, bottom = 16.dp)
                             .heightIn(min = 54.dp),
                         restingCorner = 18.dp
                     ) {
                         Text(uiText("Create Widget"), fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                     }
-                }
-            }
-        ) { padding ->
-            Column(
-                Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .background(MaterialTheme.colorScheme.background)
-            ) {
-                Column(
-                    Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        SectionTitle("Live Preview")
-                        Text(
-                            uiText("Drag elements to move"),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.End,
-                            modifier = Modifier
-                                .weight(1f, fill = false)
-                                .padding(start = 12.dp)
-                        )
-                    }
-                    WidgetPreview(
-                        config = config,
-                        onLabelPosition = { labelX = it.first; labelY = it.second },
-                        onIconPosition = { iconX = it.first; iconY = it.second },
-                        onQuotePosition = { quoteX = it.first; quoteY = it.second },
-                        onAuthorPosition = { authorX = it.first; authorY = it.second }
-                    )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.16f))
-                }
-
-                Column(
-                    Modifier
-                        .weight(1f)
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 20.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(22.dp)
-                ) {
-                    SectionTitle("Visible Elements")
-                    WidgetToggle("Author", showAuthor) { showAuthor = it }
-                    WidgetToggle("Decorative Icon", showIcon) { showIcon = it }
-                    WidgetToggle("Quote Label", showLabel) { showLabel = it }
-                    WidgetToggle("Background Blur", blurBackground) { blurBackground = it }
-
-                    ExpressiveValueSlider("Visual Widget Size", visualScale, 0.65f..1f, "${(visualScale * 100).toInt()}%") { visualScale = it }
-                    ExpressiveValueSlider("Corner Radius", cornerRadius, 0f..48f, "${cornerRadius.toInt()} dp") { cornerRadius = it }
-                    WidgetToggle("Border", borderEnabled) { borderEnabled = it }
-                    if (borderEnabled) ColorPicker("Border", borderColor) { borderColor = it }
-
-                    SectionTitle("Background Presets")
-                    Row(
-                    Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                    widgetBackgroundPresets.forEach { preset ->
-                        val selected = bgStart == preset.start && bgEnd == preset.end
-                        Box(
-                            Modifier
-                                .width(104.dp)
-                                .height(58.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(
-                                    Brush.linearGradient(
-                                        listOf(parseColor(preset.start), parseColor(preset.end))
-                                    )
-                                )
-                                .border(
-                                    if (selected) 3.dp else 1.dp,
-                                    if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                                    RoundedCornerShape(14.dp)
-                                )
-                                .clickable {
-                                    bgStart = preset.start
-                                    bgEnd = preset.end
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                uiText(preset.name),
-                                color = if (preset.name == "Paper") Color.Black else Color.White,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                textAlign = TextAlign.Center,
-                                maxLines = 2,
-                                modifier = Modifier.padding(horizontal = 6.dp)
-                            )
-                        }
-                    }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    ColorTextField("Start", bgStart, { bgStart = it }, Modifier.weight(1f))
-                    ColorTextField("End", bgEnd, { bgEnd = it }, Modifier.weight(1f))
-                    }
-
-                    SectionTitle("Widget Font")
-                    Row(
-                    Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                    listOf("Serif", "Serif Bold", "Sans", "Monospace").forEach { option ->
-                        val interactionSource = remember(option) { MutableInteractionSource() }
-                        FilterChip(
-                            selected = font == option,
-                            onClick = { font = option },
-                            label = { Text(uiText(option)) },
-                            shape = rememberExpressiveShape(interactionSource, 20.dp, 9.dp),
-                            interactionSource = interactionSource,
-                            leadingIcon = if (font == option) {
-                                { Icon(Icons.Default.Check, null, Modifier.size(16.dp)) }
-                            } else null
-                        )
-                    }
-                    }
-
-                    ExpressiveValueSlider("Quote Font Size", quoteScale, 0.7f..1.4f, "${(quoteScale * 100).toInt()}%") { quoteScale = it }
-                    ExpressiveValueSlider("Author Font Size", authorScale, 0.7f..1.4f, "${(authorScale * 100).toInt()}%") { authorScale = it }
-
-                    SectionTitle("Colors")
-                    ColorPicker("Quote Label", labelColor) { labelColor = it }
-                    ColorPicker("Quote Text", quoteColor) { quoteColor = it }
-                    ColorPicker("Author", authorColor) { authorColor = it }
-                    Spacer(Modifier.height(12.dp))
                 }
             }
         }
@@ -395,8 +435,13 @@ class WidgetConfigureActivity : ComponentActivity() {
         val colors = listOf("#FFFFFF", "#E9DDFF", "#D0BCFF", "#A0D2AD", "#ADC6FF", "#FFB2C5", "#FFDB9C", "#CAC4D0", "#1C1B1F")
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(uiText(label), style = MaterialTheme.typography.labelLarge)
+            // Scrolls out to the screen edges instead of being cut off at the settings padding.
             Row(
-                Modifier.horizontalScroll(rememberScrollState()),
+                Modifier
+                    .fillMaxWidth()
+                    .bleedHorizontally(20.dp)
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 colors.forEach { color ->

@@ -1,7 +1,9 @@
 package app.brokoli5191.quote.screenshots
 
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import org.junit.Test
 import org.robolectric.ParameterizedRobolectricTestRunner
@@ -14,6 +16,19 @@ class SavedScreenshotTest(configId: String) : ScreenshotTestBase(configId) {
         compose.setContent { TabFrame(app.viewModel, "Saved") }
         compose.awaitCondition { app.viewModel.favorites.value.isNotEmpty() }
         capture("saved", "favorites")
+    }
+
+    @Test
+    fun favoritesTranslationToggled() {
+        val app = launch()
+        compose.setContent { TabFrame(app.viewModel, "Saved") }
+        compose.awaitCondition { app.viewModel.favorites.value.isNotEmpty() }
+        // Only the first card switches; the cards below it follow its new height.
+        compose.onAllNodes(
+            hasContentDescription(text("Show in German")) or hasContentDescription(text("Show in English"))
+        )[0].performClick()
+        compose.settle()
+        capture("saved", "favorites_translation_toggled")
     }
 
     @Test

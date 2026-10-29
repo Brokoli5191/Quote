@@ -31,6 +31,7 @@ import app.brokoli5191.quote.data.matchesSourceMode
 import app.brokoli5191.quote.data.normalizedText
 import app.brokoli5191.quote.data.quoteMatchKey
 import app.brokoli5191.quote.data.submissionValidationError
+import app.brokoli5191.quote.data.tagLabel
 import app.brokoli5191.quote.utils.NotificationHelper
 import app.brokoli5191.quote.utils.NotificationScheduler
 import app.brokoli5191.quote.utils.CategoryQuoteVerifier
@@ -217,7 +218,9 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
                 it.author.contains(query, ignoreCase = true) ||
                 it.tags.splitToSequence(',').any { rawTag ->
                     val tag = rawTag.trim()
-                    tag.contains(query, ignoreCase = true) && (!tag.contains("misattributed", ignoreCase = true) || query.contains("misattributed", ignoreCase = true))
+                    // Also match the German label that the German UI shows on the chips.
+                    (tag.contains(query, ignoreCase = true) || tagLabel(tag, QuoteLanguage.GERMAN).contains(query, ignoreCase = true)) &&
+                        (!tag.contains("misattributed", ignoreCase = true) || query.contains("misattributed", ignoreCase = true))
                 }
             }
         }
@@ -1212,7 +1215,7 @@ class QuoteViewModel(application: Application, private val repository: QuoteRepo
     )
 
     private companion object {
-        const val SEEDED_FLAG = "database_json_seeded_v12"
+        const val SEEDED_FLAG = "database_json_seeded_v13"
         const val KEY_ONBOARDING_COMPLETED = "onboarding_completed"
         const val KEY_AUTHOR_IMAGES = "author_images_enabled"
         const val RESUME_SYNC_INTERVAL_MS = 15L * 60 * 1000

@@ -27,12 +27,15 @@ Quote brings daily inspiration, a searchable quote library, and personal collect
 ## Features
 
 - Daily quotes with manual cycling and no-repeat history
+- App and quotes in English and German, with a translation toggle on each card
+- Author portraits and short bios from Wikipedia (optional)
 - Search by quote, author, or tag and browse by topic
 - Curated and community quote sources
 - Favorites, sharing, and personal quotes
 - Optional community submissions with human review
 - Home-screen widgets and scheduled reminders
 - JSON backup and restore
+- Guided onboarding for language, appearance, sources, and reminders
 - Light, dark, Material You, and AMOLED themes
 - Custom accent colors and reduced-effects mode
 

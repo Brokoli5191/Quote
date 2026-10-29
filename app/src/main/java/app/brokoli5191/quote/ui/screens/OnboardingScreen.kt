@@ -95,13 +95,29 @@ import app.brokoli5191.quote.ui.QuoteViewModel
 import app.brokoli5191.quote.ui.components.AuthorAvatar
 import app.brokoli5191.quote.ui.components.ExpressiveButton
 import app.brokoli5191.quote.ui.components.ExpressiveTextButton
+import app.brokoli5191.quote.ui.components.FloatingChromeBackdrop
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.only
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import app.brokoli5191.quote.ui.components.QuoteTimePickerDialog
 import app.brokoli5191.quote.ui.theme.SerifFontFamily
 import app.brokoli5191.quote.ui.uiText
 import kotlinx.coroutines.launch
 import java.util.Calendar
 
-private enum class OnboardingPage { WELCOME, LANGUAGE, APPEARANCE, SOURCES, REMINDER, AUTHORS, DONE }
+// Space the floating top and bottom chrome covers; pages pad their scrolling content by it.
+private val LocalOnboardingChromePadding = compositionLocalOf { PaddingValues(0.dp) }
+private val TopChromeFallbackHeight = 64.dp
+private val BottomChromeFallbackHeight = 112.dp
+private val ChromeFadeGap = 16.dp
+
+private enum class OnboardingPage { WELCOME, LANGUAGE, APPEARANCE, SOURCES, REMINDER, AUTHORS, WIDGET, DONE }
 
 // Author used for the preview cards; has a bundled portrait and a translated sample quote.
 private const val PREVIEW_AUTHOR = "Marcus Aurelius"
@@ -168,6 +184,19 @@ fun OnboardingScreen(viewModel: QuoteViewModel, modifier: Modifier = Modifier) {
     val currentPage = pagerState.currentPage
     val isLastPage = currentPage == pages.lastIndex
 
+    // The Skip row and the page indicator + buttons float over the pages, which scroll under them
+    // and fade out instead of being cut off. Both are measured so page content starts and centres
+    // between them for every language and font scale.
+    val blurNavigationSurfaces by viewModel.blurNavigationSurfaces.collectAsStateWithLifecycle()
+    val onboardingHazeState = rememberHazeState(blurEnabled = blurNavigationSurfaces && !lowPerformanceMode)
+    val density = LocalDensity.current
+    val safeTop = WindowInsets.safeDrawing.only(WindowInsetsSides.Top).asPaddingValues().calculateTopPadding()
+    val safeBottom = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom).asPaddingValues().calculateBottomPadding()
+    var topChromePx by remember { mutableIntStateOf(0) }
+    var bottomChromePx by remember { mutableIntStateOf(0) }
+    val topChrome = if (topChromePx > 0) with(density) { topChromePx.toDp() } else safeTop + TopChromeFallbackHeight
+    val bottomChrome = if (bottomChromePx > 0) with(density) { bottomChromePx.toDp() } else safeBottom + BottomChromeFallbackHeight
+
     // The back gesture steps through the pages; on the first page it leaves the app as usual.
     BackHandler(enabled = currentPage > 0) { goToPage(currentPage - 1) }
 
@@ -176,14 +205,62 @@ fun OnboardingScreen(viewModel: QuoteViewModel, modifier: Modifier = Modifier) {
         color = MaterialTheme.colorScheme.background,
         contentColor = MaterialTheme.colorScheme.onBackground
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.safeDrawing)
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
         ) {
+            CompositionLocalProvider(
+                LocalOnboardingChromePadding provides PaddingValues(top = topChrome, bottom = bottomChrome)
+            ) {
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .hazeSource(onboardingHazeState),
+                    verticalAlignment = Alignment.Top,
+                    key = { pages[it].name }
+                ) { index ->
+                    when (pages[index]) {
+                        OnboardingPage.WELCOME -> WelcomePage()
+                        OnboardingPage.LANGUAGE -> LanguagePage(viewModel)
+                        OnboardingPage.APPEARANCE -> AppearancePage(viewModel)
+                        OnboardingPage.SOURCES -> SourcesPage(viewModel)
+                        OnboardingPage.REMINDER -> ReminderPage(
+                            enabled = reminderEnabled,
+                            hour = reminderHour,
+                            minute = reminderMinute,
+                            notificationsDenied = notificationsDenied,
+                            onToggle = { onReminderToggle(it) },
+                            onPickTime = { showTimePicker = true }
+                        )
+                        OnboardingPage.AUTHORS -> AuthorsPage(viewModel)
+                        OnboardingPage.WIDGET -> WidgetPage()
+                        OnboardingPage.DONE -> DonePage()
+                    }
+                }
+            }
+
+            FloatingChromeBackdrop(
+                hazeState = onboardingHazeState,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(topChrome + ChromeFadeGap)
+            )
+            FloatingChromeBackdrop(
+                hazeState = onboardingHazeState,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(bottomChrome + ChromeFadeGap),
+                fadeDown = false
+            )
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .onSizeChanged { topChromePx = it.height }
+                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
                     .heightIn(min = 56.dp)
                     .padding(horizontal = 12.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.End,
@@ -201,83 +278,65 @@ fun OnboardingScreen(viewModel: QuoteViewModel, modifier: Modifier = Modifier) {
                 }
             }
 
-            HorizontalPager(
-                state = pagerState,
+            Column(
                 modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                verticalAlignment = Alignment.Top,
-                key = { pages[it].name }
-            ) { index ->
-                when (pages[index]) {
-                    OnboardingPage.WELCOME -> WelcomePage()
-                    OnboardingPage.LANGUAGE -> LanguagePage(viewModel)
-                    OnboardingPage.APPEARANCE -> AppearancePage(viewModel)
-                    OnboardingPage.SOURCES -> SourcesPage(viewModel)
-                    OnboardingPage.REMINDER -> ReminderPage(
-                        enabled = reminderEnabled,
-                        hour = reminderHour,
-                        minute = reminderMinute,
-                        notificationsDenied = notificationsDenied,
-                        onToggle = { onReminderToggle(it) },
-                        onPickTime = { showTimePicker = true }
-                    )
-                    OnboardingPage.AUTHORS -> AuthorsPage(viewModel)
-                    OnboardingPage.DONE -> DonePage()
-                }
-            }
-
-            PageIndicator(
-                pageCount = pages.size,
-                currentPage = currentPage,
-                lowPerformanceMode = lowPerformanceMode,
-                modifier = Modifier
-                    .align(Alignment.CenterHorizontally)
-                    .padding(vertical = 12.dp)
-            )
-
-            Row(
-                modifier = Modifier
+                    .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .padding(start = 12.dp, end = 20.dp, top = 4.dp, bottom = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .onSizeChanged { bottomChromePx = it.height }
+                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
             ) {
-                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                    if (currentPage > 0) {
-                        ExpressiveTextButton(
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                goToPage(currentPage - 1)
-                            },
-                            modifier = Modifier.heightIn(min = 48.dp)
-                        ) {
-                            Text(uiText("Back"), fontWeight = FontWeight.SemiBold, maxLines = 2)
+                PageIndicator(
+                    pageCount = pages.size,
+                    currentPage = currentPage,
+                    lowPerformanceMode = lowPerformanceMode,
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .padding(vertical = 12.dp)
+                )
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 12.dp, end = 20.dp, top = 4.dp, bottom = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                        if (currentPage > 0) {
+                            ExpressiveTextButton(
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    goToPage(currentPage - 1)
+                                },
+                                modifier = Modifier.heightIn(min = 48.dp)
+                            ) {
+                                Text(uiText("Back"), fontWeight = FontWeight.SemiBold, maxLines = 2)
+                            }
                         }
                     }
-                }
-                ExpressiveButton(
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        if (isLastPage) finish() else goToPage(currentPage + 1)
-                    },
-                    modifier = Modifier
-                        .weight(1f, fill = false)
-                        .widthIn(min = 132.dp)
-                        .heightIn(min = 52.dp),
-                    restingCorner = 18.dp,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    ),
-                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp)
-                ) {
-                    Text(
-                        text = uiText(if (isLastPage) "Get started" else "Next"),
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        maxLines = 2
-                    )
+                    ExpressiveButton(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            if (isLastPage) finish() else goToPage(currentPage + 1)
+                        },
+                        modifier = Modifier
+                            .weight(1f, fill = false)
+                            .widthIn(min = 132.dp)
+                            .heightIn(min = 52.dp),
+                        restingCorner = 18.dp,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        ),
+                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            text = uiText(if (isLastPage) "Get started" else "Next"),
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            maxLines = 2
+                        )
+                    }
                 }
             }
         }
@@ -334,14 +393,19 @@ private fun PageIndicator(
     }
 }
 
-/** Scrollable page body, vertically centred when it fits. */
+/**
+ * Scrollable page body, vertically centred when it fits. [compact] tightens the gaps around the
+ * header for pages with a lot of content.
+ */
 @Composable
 private fun OnboardingPageLayout(
     icon: ImageVector?,
     title: String,
     body: String,
+    compact: Boolean = false,
     content: @Composable ColumnScope.() -> Unit = {}
 ) {
+    val chrome = LocalOnboardingChromePadding.current
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val minHeight = maxHeight
         Column(
@@ -349,13 +413,14 @@ private fun OnboardingPageLayout(
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
                 .heightIn(min = minHeight)
-                .padding(horizontal = 24.dp, vertical = 16.dp),
+                .padding(chrome)
+                .padding(horizontal = 24.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.Center
         ) {
             if (icon != null) {
                 Box(
                     modifier = Modifier
-                        .size(56.dp)
+                        .size(if (compact) 44.dp else 56.dp)
                         .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
@@ -363,10 +428,10 @@ private fun OnboardingPageLayout(
                         imageVector = icon,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(if (compact) 22.dp else 28.dp)
                     )
                 }
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(if (compact) 8.dp else 20.dp))
             }
             Text(
                 text = title,
@@ -380,7 +445,7 @@ private fun OnboardingPageLayout(
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(if (compact) 12.dp else 24.dp))
             Column(verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
         }
     }
@@ -388,6 +453,7 @@ private fun OnboardingPageLayout(
 
 @Composable
 private fun WelcomePage() {
+    val chrome = LocalOnboardingChromePadding.current
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val minHeight = maxHeight
         Column(
@@ -395,7 +461,8 @@ private fun WelcomePage() {
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
                 .heightIn(min = minHeight)
-                .padding(horizontal = 24.dp, vertical = 16.dp),
+                .padding(chrome)
+                .padding(horizontal = 24.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -410,14 +477,14 @@ private fun WelcomePage() {
             )
             Spacer(Modifier.height(12.dp))
             Text(
-                text = uiText("A calm quote for every day, a library of curated and community wisdom, and a place for your own thoughts."),
+                text = uiText("A quote for every day, a library full of wisdom and room for your own thoughts."),
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(12.dp))
             Text(
-                text = uiText("Let’s set it up in a minute."),
+                text = uiText("Ready in a minute."),
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.primary,
@@ -457,7 +524,7 @@ private fun LanguagePage(viewModel: QuoteViewModel) {
     OnboardingPageLayout(
         icon = Icons.Outlined.Translate,
         title = uiText("Choose your language"),
-        body = uiText("The app and the quotes switch right away. You can change this later in Settings.")
+        body = uiText("Applies right away. Change it later in Settings.")
     ) {
         // Each language is named in itself so it can be found from either one.
         listOf(
@@ -488,99 +555,103 @@ private fun AppearancePage(viewModel: QuoteViewModel) {
     OnboardingPageLayout(
         icon = Icons.Outlined.Palette,
         title = uiText("Make it yours"),
-        body = uiText("Pick a theme and an accent color. The preview updates as you go.")
+        body = uiText("Pick a theme and an accent color."),
+        compact = true
     ) {
-        ThemePreviewCard()
+        // Tighter spacing than the other pages so the whole page fits without scrolling, also in
+        // German at a large font scale.
+        Column {
+            ThemePreviewCard()
 
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = uiText("App Theme"),
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-            color = MaterialTheme.colorScheme.primary
-        )
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("LIGHT", "DARK", "AMOLED", "DYNAMIC").chunked(2).forEach { rowModes ->
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = uiText("App Theme"),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(Modifier.height(6.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("LIGHT", "DARK", "AMOLED", "DYNAMIC").chunked(2).forEach { rowModes ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        rowModes.forEach { mode ->
+                            val label = when (mode) {
+                                "DYNAMIC" -> "System"
+                                "AMOLED" -> "AMOLED"
+                                else -> mode.lowercase().replaceFirstChar { it.uppercase() }
+                            }
+                            ChoiceButton(
+                                selected = themeMode == mode,
+                                label = uiText(label),
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    viewModel.setThemeMode(mode)
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = uiText("Accent Palette"),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(Modifier.height(6.dp))
+            // System mode takes its accent from the wallpaper, so the hint replaces the swatches
+            // (which would all be disabled) instead of adding another line to the page.
+            if (isDynamic) {
+                Text(
+                    text = uiText("Accent colors come from your system in System mode."),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    rowModes.forEach { mode ->
-                        val label = when (mode) {
-                            "DYNAMIC" -> "System"
-                            "AMOLED" -> "AMOLED"
-                            else -> mode.lowercase().replaceFirstChar { it.uppercase() }
+                    listOf("Violet", "Amber", "Green", "Blue", "Rose").forEach { accent ->
+                        val selected = themeAccent == accent
+                        val label = uiText(accent)
+                        val swatch = accentSwatch(accent)
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(40.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                                .border(
+                                    width = if (selected) 2.dp else 1.dp,
+                                    color = if (selected) swatch else MaterialTheme.colorScheme.outline.copy(alpha = 0.1f),
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                .semantics { contentDescription = label }
+                                .selectable(selected = selected, role = Role.RadioButton) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    viewModel.setThemeAccent(accent)
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Box(
+                                Modifier
+                                    .size(if (selected) 20.dp else 14.dp)
+                                    .background(swatch, CircleShape)
+                                    .border(
+                                        width = if (selected) 2.dp else 0.dp,
+                                        color = MaterialTheme.colorScheme.surface,
+                                        shape = CircleShape
+                                    )
+                            )
                         }
-                        ChoiceButton(
-                            selected = themeMode == mode,
-                            label = uiText(label),
-                            modifier = Modifier.weight(1f),
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                viewModel.setThemeMode(mode)
-                            }
-                        )
                     }
                 }
             }
-        }
-
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = uiText("Accent Palette"),
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-            color = MaterialTheme.colorScheme.primary
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            listOf("Violet", "Amber", "Green", "Blue", "Rose").forEach { accent ->
-                val selected = !isDynamic && themeAccent == accent
-                val label = uiText(accent)
-                val swatch = accentSwatch(accent)
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDynamic) 0.15f else 0.4f)
-                        )
-                        .border(
-                            width = if (selected) 2.dp else 1.dp,
-                            color = if (selected) swatch else MaterialTheme.colorScheme.outline.copy(alpha = 0.1f),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                        .semantics { contentDescription = label }
-                        .selectable(
-                            selected = selected,
-                            enabled = !isDynamic,
-                            role = Role.RadioButton
-                        ) {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            viewModel.setThemeAccent(accent)
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Box(
-                        Modifier
-                            .size(if (selected) 20.dp else 14.dp)
-                            .background(if (isDynamic) swatch.copy(alpha = 0.4f) else swatch, CircleShape)
-                            .border(
-                                width = if (selected) 2.dp else 0.dp,
-                                color = MaterialTheme.colorScheme.surface,
-                                shape = CircleShape
-                            )
-                    )
-                }
-            }
-        }
-        if (isDynamic) {
-            Text(
-                text = uiText("Accent colors come from your system in System mode."),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
     }
 }
@@ -593,7 +664,7 @@ private fun accentSwatch(accent: String): Color = when (accent) {
     else -> Color(0xFFFFB2C5) // Rose
 }
 
-/** Small version of the daily quote card; follows the live theme. */
+/** Small, compact version of the daily quote card; follows the live theme. */
 @Composable
 private fun ThemePreviewCard() {
     Card(
@@ -605,7 +676,7 @@ private fun ThemePreviewCard() {
             containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.32f)
         )
     ) {
-        Column(Modifier.padding(20.dp)) {
+        Column(Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
             Text(
                 text = uiText("Preview").uppercase(),
                 style = MaterialTheme.typography.labelSmall,
@@ -613,16 +684,16 @@ private fun ThemePreviewCard() {
                 color = MaterialTheme.colorScheme.primary,
                 letterSpacing = 1.2.sp
             )
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(4.dp))
             Text(
                 text = "“${uiText(PREVIEW_QUOTE)}”",
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleSmall,
                 fontFamily = SerifFontFamily,
                 color = MaterialTheme.colorScheme.onSurface
             )
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                AuthorAvatar(name = PREVIEW_AUTHOR, imageUrl = null, unknown = false, size = 36.dp)
+                AuthorAvatar(name = PREVIEW_AUTHOR, imageUrl = null, unknown = false, size = 28.dp)
                 Spacer(Modifier.width(10.dp))
                 Text(
                     text = PREVIEW_AUTHOR,
@@ -633,7 +704,7 @@ private fun ThemePreviewCard() {
                 )
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(28.dp)
                         .background(MaterialTheme.colorScheme.primary, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
@@ -641,7 +712,7 @@ private fun ThemePreviewCard() {
                         imageVector = Icons.Filled.Favorite,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
@@ -657,13 +728,14 @@ private fun SourcesPage(viewModel: QuoteViewModel) {
 
     OnboardingPageLayout(
         icon = Icons.Outlined.AutoStories,
-        title = uiText("Where quotes come from"),
-        body = uiText("Choose which quotes appear in your daily quote and in the library.")
+        title = uiText("Choose your sources"),
+        body = uiText("Pick what shows up daily and in the library."),
+        compact = true
     ) {
         listOf(
-            Triple(QuoteSourceMode.ALL, "All", "Curated and community quotes together."),
-            Triple(QuoteSourceMode.CURATED, "Curated", "Hand-picked quotes from well-known authors."),
-            Triple(QuoteSourceMode.COMMUNITY, "Community", "Quotes shared by other users, reviewed before they are published.")
+            Triple(QuoteSourceMode.ALL, "All", "Curated and community quotes."),
+            Triple(QuoteSourceMode.CURATED, "Curated", "Hand-picked from well-known authors."),
+            Triple(QuoteSourceMode.COMMUNITY, "Community", "Shared by users, reviewed first.")
         ).forEach { (mode, title, description) ->
             OptionRow(
                 selected = sourceMode == mode,
@@ -675,10 +747,9 @@ private fun SourcesPage(viewModel: QuoteViewModel) {
                 }
             )
         }
-        Spacer(Modifier.height(4.dp))
         SwitchRow(
             title = uiText("Anonymous reflections"),
-            description = uiText("Show original poetic quotes without an author"),
+            description = uiText("Poetic quotes without an author."),
             checked = showAnonymous,
             onCheckedChange = viewModel::setShowAnonymousQuotes
         )
@@ -706,11 +777,11 @@ private fun ReminderPage(
     OnboardingPageLayout(
         icon = Icons.Outlined.NotificationsActive,
         title = uiText("A daily nudge"),
-        body = uiText("Get one quote as a notification at a time that suits you.")
+        body = uiText("One quote a day as a notification.")
     ) {
         SwitchRow(
             title = uiText("Daily quote reminder"),
-            description = uiText("Receive one quote at your chosen time."),
+            description = null,
             checked = enabled,
             onCheckedChange = onToggle
         )
@@ -743,7 +814,7 @@ private fun ReminderPage(
         }
         if (notificationsDenied) {
             Text(
-                text = uiText("Notifications are blocked. You can allow them later in the system settings."),
+                text = uiText("Notifications are blocked. Allow them in the system settings."),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error
             )
@@ -760,7 +831,7 @@ private fun AuthorsPage(viewModel: QuoteViewModel) {
     OnboardingPageLayout(
         icon = Icons.Outlined.AccountCircle,
         title = uiText("Author portraits"),
-        body = uiText("Quote can show a portrait and a short description of each author, taken from Wikipedia.")
+        body = uiText("Portraits and short bios from Wikipedia.")
     ) {
         OptionSurface(selected = false) {
             AuthorAvatar(
@@ -787,28 +858,46 @@ private fun AuthorsPage(viewModel: QuoteViewModel) {
         }
         SwitchRow(
             title = uiText("Show author images"),
-            description = uiText("Portraits are loaded from Wikimedia when shown. Turn this off to skip those requests."),
+            description = uiText("Loaded from Wikimedia. Turn off to skip these requests."),
             checked = imagesEnabled,
             onCheckedChange = viewModel::setAuthorImagesEnabled
         )
-        Spacer(Modifier.height(4.dp))
-        OptionSurface(selected = false) {
-            Icon(
-                imageVector = Icons.Outlined.Widgets,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary
-            )
-            Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f)) {
+    }
+}
+
+@Composable
+private fun WidgetPage() {
+    OnboardingPageLayout(
+        icon = Icons.Outlined.Widgets,
+        title = uiText("Home screen widget"),
+        body = uiText("Today’s quote at a glance.")
+    ) {
+        listOf(
+            "Long-press an empty spot on your home screen.",
+            "Tap Widgets.",
+            "Pick Quote and place it."
+        ).forEachIndexed { index, step ->
+            OptionSurface(selected = false) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "${index + 1}",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        maxLines = 1
+                    )
+                }
+                Spacer(Modifier.width(14.dp))
                 Text(
-                    text = uiText("Quote on your home screen"),
+                    text = uiText(step),
                     style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    text = uiText("Long-press an empty spot on your home screen, choose Widgets and add Quote."),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f)
                 )
             }
         }
@@ -820,7 +909,7 @@ private fun DonePage() {
     OnboardingPageLayout(
         icon = Icons.Outlined.TaskAlt,
         title = uiText("You’re all set"),
-        body = uiText("Everything you chose can be changed anytime in Settings.")
+        body = uiText("You can change everything later in Settings.")
     )
 }
 

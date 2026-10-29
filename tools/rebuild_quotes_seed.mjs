@@ -1,9 +1,9 @@
 import fs from 'node:fs';
-import { buildSeed } from './quote_seed_rules.mjs';
+import { applyQuoteTags, buildSeed } from './quote_seed_rules.mjs';
 
-const [, , inputPath, outputPath, curatedPath] = process.argv;
+const [, , inputPath, outputPath, curatedPath, quoteTagsPath] = process.argv;
 if (!inputPath || !outputPath || !curatedPath) {
-  console.error('Usage: node tools/rebuild_quotes_seed.mjs <input.json|jsonl> <output.json> <curated.json>');
+  console.error('Usage: node tools/rebuild_quotes_seed.mjs <input.json|jsonl> <output.json> <curated.json> [quote_tags.json]');
   process.exit(2);
 }
 
@@ -14,7 +14,8 @@ const sourceRecords = input.startsWith('[')
       try { return [JSON.parse(line)]; } catch { return []; }
     });
 const curatedRecords = JSON.parse(fs.readFileSync(curatedPath, 'utf8'));
-const output = buildSeed([...sourceRecords, ...curatedRecords]);
+const quoteTags = quoteTagsPath ? JSON.parse(fs.readFileSync(quoteTagsPath, 'utf8')) : {};
+const output = applyQuoteTags(buildSeed([...sourceRecords, ...curatedRecords]), quoteTags);
 
 fs.writeFileSync(outputPath, JSON.stringify(output, null, 1) + '\n');
 console.error(`Wrote ${output.length} unique English quotes to ${outputPath}`);

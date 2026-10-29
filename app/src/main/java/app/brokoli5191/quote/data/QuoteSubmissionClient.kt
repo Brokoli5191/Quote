@@ -8,7 +8,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 private const val SUBMISSION_URL =
-    "https://quote-submission-api.brokoli5191.workers.dev/api/submissions"
+    "https://quote.cowsay.win/api/submissions"
 
 /**
  * Stable submission error codes. The UI maps them to localized text; most match the

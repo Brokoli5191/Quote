@@ -65,8 +65,17 @@ import app.brokoli5191.quote.ui.uiText
 import app.brokoli5191.quote.ui.components.AuthorAvatar
 import app.brokoli5191.quote.ui.components.ExpressiveButton
 import app.brokoli5191.quote.ui.components.ExpressiveIconButton
+import app.brokoli5191.quote.ui.components.AnimatedTranslation
 import app.brokoli5191.quote.ui.components.TranslationToggle
 import app.brokoli5191.quote.ui.components.rememberExpressiveShape
+import app.brokoli5191.quote.ui.components.FloatingChromeBackdrop
+import app.brokoli5191.quote.ui.components.SingleLineFitRow
+import app.brokoli5191.quote.ui.components.bleedHorizontally
+import app.brokoli5191.quote.ui.components.floatingBottomBarHeight
+import app.brokoli5191.quote.data.tagLabel
+import androidx.compose.ui.layout.onSizeChanged
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import app.brokoli5191.quote.ui.strings.submissionErrorText
 import app.brokoli5191.quote.ui.theme.SerifFontFamily
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -79,6 +88,9 @@ private const val MAX_SUBMISSION_AUTHOR = 100
 private const val MAX_SUBMISSION_TAGS = 8
 private const val MAX_SUBMISSION_TAG_LENGTH = 30
 
+private val SavedHeaderFallbackHeight = 140.dp
+private val SavedContentGap = 16.dp
+
 private data class EditRequest(val quote: QuoteEntity, val resubmit: Boolean)
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -90,6 +102,7 @@ fun SavedScreen(viewModel: QuoteViewModel) {
     val activeSubTab by viewModel.savedSubTab.collectAsStateWithLifecycle()
     val lowPerformanceMode by viewModel.lowPerformanceMode.collectAsStateWithLifecycle()
     val authorImagesEnabled by viewModel.authorImagesEnabled.collectAsStateWithLifecycle()
+    val blurNavigationSurfaces by viewModel.blurNavigationSurfaces.collectAsStateWithLifecycle()
 
     var quoteToSubmit by remember { mutableStateOf<QuoteEntity?>(null) }
     var quoteToDelete by remember { mutableStateOf<QuoteEntity?>(null) }
@@ -105,6 +118,16 @@ fun SavedScreen(viewModel: QuoteViewModel) {
     val scope = rememberCoroutineScope()
     val deletedMessage = uiText("Quote deleted")
     val undoLabel = uiText("Undo")
+    // The header (title + tab switcher) floats over the list; it is measured so the list starts
+    // below it for every language and font scale and scrolls underneath it.
+    val savedHazeState = rememberHazeState(blurEnabled = blurNavigationSurfaces && !lowPerformanceMode)
+    val density = LocalDensity.current
+    val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    var headerHeightPx by remember { mutableIntStateOf(0) }
+    val headerHeight = if (headerHeightPx > 0) with(density) { headerHeightPx.toDp() } else statusBarTop + SavedHeaderFallbackHeight
+    // FAB sits above the floating bottom bar; the list and snackbar clear both.
+    val fabBottom = floatingBottomBarHeight() + 23.dp
+    val listBottom = fabBottom + 56.dp + 16.dp
     var timestampTick by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -143,9 +166,146 @@ fun SavedScreen(viewModel: QuoteViewModel) {
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        Column(
+        // Lists representation with smooth swipe animation
+        AnimatedContent(
+            targetState = activeSubTab,
+            transitionSpec = {
+                if (lowPerformanceMode) {
+                    EnterTransition.None togetherWith ExitTransition.None
+                } else if (targetState == "My Quotes") {
+                    slideInHorizontally(
+                        initialOffsetX = { it },
+                        animationSpec = spring(stiffness = 300f, dampingRatio = 0.85f)
+                    ) + fadeIn() togetherWith
+                    slideOutHorizontally(
+                        targetOffsetX = { -it },
+                        animationSpec = spring(stiffness = 300f, dampingRatio = 0.85f)
+                    ) + fadeOut()
+                } else {
+                    slideInHorizontally(
+                        initialOffsetX = { -it },
+                        animationSpec = spring(stiffness = 300f, dampingRatio = 0.85f)
+                    ) + fadeIn() togetherWith
+                    slideOutHorizontally(
+                        targetOffsetX = { it },
+                        animationSpec = spring(stiffness = 300f, dampingRatio = 0.85f)
+                    ) + fadeOut()
+                }
+            },
             modifier = Modifier
                 .fillMaxSize()
+                .hazeSource(savedHazeState),
+            label = "SavedQuotesTabsTransition"
+        ) { subTab ->
+            val activeList = if (subTab == "Favorites") favorites else userAdded
+
+            if (activeList.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(top = headerHeight + SavedContentGap),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.padding(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (subTab == "Favorites") Icons.Default.FavoriteBorder else Icons.Default.NoteAlt,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                            modifier = Modifier.size(64.dp)
+                        )
+                        Text(
+                            text = if (subTab == "Favorites") uiText("No favorites yet") else uiText("No custom quotes yet"),
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            text = if (subTab == "Favorites") {
+                                uiText("Tap the heart on a quote to keep it here.")
+                            } else {
+                                uiText("Create a personal quote from the add button.")
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            } else {
+                // The list scrolls under the floating header, bottom bar and FAB; the bottom padding
+                // clears the bar and the FAB above it, so the last card's buttons can scroll out
+                // from under the FAB.
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(
+                        start = 16.dp,
+                        top = headerHeight + SavedContentGap + 16.dp,
+                        end = 16.dp,
+                        bottom = listBottom
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    items(activeList, key = { it.id }) { quote ->
+                        // Own quotes are stored locally only, so their author is never looked up
+                        // online; bundled names still resolve from the offline map elsewhere.
+                        val lookUpAuthor = authorImagesEnabled && !quote.isUserAdded && !quote.hasUnknownAuthor
+                        val authorInfoFlow = remember(quote.author, lookUpAuthor) {
+                            if (lookUpAuthor) viewModel.authorInfo(quote.author) else null
+                        }
+                        val authorImageUrl = authorInfoFlow?.let { it.collectAsStateWithLifecycle().value }?.imageUrl
+                        val isSubmitting = quote.id in submittingQuoteIds
+
+                        PremiumCollectionQuoteCard(
+                            quote = quote,
+                            nowMillis = timestampTick,
+                            authorImageUrl = authorImageUrl,
+                            onToggleFavorite = { viewModel.toggleFavorite(quote) },
+                            onDelete = {
+                                // Pending quotes are withdrawn on delete, approved ones stay published:
+                                // both get a dialog that says so.
+                                val needsConfirmation = quote.isUserAdded && (
+                                    quote.submissionStatus == QuoteSubmissionStatus.PENDING ||
+                                        quote.submissionStatus == QuoteSubmissionStatus.APPROVED
+                                    )
+                                when {
+                                    isSubmitting -> Unit
+                                    needsConfirmation -> quoteToDelete = quote
+                                    else -> deleteWithUndo(quote)
+                                }
+                            },
+                            isSubmitting = isSubmitting,
+                            lowPerformanceMode = lowPerformanceMode,
+                            onSubmit = { requestSubmit(quote) },
+                            onEdit = { resubmit -> editRequest = EditRequest(quote, resubmit) },
+                            onWithdraw = { quoteToWithdraw = quote },
+                            onShare = { shareText ->
+                                val intent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_TEXT, shareText)
+                                }
+                                context.startActivity(Intent.createChooser(intent, shareTitle))
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        FloatingChromeBackdrop(
+            hazeState = savedHazeState,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(headerHeight + SavedContentGap)
+        )
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .onSizeChanged { headerHeightPx = it.height }
         ) {
             // Screen titles shown with comfortable top margin
             Column(
@@ -173,129 +333,6 @@ fun SavedScreen(viewModel: QuoteViewModel) {
                 lowPerformanceMode = lowPerformanceMode,
                 onSelect = viewModel::selectSavedSubTab
             )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Lists representation with smooth swipe animation
-            AnimatedContent(
-                targetState = activeSubTab,
-                transitionSpec = {
-                    if (lowPerformanceMode) {
-                        EnterTransition.None togetherWith ExitTransition.None
-                    } else if (targetState == "My Quotes") {
-                        slideInHorizontally(
-                            initialOffsetX = { it },
-                            animationSpec = spring(stiffness = 300f, dampingRatio = 0.85f)
-                        ) + fadeIn() togetherWith
-                        slideOutHorizontally(
-                            targetOffsetX = { -it },
-                            animationSpec = spring(stiffness = 300f, dampingRatio = 0.85f)
-                        ) + fadeOut()
-                    } else {
-                        slideInHorizontally(
-                            initialOffsetX = { -it },
-                            animationSpec = spring(stiffness = 300f, dampingRatio = 0.85f)
-                        ) + fadeIn() togetherWith
-                        slideOutHorizontally(
-                            targetOffsetX = { it },
-                            animationSpec = spring(stiffness = 300f, dampingRatio = 0.85f)
-                        ) + fadeOut()
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                label = "SavedQuotesTabsTransition"
-            ) { subTab ->
-                val activeList = if (subTab == "Favorites") favorites else userAdded
-
-                if (activeList.isEmpty()) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.padding(32.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (subTab == "Favorites") Icons.Default.FavoriteBorder else Icons.Default.NoteAlt,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-                                modifier = Modifier.size(64.dp)
-                            )
-                            Text(
-                                text = if (subTab == "Favorites") uiText("No favorites yet") else uiText("No custom quotes yet"),
-                                style = MaterialTheme.typography.headlineMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center
-                            )
-                            Text(
-                                text = if (subTab == "Favorites") {
-                                    uiText("Tap the heart on a quote to keep it here.")
-                                } else {
-                                    uiText("Create a personal quote from the add button.")
-                                },
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    }
-                } else {
-                    // The bottom padding clears the bottom bar and the FAB above it (104dp + 56dp), so the
-                    // last card's buttons can scroll out from under the FAB.
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 176.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        items(activeList, key = { it.id }) { quote ->
-                            // Own quotes are stored locally only, so their author is never looked up
-                            // online; bundled names still resolve from the offline map elsewhere.
-                            val lookUpAuthor = authorImagesEnabled && !quote.isUserAdded && !quote.hasUnknownAuthor
-                            val authorInfoFlow = remember(quote.author, lookUpAuthor) {
-                                if (lookUpAuthor) viewModel.authorInfo(quote.author) else null
-                            }
-                            val authorImageUrl = authorInfoFlow?.let { it.collectAsStateWithLifecycle().value }?.imageUrl
-                            val isSubmitting = quote.id in submittingQuoteIds
-
-                            PremiumCollectionQuoteCard(
-                                quote = quote,
-                                nowMillis = timestampTick,
-                                authorImageUrl = authorImageUrl,
-                                onToggleFavorite = { viewModel.toggleFavorite(quote) },
-                                onDelete = {
-                                    // Pending quotes are withdrawn on delete, approved ones stay published:
-                                    // both get a dialog that says so.
-                                    val needsConfirmation = quote.isUserAdded && (
-                                        quote.submissionStatus == QuoteSubmissionStatus.PENDING ||
-                                            quote.submissionStatus == QuoteSubmissionStatus.APPROVED
-                                        )
-                                    when {
-                                        isSubmitting -> Unit
-                                        needsConfirmation -> quoteToDelete = quote
-                                        else -> deleteWithUndo(quote)
-                                    }
-                                },
-                                isSubmitting = isSubmitting,
-                                lowPerformanceMode = lowPerformanceMode,
-                                onSubmit = { requestSubmit(quote) },
-                                onEdit = { resubmit -> editRequest = EditRequest(quote, resubmit) },
-                                onWithdraw = { quoteToWithdraw = quote },
-                                onShare = { shareText ->
-                                    val intent = Intent(Intent.ACTION_SEND).apply {
-                                        type = "text/plain"
-                                        putExtra(Intent.EXTRA_TEXT, shareText)
-                                    }
-                                    context.startActivity(Intent.createChooser(intent, shareTitle))
-                                }
-                            )
-                        }
-                    }
-                }
-            }
         }
 
         // Floating creator button
@@ -306,7 +343,7 @@ fun SavedScreen(viewModel: QuoteViewModel) {
             },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = 104.dp, end = 16.dp)
+                .padding(bottom = fabBottom, end = 16.dp)
                 .size(56.dp),
             shape = rememberExpressiveShape(fabInteractionSource, 16.dp, 8.dp),
             containerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -324,7 +361,7 @@ fun SavedScreen(viewModel: QuoteViewModel) {
             hostState = snackbarHostState,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(start = 16.dp, end = 16.dp, bottom = 176.dp)
+                .padding(start = 16.dp, end = 16.dp, bottom = listBottom)
         )
 
         quoteToSubmit?.let { quote ->
@@ -579,6 +616,8 @@ private fun SavedTabSwitcher(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp)
+            // Opaque underlay: the switcher floats over the list, cards must not show through it.
+            .background(MaterialTheme.colorScheme.background, RoundedCornerShape(16.dp))
             .background(
                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                 RoundedCornerShape(16.dp)
@@ -704,10 +743,10 @@ fun PremiumCollectionQuoteCard(
     // Quotation marks follow the language of the text on screen, not the app language. An own quote
     // without a translation stores the app language it was written in, not its own, so it keeps
     // neutral English marks.
-    val displayedLanguage = when {
+    fun languageOf(translated: Boolean) = when {
         alternateLanguage == null && quote.isUserAdded -> QuoteLanguage.ENGLISH
         alternateLanguage == null -> quote.language
-        showTranslation -> alternateLanguage
+        translated -> alternateLanguage
         alternateLanguage == QuoteLanguage.GERMAN -> QuoteLanguage.ENGLISH
         else -> QuoteLanguage.GERMAN
     }
@@ -736,10 +775,10 @@ fun PremiumCollectionQuoteCard(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 // Tags and saved date; skipped when both are empty so no blank row is left behind.
-                // Catalogue tags are English only, so like on Daily they're hidden in German; own tags stay.
-                val tagsSp = remember(quote.tags, quote.isAnonymous, quote.isUserAdded, language) {
-                    if (quote.isAnonymous || (!quote.isUserAdded && language == QuoteLanguage.GERMAN)) emptyList()
-                    else quote.tags.split(",").map { it.trim() }.filter { it.isNotBlank() }
+                // Catalogue tags are shown in the app language; own tags stay as written.
+                val tagsSp = remember(quote.tags, quote.isUserAdded, language) {
+                    quote.tags.split(",").map { it.trim() }.filter { it.isNotBlank() }
+                        .map { if (quote.isUserAdded) it else tagLabel(it, language) }
                 }
                 val savedDateText = formatSavedDate(quote.savedDate, nowMillis, language)
                 if (tagsSp.isNotEmpty() || savedDateText.isNotEmpty()) Row(
@@ -747,7 +786,11 @@ fun PremiumCollectionQuoteCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    // One line: tags that don't fit beside the date are left out instead of wrapping.
+                    SingleLineFitRow(
+                        modifier = Modifier.weight(1f).padding(end = 8.dp),
+                        spacing = 6.dp
+                    ) {
                         tagsSp.take(2).forEach { tag ->
                             Box(
                                 modifier = Modifier
@@ -760,7 +803,9 @@ fun PremiumCollectionQuoteCard(
                                 Text(
                                     text = "#$tag",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary
+                                    color = MaterialTheme.colorScheme.primary,
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
                             }
                         }
@@ -774,15 +819,18 @@ fun PremiumCollectionQuoteCard(
                 }
 
                 // Quote Content Text in Serif Medium italic
-                Text(
-                    text = if (displayedLanguage == QuoteLanguage.GERMAN) "„$displayedText“" else "“$displayedText”",
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontFamily = SerifFontFamily,
-                        fontStyle = FontStyle.Italic,
-                        lineHeight = 28.sp
-                    ),
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                AnimatedTranslation(showTranslation, lowPerformanceMode) { showing ->
+                    val text = if (showing && alternateText != null) alternateText else quote.text
+                    Text(
+                        text = if (languageOf(showing) == QuoteLanguage.GERMAN) "„$text“" else "“$text”",
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            fontFamily = SerifFontFamily,
+                            fontStyle = FontStyle.Italic,
+                            lineHeight = 28.sp
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
 
                 if (alternateText != null && alternateLanguage != null) {
                     // The chip names the language the quote switches to.
@@ -1338,10 +1386,13 @@ private fun EditQuoteSheet(
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold
                 )
+                // The chips scroll out to the sheet edges instead of being cut off at its padding.
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
+                        .bleedHorizontally(20.dp)
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 20.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     CategoryMapper.categories.forEach { categoryName ->

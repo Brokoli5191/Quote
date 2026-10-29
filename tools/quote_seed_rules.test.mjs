@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  authorKey, buildSeed, cleanAuthor, cleanText, isProbablyEnglish, MAX_TAGS, pairQuoteMarks,
+  applyQuoteTags, authorKey, buildSeed, cleanAuthor, cleanText, isProbablyEnglish, MAX_TAGS, pairQuoteMarks,
 } from './quote_seed_rules.mjs';
 
 test('language check accepts short English quotes and rejects common non-English examples', () => {
@@ -121,4 +121,15 @@ test('seed builder stores the canonical author and drops tags that repeat it', (
     { quote: 'All the world’s a stage.', author: 'William Shakespear', tags: ['shakespeare', 'theatre'] },
   ]);
   assert.deepEqual(seed, [{ quote: 'All the world’s a stage.', author: 'William Shakespeare', tags: ['theatre'] }]);
+});
+
+test('curated tags replace source tags without changing the source-tag category', () => {
+  const seed = applyQuoteTags([
+    { quote: 'So many books, so little time.', author: 'Frank Zappa', tags: ['books', 'humor'] },
+    { quote: 'An untagged quote.', author: 'Someone', tags: ['romance'] },
+  ], { 'So many books, so little time.': ['books', 'reading', 'time'] });
+
+  assert.deepEqual(seed[0], { quote: 'So many books, so little time.', author: 'Frank Zappa', tags: ['books', 'reading', 'time'], category: 'Humor' });
+  assert.deepEqual(seed[1].tags, ['romance']);
+  assert.equal(seed[1].category, 'Love');
 });

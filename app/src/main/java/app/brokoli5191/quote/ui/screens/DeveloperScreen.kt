@@ -38,6 +38,9 @@ import app.brokoli5191.quote.ui.localizeUi
 import app.brokoli5191.quote.ui.uiText
 import app.brokoli5191.quote.ui.components.ExpressiveButton
 import app.brokoli5191.quote.ui.components.ExpressiveOutlinedButton
+import app.brokoli5191.quote.ui.components.FloatingChromeBackdrop
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 
 @Composable
 fun DeveloperScreen(viewModel: QuoteViewModel, modifier: Modifier = Modifier) {
@@ -56,6 +59,8 @@ fun DeveloperScreen(viewModel: QuoteViewModel, modifier: Modifier = Modifier) {
     val quoteSourceMode by viewModel.quoteSourceMode.collectAsStateWithLifecycle()
     val communitySyncFinished by viewModel.communitySyncFinished.collectAsStateWithLifecycle()
     val verificationResult by viewModel.verificationResult.collectAsStateWithLifecycle()
+    val blurNavigationSurfaces by viewModel.blurNavigationSurfaces.collectAsStateWithLifecycle()
+    val developerHazeState = rememberHazeState(blurEnabled = blurNavigationSurfaces && !lowPerf)
 
     Box(
         modifier = modifier
@@ -65,6 +70,7 @@ fun DeveloperScreen(viewModel: QuoteViewModel, modifier: Modifier = Modifier) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .hazeSource(developerHazeState)
                 .verticalScroll(rememberScrollState())
                 .statusBarsPadding()
                 .navigationBarsPadding()
@@ -256,6 +262,14 @@ fun DeveloperScreen(viewModel: QuoteViewModel, modifier: Modifier = Modifier) {
                 }
             }
         }
+
+        // Content scrolling under the status bar fades out instead of running into its icons.
+        FloatingChromeBackdrop(
+            hazeState = developerHazeState,
+            modifier = Modifier
+                .fillMaxWidth()
+                .windowInsetsTopHeight(WindowInsets.statusBars.add(WindowInsets(top = 16.dp)))
+        )
     }
 }
 
