@@ -54,7 +54,9 @@ import app.brokoli5191.quote.ui.uiText
 import app.brokoli5191.quote.ui.components.ExpressiveButton
 import app.brokoli5191.quote.ui.components.ExpressiveIconButton
 import app.brokoli5191.quote.ui.components.ExpressiveTextButton
+import app.brokoli5191.quote.ui.components.AnimatedTranslation
 import app.brokoli5191.quote.ui.components.TranslationToggle
+import app.brokoli5191.quote.ui.components.bottomBarContentPadding
 import app.brokoli5191.quote.ui.components.rememberExpressiveShape
 import app.brokoli5191.quote.ui.theme.SerifFontFamily
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -191,7 +193,7 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                         modifier = Modifier
                             .fillMaxSize()
                             .verticalScroll(scrollState)
-                            .padding(bottom = 112.dp)
+                            .padding(bottom = bottomBarContentPadding())
                     ) {
                         Spacer(modifier = Modifier.height(headerHeight + LibraryContentGap))
 
@@ -609,10 +611,11 @@ fun CategoryBrowseViewInPlace(
         }
     }
 
+    // The side margin is content padding, not layout padding, so cards sliding in are not cut off
+    // at a hard edge inside the screen.
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 20.dp)
     ) {
         if (quotes.isEmpty()) {
             val infiniteTransition = rememberInfiniteTransition(label = "EmptyStateAnimation")
@@ -663,7 +666,7 @@ fun CategoryBrowseViewInPlace(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = topContentPadding, bottom = 32.dp),
+                    .padding(start = 20.dp, top = topContentPadding, end = 20.dp, bottom = 32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
@@ -792,7 +795,12 @@ fun CategoryBrowseViewInPlace(
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(top = topContentPadding, bottom = 112.dp),
+                contentPadding = PaddingValues(
+                    start = 20.dp,
+                    top = topContentPadding,
+                    end = 20.dp,
+                    bottom = bottomBarContentPadding()
+                ),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(quotes, key = { it.id }, contentType = { BrowseQuoteContentType }) { quote ->
@@ -905,10 +913,10 @@ fun QuoteBrowseItemCard(
     val appLanguage = LocalAppLanguage.current
     // Quotation marks follow the language of the text on screen, not the app language. An own quote
     // without a translation has no known text language, so it keeps neutral English marks.
-    val displayedLanguage = when {
+    fun languageOf(translated: Boolean) = when {
         alternateLanguage == null && quote.isUserAdded -> QuoteLanguage.ENGLISH
         alternateLanguage == null -> appLanguage
-        showTranslation -> alternateLanguage
+        translated -> alternateLanguage
         alternateLanguage == QuoteLanguage.GERMAN -> QuoteLanguage.ENGLISH
         else -> QuoteLanguage.GERMAN
     }
@@ -937,15 +945,18 @@ fun QuoteBrowseItemCard(
             modifier = Modifier.padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = if (displayedLanguage == QuoteLanguage.GERMAN) "„$displayedText“" else "“$displayedText”",
-                style = MaterialTheme.typography.bodyLarge.copy(
-                    fontFamily = SerifFontFamily,
-                    fontStyle = FontStyle.Italic,
-                    lineHeight = 26.sp
-                ),
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            AnimatedTranslation(showTranslation, lowPerformanceMode) { showing ->
+                val text = if (showing && alternateText != null) alternateText else quote.text
+                Text(
+                    text = if (languageOf(showing) == QuoteLanguage.GERMAN) "„$text“" else "“$text”",
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontFamily = SerifFontFamily,
+                        fontStyle = FontStyle.Italic,
+                        lineHeight = 26.sp
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
 
             if (alternateText != null && alternateLanguage != null) {
                 // The chip names the language the quote switches to.

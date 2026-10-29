@@ -45,6 +45,43 @@ class SeedAndMigrationTest {
     }
 
     @Test
+    fun everySeedQuote_hasValidCategoryAndCuratedTags() {
+        val seed = rawArray(R.raw.quotes_seed)
+        val problems = (0 until seed.length()).map { seed.getJSONObject(it) }.filter { item ->
+            val tags = item.getJSONArray("tags")
+            item.optString("category") !in CategoryMapper.categories || tags.length() !in 3..5
+        }.map { it.getString("quote") }
+        assertEquals(emptyList<String>(), problems)
+    }
+
+    @Test
+    fun preseed_usesSeedCategoriesAndTagsAnonymousQuotes() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).allowMainThreadQueries().build()
+        val repository = QuoteRepository(db.quoteDao(), 1L)
+        repository.preseedDatabase(context)
+        val rows = db.quoteDao().getAllQuotesSync()
+
+        val seed = rawArray(R.raw.quotes_seed)
+        val expected = (0 until seed.length()).map { seed.getJSONObject(it) }
+            .associate { normalizeQuoteText(it.getString("quote")) to it.getString("category") }
+        val wrongCategory = rows.filter { !it.isAnonymous && expected[it.text] != it.category }.map { it.text }
+        assertEquals(emptyList<String>(), wrongCategory)
+
+        val anonymous = rows.filter { it.isAnonymous }
+        assertEquals(rawArray(R.raw.anonymous_quotes).length(), anonymous.size)
+        assertTrue(anonymous.all { it.tags.split(", ").size in 3..5 && "anonymous" !in it.tags })
+        db.close()
+    }
+
+    @Test
+    fun tagLabel_translatesVocabularyTagsForGermanOnly() {
+        assertEquals("Mut", tagLabel("courage", QuoteLanguage.GERMAN))
+        assertEquals("Menschliche Natur", tagLabel("human-nature", QuoteLanguage.GERMAN))
+        assertEquals("human nature", tagLabel("human-nature", QuoteLanguage.ENGLISH))
+        assertEquals("my own tag", tagLabel("my-own-tag", QuoteLanguage.GERMAN))
+    }
+
+    @Test
     fun reseed_keepsFavoritesUserQuotesAndCommunityRows() = runBlocking {
         val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).allowMainThreadQueries().build()
         val dao = db.quoteDao()

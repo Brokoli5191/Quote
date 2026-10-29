@@ -52,6 +52,10 @@ import app.brokoli5191.quote.ui.components.ExpressiveButton
 import app.brokoli5191.quote.ui.components.ExpressiveOutlinedButton
 import app.brokoli5191.quote.ui.components.ExpressiveTextButton
 import app.brokoli5191.quote.ui.components.QuoteTimePickerDialog
+import app.brokoli5191.quote.ui.components.FloatingChromeBackdrop
+import app.brokoli5191.quote.ui.components.bottomBarContentPadding
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import app.brokoli5191.quote.utils.UpdateStatus
 import java.util.Calendar
 
@@ -59,6 +63,9 @@ import java.util.Calendar
 fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
+    val chromeLowPerformance by viewModel.lowPerformanceMode.collectAsStateWithLifecycle()
+    val chromeBlur by viewModel.blurNavigationSurfaces.collectAsStateWithLifecycle()
+    val settingsHazeState = rememberHazeState(blurEnabled = chromeBlur && !chromeLowPerformance)
     val haptic = LocalHapticFeedback.current
     val uiLanguage = LocalAppLanguage.current
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -89,8 +96,9 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .hazeSource(settingsHazeState)
                 .verticalScroll(scrollState)
-                .padding(bottom = 112.dp),
+                .padding(bottom = bottomBarContentPadding()),
             horizontalAlignment = Alignment.Start
         ) {
             // Elegant Settings Page Title (matches Library / Saved headers)
@@ -1070,6 +1078,14 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
 
             Spacer(modifier = Modifier.height(8.dp))
         }
+
+        // Content scrolling under the status bar fades out instead of running into its icons.
+        FloatingChromeBackdrop(
+            hazeState = settingsHazeState,
+            modifier = Modifier
+                .fillMaxWidth()
+                .windowInsetsTopHeight(WindowInsets.statusBars.add(WindowInsets(top = 16.dp)))
+        )
     }
 }
 

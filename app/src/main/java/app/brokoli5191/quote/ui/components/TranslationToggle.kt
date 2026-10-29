@@ -1,5 +1,15 @@
 package app.brokoli5191.quote.ui.components
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.VisibilityThreshold
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Translate
@@ -13,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntSize
 import app.brokoli5191.quote.data.QuoteLanguage
 import app.brokoli5191.quote.ui.uiText
 
@@ -53,4 +64,42 @@ fun TranslationToggle(
         ),
         modifier = modifier.semantics { contentDescription = description }
     )
+}
+
+/**
+ * Quote text that crossfades between original and translation while the card's height springs to
+ * the new size. Keyed on [showingTranslation] rather than the text, so only a card whose toggle was
+ * tapped animates (an app language change swaps texts instantly). [lowPerformanceMode] switches
+ * instantly without any animation. Takes the full width, so only the height changes.
+ */
+@Composable
+fun AnimatedTranslation(
+    showingTranslation: Boolean,
+    lowPerformanceMode: Boolean,
+    content: @Composable (showingTranslation: Boolean) -> Unit,
+) {
+    if (lowPerformanceMode) {
+        content(showingTranslation)
+        return
+    }
+    AnimatedContent(
+        targetState = showingTranslation,
+        transitionSpec = {
+            // Clipped only while the size animates, so a longer text fading in does not draw over
+            // the toggle and author row below before the card has grown to fit it.
+            fadeIn(tween(durationMillis = 220, delayMillis = 60)) togetherWith
+                fadeOut(tween(durationMillis = 90)) using
+                SizeTransform(clip = true) { _, _ ->
+                    spring(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = Spring.StiffnessMediumLow,
+                        visibilityThreshold = IntSize.VisibilityThreshold
+                    )
+                }
+        },
+        modifier = Modifier.fillMaxWidth(),
+        label = "TranslationTransition"
+    ) { showing ->
+        content(showing)
+    }
 }

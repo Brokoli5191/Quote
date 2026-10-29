@@ -41,7 +41,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -68,7 +67,14 @@ import app.brokoli5191.quote.ui.uiText
 import app.brokoli5191.quote.ui.components.ExpressiveButton
 import app.brokoli5191.quote.ui.components.ExpressiveTonalButton
 import app.brokoli5191.quote.ui.components.AuthorAvatar
+import app.brokoli5191.quote.ui.components.AnimatedTranslation
 import app.brokoli5191.quote.ui.components.TranslationToggle
+import app.brokoli5191.quote.ui.components.FloatingChromeBackdrop
+import app.brokoli5191.quote.ui.components.SingleLineFitRow
+import app.brokoli5191.quote.ui.components.bottomBarContentPadding
+import app.brokoli5191.quote.data.tagLabel
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import app.brokoli5191.quote.ui.theme.SerifFontFamily
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -78,6 +84,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 fun DailyScreen(viewModel: QuoteViewModel) {
     val quoteState by viewModel.dailyQuote.collectAsStateWithLifecycle()
     val lowPerformanceMode by viewModel.lowPerformanceMode.collectAsStateWithLifecycle()
+    val blurNavigationSurfaces by viewModel.blurNavigationSurfaces.collectAsStateWithLifecycle()
     val sourceMode by viewModel.quoteSourceMode.collectAsStateWithLifecycle()
     val communitySyncFinished by viewModel.communitySyncFinished.collectAsStateWithLifecycle()
     val authorImagesEnabled by viewModel.authorImagesEnabled.collectAsStateWithLifecycle()
@@ -85,6 +92,7 @@ fun DailyScreen(viewModel: QuoteViewModel) {
     val haptic = LocalHapticFeedback.current
     val uiLanguage = LocalAppLanguage.current
     val scrollState = rememberScrollState()
+    val dailyHazeState = rememberHazeState(blurEnabled = blurNavigationSurfaces && !lowPerformanceMode)
     val feedbackScope = rememberCoroutineScope()
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -105,8 +113,9 @@ fun DailyScreen(viewModel: QuoteViewModel) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .hazeSource(dailyHazeState)
                 .verticalScroll(scrollState)
-                .padding(bottom = 112.dp)
+                .padding(bottom = bottomBarContentPadding())
         ) {
             Column(
                 modifier = Modifier
@@ -119,11 +128,6 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                     style = MaterialTheme.typography.headlineLarge,
                     color = MaterialTheme.colorScheme.onBackground,
                     fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    text = uiText("A thought worth keeping"),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -168,11 +172,12 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                         var showTranslation by remember(quote.id, quote.text) { mutableStateOf(false) }
                         val displayedText =
                             if (showTranslation && alternateText != null) alternateText else quote.text
-                        val tags = remember(quote.tags) {
+                        // Shown in both languages (also for anonymous quotes); the row keeps as many as fit.
+                        val tags = remember(quote.tags, uiLanguage) {
                             quote.tags.split(",")
                                 .map { it.trim() }
                                 .filter { it.isNotEmpty() }
-                                .take(4)
+                                .map { tagLabel(it, uiLanguage) }
                         }
                         Column(
                             modifier = Modifier.padding(horizontal = 20.dp)
@@ -208,19 +213,8 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                                             // closes the last line instead of overlapping the lines above it.
                                             modifier = Modifier.align(Alignment.BottomEnd).offset(y = 50.dp)
                                         )
-                                        if (lowPerformanceMode) {
-                                            DailyQuoteText(displayedText)
-                                        } else {
-                                            AnimatedContent(
-                                                targetState = displayedText,
-                                                transitionSpec = {
-                                                    fadeIn(tween(220)) togetherWith fadeOut(tween(150)) using
-                                                        SizeTransform(clip = false)
-                                                },
-                                                label = "DailyTranslationTransition"
-                                            ) { text ->
-                                                DailyQuoteText(text)
-                                            }
+                                        AnimatedTranslation(showTranslation, lowPerformanceMode) { showing ->
+                                            DailyQuoteText(if (showing && alternateText != null) alternateText else quote.text)
                                         }
                                     }
                                     if (alternateText != null && alternateLanguage != null) {
@@ -273,9 +267,7 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                             }
 
                             Spacer(Modifier.height(12.dp))
-                            if (!quote.isAnonymous && uiLanguage == QuoteLanguage.ENGLISH) {
-                                QuoteTags(tags = tags)
-                            }
+                            QuoteTags(tags = tags)
 
                             Spacer(Modifier.height(8.dp))
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -335,6 +327,14 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                     }
                 }
             }
+
+        // Content scrolling under the status bar fades out instead of running into its icons.
+        FloatingChromeBackdrop(
+            hazeState = dailyHazeState,
+            modifier = Modifier
+                .fillMaxWidth()
+                .windowInsetsTopHeight(WindowInsets.statusBars.add(WindowInsets(top = 16.dp)))
+        )
         }
 }
 
@@ -379,44 +379,16 @@ private fun DailyQuoteEmptyState(
     }
 }
 
+// A single line of chips: the tags that fit completely, in order, never wrapped or cut off.
 @Composable
 private fun QuoteTags(tags: List<String>) {
     CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
-        Layout(
-            modifier = Modifier.fillMaxWidth(),
-            content = {
-                tags.forEach { tag ->
-                    SuggestionChip(
-                        onClick = {},
-                        label = { Text(tag, maxLines = 1) }
-                    )
-                }
-            }
-        ) { measurables, constraints ->
-            val spacing = 8.dp.roundToPx()
-            val placeables = measurables.map { it.measure(constraints.copy(minWidth = 0, minHeight = 0)) }
-            val positions = ArrayList<Pair<Int, Int>>(placeables.size)
-            var x = 0
-            var y = 0
-            var rowHeight = 0
-
-            placeables.forEach { placeable ->
-                if (x > 0 && x + placeable.width > constraints.maxWidth) {
-                    x = 0
-                    y += rowHeight + spacing
-                    rowHeight = 0
-                }
-                positions += x to y
-                x += placeable.width + spacing
-                rowHeight = maxOf(rowHeight, placeable.height)
-            }
-
-            val height = (y + rowHeight).coerceIn(constraints.minHeight, constraints.maxHeight)
-            layout(constraints.maxWidth, height) {
-                placeables.forEachIndexed { index, placeable ->
-                    val (placeX, placeY) = positions[index]
-                    placeable.placeRelative(placeX, placeY)
-                }
+        SingleLineFitRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp) {
+            tags.forEach { tag ->
+                SuggestionChip(
+                    onClick = {},
+                    label = { Text(tag, maxLines = 1, softWrap = false) }
+                )
             }
         }
     }

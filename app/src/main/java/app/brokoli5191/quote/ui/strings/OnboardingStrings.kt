@@ -10,41 +10,47 @@ internal val onboardingGermanUi: Map<String, String> = mapOf(
 
     // Welcome
     "Welcome to Quote" to "Willkommen bei Quote",
-    "A calm quote for every day, a library of curated and community wisdom, and a place for your own thoughts." to "Ein ruhiges Quote für jeden Tag, eine Bibliothek mit kuratierten und Community-Quotes und ein Ort für deine eigenen Gedanken.",
-    "Let’s set it up in a minute." to "In einer Minute ist alles eingerichtet.",
+    "A quote for every day, a library full of wisdom and room for your own thoughts." to "Jeden Tag ein Quote, eine Bibliothek voller Weisheit und Platz für eigene Gedanken.",
+    "Ready in a minute." to "In einer Minute startklar.",
 
     // Language
     "Choose your language" to "Wähle deine Sprache",
-    "The app and the quotes switch right away. You can change this later in Settings." to "App und Quotes wechseln sofort. Du kannst das später in den Einstellungen ändern.",
+    "Applies right away. Change it later in Settings." to "Gilt sofort. Später in den Einstellungen änderbar.",
 
     // Appearance
-    "Make it yours" to "Ganz nach deinem Geschmack",
-    "Pick a theme and an accent color. The preview updates as you go." to "Wähle ein Design und eine Akzentfarbe. Die Vorschau passt sich sofort an.",
+    "Make it yours" to "Ganz dein Stil",
+    "Pick a theme and an accent color." to "Wähle Design und Akzentfarbe.",
     "Preview" to "Vorschau",
 
     // Sources
-    "Where quotes come from" to "Woher die Quotes kommen",
-    "Choose which quotes appear in your daily quote and in the library." to "Wähle, welche Quotes im Tages-Quote und in der Bibliothek erscheinen.",
-    "Curated and community quotes together." to "Kuratierte und Community-Quotes zusammen.",
-    "Hand-picked quotes from well-known authors." to "Handverlesene Quotes bekannter Autoren.",
-    "Quotes shared by other users, reviewed before they are published." to "Von anderen geteilte Quotes, die vor der Veröffentlichung geprüft werden.",
+    "Choose your sources" to "Deine Quellen",
+    "Pick what shows up daily and in the library." to "Was täglich und in der Bibliothek erscheint.",
+    "Curated and community quotes." to "Kuratiert und Community.",
+    "Hand-picked from well-known authors." to "Handverlesen, bekannte Autoren.",
+    "Shared by users, reviewed first." to "Von Nutzern, vorher geprüft.",
+    "Poetic quotes without an author." to "Poetische Quotes ohne Autor.",
 
     // Daily reminder
     "A daily nudge" to "Ein täglicher Impuls",
-    "Get one quote as a notification at a time that suits you." to "Erhalte ein Quote als Benachrichtigung zu einer Uhrzeit, die dir passt.",
-    "Reminder time" to "Uhrzeit der Erinnerung",
+    "One quote a day as a notification." to "Ein Quote pro Tag als Benachrichtigung.",
+    "Reminder time" to "Uhrzeit",
     "Tap to change" to "Zum Ändern tippen",
-    "Notifications are blocked. You can allow them later in the system settings." to "Benachrichtigungen sind blockiert. Du kannst sie später in den Systemeinstellungen erlauben.",
+    "Notifications are blocked. Allow them in the system settings." to "Benachrichtigungen sind blockiert. Erlaube sie in den Systemeinstellungen.",
 
-    // Author images + widget
+    // Author images
     "Author portraits" to "Autorenporträts",
-    "Quote can show a portrait and a short description of each author, taken from Wikipedia." to "Quote kann zu jedem Autor ein Porträt und eine kurze Beschreibung aus Wikipedia anzeigen.",
+    "Portraits and short bios from Wikipedia." to "Porträts und Kurzinfos aus Wikipedia.",
     "Show author images" to "Autorenbilder anzeigen",
-    "Portraits are loaded from Wikimedia when shown. Turn this off to skip those requests." to "Porträts werden beim Anzeigen von Wikimedia geladen. Schalte das aus, um diese Anfragen zu vermeiden.",
-    "Quote on your home screen" to "Quote auf deinem Startbildschirm",
-    "Long-press an empty spot on your home screen, choose Widgets and add Quote." to "Halte eine freie Stelle auf dem Startbildschirm gedrückt, wähle „Widgets“ und füge Quote hinzu.",
+    "Loaded from Wikimedia. Turn off to skip these requests." to "Kommen von Wikimedia. Ausschalten spart diese Anfragen.",
+
+    // Widget
+    "Home screen widget" to "Quote als Widget",
+    "Today’s quote at a glance." to "Das Tages-Quote immer im Blick.",
+    "Long-press an empty spot on your home screen." to "Halte eine freie Stelle auf dem Startbildschirm gedrückt.",
+    "Tap Widgets." to "Tippe auf „Widgets“.",
+    "Pick Quote and place it." to "Wähle Quote und platziere es.",
 
     // Done
     "You’re all set" to "Alles bereit",
-    "Everything you chose can be changed anytime in Settings." to "Alles, was du gewählt hast, kannst du jederzeit in den Einstellungen ändern."
+    "You can change everything later in Settings." to "Alles lässt sich später in den Einstellungen ändern."
 )

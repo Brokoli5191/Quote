@@ -68,13 +68,12 @@ class QuoteRepository(
             val quoteText = item.getString("quote")
             val author = item.getString("author")
 
-            val tagsArray = item.getJSONArray("tags")
-            val tagsList = mutableListOf<String>()
-            for (j in 0 until tagsArray.length()) {
-                tagsList.add(tagsArray.getString(j))
-            }
+            val tagsList = readTags(item)
 
-            val category = CategoryMapper.map(tagsList, quoteText)
+            // The seed freezes each quote's category (tools/apply_quote_tags.mjs), so curated tags
+            // never move a quote; the mapper is only the fallback for rows without a valid one.
+            val category = item.optString("category").takeIf { it in CategoryMapper.categories }
+                ?: CategoryMapper.map(tagsList, quoteText)
             val cleanText = normalizeQuoteText(quoteText)
             quoteEntities.add(
                 QuoteEntity(
@@ -100,13 +99,18 @@ class QuoteRepository(
                     textDe = normalizeQuoteText(item.getString("quote_de")),
                     author = "",
                     category = "Reflections",
-                    tags = "reflection, anonymous, original",
+                    tags = readTags(item).ifEmpty { listOf("reflection", "anonymous", "original") }.joinToString(", "),
                     isAnonymous = true,
                     timestamp = now + i
                 )
             )
         }
         return quoteEntities
+    }
+
+    private fun readTags(item: org.json.JSONObject): List<String> {
+        val tagsArray = item.optJSONArray("tags") ?: return emptyList()
+        return (0 until tagsArray.length()).map { tagsArray.getString(it) }
     }
 
     private fun loadGermanTranslations(context: Context): Map<String, String> {
@@ -148,7 +152,11 @@ class QuoteRepository(
             matched += favorite.id
             quote.copy(isFavorite = true, savedDate = favorite.savedDate ?: System.currentTimeMillis().toString())
         }
-        val keptFavorites = oldFavorites.filter { it.id !in matched }.map { it.copy(id = 0) }
+        // Kept favorites drop the noisy source tags of older seeds and keep only curated ones.
+        val keptFavorites = oldFavorites.filter { it.id !in matched }.map { favorite ->
+            val tags = favorite.tags.split(',').map { it.trim() }.filter { isVocabularyTag(it) }
+            favorite.copy(id = 0, tags = tags.joinToString(", "))
+        }
         quoteDao.replaceBundledQuotes(seeded + keptFavorites)
     }
 

@@ -1,3 +1,5 @@
+import { mapCategory } from './category_mapper.mjs';
+
 const WINDOWS_1252 = new Map([
   ['€', 0x80], ['‚', 0x82], ['ƒ', 0x83], ['„', 0x84], ['…', 0x85],
   ['†', 0x86], ['‡', 0x87], ['ˆ', 0x88], ['‰', 0x89], ['Š', 0x8a],
@@ -321,4 +323,16 @@ export function buildSeed(records) {
     quotes.push({ quote, author, tags: cleanTags(record.tags, author) });
   }
   return quotes;
+}
+
+// Replaces the cleaned source tags with the curated tags from tools/quote_tags.json. The category
+// is computed from the source tags first, so curated tags never move a quote to another category.
+// Quotes without curated tags keep their source tags (the validator then asks for curated ones).
+export function applyQuoteTags(seed, quoteTags) {
+  return seed.map(item => ({
+    quote: item.quote,
+    author: item.author,
+    tags: quoteTags[item.quote] ?? item.tags,
+    category: item.category ?? mapCategory(item.tags, item.quote),
+  }));
 }

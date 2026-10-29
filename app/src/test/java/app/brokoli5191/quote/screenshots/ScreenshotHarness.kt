@@ -74,7 +74,7 @@ import java.util.concurrent.Executors
 const val SCREENSHOT_DEVICE = "w360dp-h780dp-xxhdpi"
 
 /** Recorded images land here (relative to the app module) when Roborazzi runs in record mode. */
-private const val OUTPUT_DIR = "build/outputs/roborazzi"
+const val OUTPUT_DIR = "build/outputs/roborazzi"
 
 /**
  * One rendering configuration: app language, app theme and font scale. Passed to the
@@ -162,7 +162,7 @@ class ScreenshotApp(
         val appPrefs = context.getSharedPreferences("aura_prefs", Context.MODE_PRIVATE)
         appPrefs.edit().clear().apply {
             putBoolean("onboarding_completed", true)
-            putBoolean("database_json_seeded_v12", true)
+            putBoolean("database_json_seeded_v13", true)
             putBoolean("stored_quote_text_repaired_v2", true)
             putString("theme_mode", config.theme)
             putBoolean("amoled_black", config.theme == "AMOLED")
@@ -236,9 +236,10 @@ private fun initWorkManager(context: Context) {
     )
 }
 
-// Every image request gets the same generated portrait, from "memory cache" so Coil skips the crossfade.
-private fun fakeImageLoader(context: Context): ImageLoader {
-    val portrait = BitmapDrawable(context.resources, fakePortrait())
+// Every image request gets the same portrait (generated unless given), from "memory cache" so Coil
+// skips the crossfade.
+fun fakeImageLoader(context: Context, portraitBitmap: Bitmap = fakePortrait()): ImageLoader {
+    val portrait = BitmapDrawable(context.resources, portraitBitmap)
     return ImageLoader.Builder(context)
         .dispatcher(Dispatchers.Main.immediate)
         .components {
@@ -379,29 +380,29 @@ object FakeQuotes {
 
     val bundledQuotes = listOf(
         bundled(MARCUS, "Das Glück deines Lebens hängt von der Beschaffenheit deiner Gedanken ab.",
-            "Marcus Aurelius", "Philosophy", "happiness,stoicism,mind", favoriteDaysAgo = 0, age = 1),
+            "Marcus Aurelius", "Philosophy", "happiness, mind, thinking, attitude, life", favoriteDaysAgo = 0, age = 1),
         bundled(SENECA_LONG,
             "Es ist nicht so, dass wir wenig Zeit haben, sondern dass wir viel davon vergeuden. Das Leben ist lang genug " +
                 "und reichlich bemessen, um selbst das Größte zu vollbringen, wenn es nur gut angelegt wird.",
-            "Seneca", "Life", "life,time,stoicism", age = 2),
+            "Seneca", "Life", "time, life, purpose, philosophy", age = 2),
         bundled("Life is like riding a bicycle. To keep your balance you must keep moving.",
             "Das Leben ist wie Fahrradfahren. Um die Balance zu halten, musst du in Bewegung bleiben.",
-            "Albert Einstein", "Life", "life,balance", favoriteDaysAgo = 3, age = 3),
+            "Albert Einstein", "Life", "life, change, perseverance, action", favoriteDaysAgo = 3, age = 3),
         bundled("My mission in life is not merely to survive, but to thrive.",
             "Meine Mission im Leben ist es nicht, bloß zu überleben, sondern aufzublühen.",
-            "Maya Angelou", "Inspirational", "life,inspiration", favoriteDaysAgo = 1, age = 4),
+            "Maya Angelou", "Inspirational", "purpose, life, growth, inspiration", favoriteDaysAgo = 1, age = 4),
         bundled("To live is the rarest thing in the world. Most people exist, that is all.",
             "Zu leben ist das Seltenste auf der Welt. Die meisten Menschen existieren nur.",
-            "Oscar Wilde", "Life", "life,humor", age = 5),
+            "Oscar Wilde", "Life", "life, meaning, people, world", age = 5),
         bundled("The journey of a thousand miles begins with one step.",
             "Eine Reise von tausend Meilen beginnt mit einem einzigen Schritt.",
-            "Lao Tzu", "Inspirational", "journey,beginning", favoriteDaysAgo = 12, age = 6),
+            "Lao Tzu", "Inspirational", "journey, beginnings, action, travel", favoriteDaysAgo = 12, age = 6),
         bundled("What you seek is seeking you.",
             "Was du suchst, sucht dich.",
-            "Rumi", "Wisdom", "wisdom,love", favoriteDaysAgo = 40, age = 7),
+            "Rumi", "Wisdom", "desire, spirituality, soul, purpose", favoriteDaysAgo = 40, age = 7),
         bundled("He who has a why to live can bear almost any how.",
             "Wer ein Warum zum Leben hat, erträgt fast jedes Wie.",
-            "Friedrich Nietzsche", "Philosophy", "life,meaning", age = 8),
+            "Friedrich Nietzsche", "Philosophy", "purpose, meaning, life, perseverance", age = 8),
     )
 
     val anonymous = QuoteEntity(
@@ -409,6 +410,7 @@ object FakeQuotes {
         textDe = "An manchen Tagen ist das Mutigste, was du tun kannst, einfach neu anzufangen.",
         author = "Unknown",
         category = "Reflections",
+        tags = "beginnings, courage, perseverance, hope",
         origin = QuoteOrigin.BUNDLED,
         isAnonymous = true,
         timestamp = now - 9 * 60_000L
@@ -420,7 +422,7 @@ object FakeQuotes {
             textEn = "Knowing is not enough; we must apply. Willing is not enough; we must do.",
             author = "Johann Wolfgang von Goethe",
             category = "Wisdom",
-            tags = "action,wisdom",
+            tags = "action, knowledge, wisdom",
             language = QuoteLanguage.GERMAN,
             origin = QuoteOrigin.COMMUNITY,
             serverId = "c-101",
@@ -432,7 +434,7 @@ object FakeQuotes {
             textDe = "Kleine Schritte jeden Tag bringen dich trotzdem voran.",
             author = "Jonas Weber",
             category = "Inspirational",
-            tags = "life,progress",
+            tags = "growth, perseverance, action",
             origin = QuoteOrigin.COMMUNITY,
             serverId = "c-102",
             serverRevision = 8,

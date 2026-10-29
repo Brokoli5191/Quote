@@ -3,6 +3,7 @@
   "name": "quote-submission-api",
   "main": "src/index.ts",
   "compatibility_date": "2026-08-05",
+  // Apps up to 2.0.0 send submissions to the workers.dev hostname; disable it once those are gone.
   "workers_dev": true,
   "preview_urls": false,
   "vars": {
