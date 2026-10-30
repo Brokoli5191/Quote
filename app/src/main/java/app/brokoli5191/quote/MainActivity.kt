@@ -163,7 +163,7 @@ private val DarkNavigationScrim = android.graphics.Color.argb(0x80, 0x1b, 0x1b, 
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun MainContent(
+internal fun MainContent(
     viewModel: QuoteViewModel,
     lowPerformanceMode: Boolean,
     blurNavigationSurfaces: Boolean
@@ -258,12 +258,14 @@ private fun MainContent(
             viewModel.popBackStack()
             kotlinx.coroutines.delay(50L)
         } finally {
-            isCompletingPredictiveBack = false
             isCompletingDevBack = false
-            completionPreviewTab = null
             kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
                 kotlinx.coroutines.delay(32L)
                 backProgressAnim.snapTo(0f)
+                // Cleared in the same frame as the progress reset: the peek only leaves once the
+                // real tab has slid back in, so no empty frame shows in between.
+                isCompletingPredictiveBack = false
+                completionPreviewTab = null
                 backGestureIsFilterClear = false
             }
         }
@@ -367,19 +369,9 @@ private fun MainContent(
                                 scaleY = 0.93f + backProgress * 0.07f
                             }
                     ) {
-                        // Lightweight static peek — avoids composing the full
-                        // DailyScreen on every predictive-back gesture frame.
-                        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                            Text(
-                                text = uiText("Daily Quote"),
-                                style = MaterialTheme.typography.headlineLarge,
-                                color = MaterialTheme.colorScheme.onBackground,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier
-                                    .statusBarsPadding()
-                                    .padding(start = 20.dp, top = 16.dp)
-                            )
-                        }
+                        // Composed once when the gesture starts; progress is only read in
+                        // graphicsLayer above, so gesture frames don't recompose it.
+                        DailyScreen(viewModel)
                     }
                 }
 
@@ -389,7 +381,9 @@ private fun MainContent(
                         .fillMaxSize()
                         .graphicsLayer {
                             val backProgress = backProgressAnim.value
-                            if (!showDevScreen && !showNewQuoteScreen && backProgress > 0f && !isFilterClearBack && !lowPerformanceMode) {
+                            // A completing back without a peek (Developer screen) keeps the tab in place.
+                            val completingWithoutPeek = isCompletingPredictiveBack && completionPreviewTab == null
+                            if (!showDevScreen && !showNewQuoteScreen && backProgress > 0f && !isFilterClearBack && !lowPerformanceMode && !completingWithoutPeek) {
                                 translationX = size.width * backProgress
                             }
                         }
