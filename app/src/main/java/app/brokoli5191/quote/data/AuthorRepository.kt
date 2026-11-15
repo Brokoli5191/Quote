@@ -66,13 +66,17 @@ internal data class WikiPage(val title: String, val imageUrl: String?, val descr
 
 /**
  * Author portraits and short descriptions: first the bundled map (res/raw/author_wiki.json),
- * then, only when [allowNetwork] is set, a cached runtime lookup on English Wikipedia that
- * accepts only pages about a real person.
+ * then, only when [allowNetwork] is set, a cached runtime lookup that accepts only pages about a
+ * real person. German looks on de.wikipedia first and falls back to English Wikipedia. Without
+ * [allowNetwork] only already cached runtime rows are used (never the network, never an image).
  */
-class AuthorRepository(
+class AuthorRepository internal constructor(
     context: Context,
-    private val dao: AuthorInfoDao
+    private val dao: AuthorInfoDao,
+    private val httpGet: (String) -> String?
 ) {
+    constructor(context: Context, dao: AuthorInfoDao) : this(context, dao, ::wikimediaHttpGet)
+
     private val appContext = context.applicationContext
     private val lookupLocks = HashMap<String, Mutex>()
 
@@ -80,63 +84,53 @@ class AuthorRepository(
         val name = author.trim()
         if (name.isBlank() || name == "Unknown" || name == "Unbekannt") return null
         bundled(appContext)[name]?.let { return it.toAuthorInfo(name, language, allowNetwork) }
-        if (!allowNetwork) return null
 
-        val lock = synchronized(lookupLocks) { lookupLocks.getOrPut(name) { Mutex() } }
+        val german = language == QuoteLanguage.GERMAN
+        val de = if (german) resolve(name, "de", allowNetwork)?.takeIf { it.wikiTitle != null } else null
+        val needsEnglish = de == null || de.description == null || de.imageUrl == null
+        val en = if (needsEnglish) resolve(name, "en", allowNetwork)?.takeIf { it.wikiTitle != null } else null
+        val title = de?.wikiTitle ?: en?.wikiTitle ?: return null
+        return AuthorInfo(
+            name = name,
+            wikiTitle = title,
+            imageUrl = (de?.imageUrl ?: en?.imageUrl).takeIf { allowNetwork },
+            // A German page without a description falls back to the English one.
+            description = de?.description ?: en?.description,
+            wikiUrl = wikiUrl(if (de != null) "de" else "en", title)
+        )
+    }
+
+    // English rows are keyed by the plain name (as before), other languages by "<lang>:<name>".
+    // An expired row is still returned when the refresh fails, or when the network is not allowed.
+    private suspend fun resolve(name: String, wikiLanguage: String, allowNetwork: Boolean): AuthorInfoEntity? {
+        val key = if (wikiLanguage == "en") name else "$wikiLanguage:$name"
+        val lock = synchronized(lookupLocks) { lookupLocks.getOrPut(key) { Mutex() } }
         return lock.withLock {
             val now = System.currentTimeMillis()
-            val cached = dao.get(name)?.takeIf { now - it.fetchedAt < CACHE_TTL_MS }
-            val entity = cached ?: fetch(name, now)?.also { dao.put(it) } ?: return@withLock null
-            entity.wikiTitle?.let { title ->
-                AuthorInfo(
-                    name = name,
-                    wikiTitle = title,
-                    imageUrl = entity.imageUrl,
-                    // Runtime descriptions come from English Wikipedia only.
-                    description = entity.description.takeIf { language != QuoteLanguage.GERMAN },
-                    wikiUrl = wikiUrl("en", title)
-                )
-            }
+            val stored = dao.get(key)
+            if (stored != null && (!allowNetwork || now - stored.fetchedAt < CACHE_TTL_MS)) return@withLock stored
+            if (!allowNetwork) return@withLock null
+            fetch(key, name, wikiLanguage, now)?.also { dao.put(it) } ?: stored
         }
     }
 
     // Returns null on network errors so nothing is cached; a definite "no match" is cached.
-    private suspend fun fetch(name: String, now: Long): AuthorInfoEntity? = withContext(Dispatchers.IO) {
-        val noMatch = AuthorInfoEntity(name, null, null, null, now)
-        val pageJson = httpGet(
-            "https://en.wikipedia.org/w/api.php?action=query&format=json&formatversion=2&redirects=1" +
-                "&prop=pageimages%7Cdescription%7Cpageprops&piprop=thumbnail&pithumbsize=330&titles=" +
-                URLEncoder.encode(name, "UTF-8")
-        ) ?: return@withContext null
-        val page = runCatching { parseWikipediaPage(pageJson) }.getOrNull() ?: return@withContext noMatch
-        val claimsJson = httpGet(
-            "https://www.wikidata.org/w/api.php?action=wbgetclaims&format=json&property=P31&entity=" +
-                URLEncoder.encode(page.wikidataId, "UTF-8")
-        ) ?: return@withContext null
-        if (!runCatching { isHumanEntity(claimsJson) }.getOrDefault(false)) return@withContext noMatch
-        AuthorInfoEntity(name, page.title, page.imageUrl, page.description, now)
-    }
-
-    private fun httpGet(url: String): String? = try {
-        val connection = (URL(url).openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            connectTimeout = 10_000
-            readTimeout = 10_000
-            setRequestProperty("Accept", "application/json")
-            setRequestProperty("User-Agent", WIKIMEDIA_USER_AGENT)
+    private suspend fun fetch(key: String, name: String, wikiLanguage: String, now: Long): AuthorInfoEntity? =
+        withContext(Dispatchers.IO) {
+            val noMatch = AuthorInfoEntity(key, null, null, null, now)
+            val pageJson = httpGet(
+                "https://$wikiLanguage.wikipedia.org/w/api.php?action=query&format=json&formatversion=2&redirects=1" +
+                    "&prop=pageimages%7Cdescription%7Cpageprops&piprop=thumbnail&pithumbsize=330&titles=" +
+                    URLEncoder.encode(name, "UTF-8")
+            ) ?: return@withContext null
+            val page = runCatching { parseWikipediaPage(pageJson) }.getOrNull() ?: return@withContext noMatch
+            val claimsJson = httpGet(
+                "https://www.wikidata.org/w/api.php?action=wbgetclaims&format=json&property=P31&entity=" +
+                    URLEncoder.encode(page.wikidataId, "UTF-8")
+            ) ?: return@withContext null
+            if (!runCatching { isHumanEntity(claimsJson) }.getOrDefault(false)) return@withContext noMatch
+            AuthorInfoEntity(key, page.title, page.imageUrl, page.description, now)
         }
-        try {
-            if (connection.responseCode == HttpURLConnection.HTTP_OK) {
-                connection.inputStream.bufferedReader().use { it.readText() }
-            } else {
-                null
-            }
-        } finally {
-            connection.disconnect()
-        }
-    } catch (_: Exception) {
-        null
-    }
 
     companion object {
         private const val CACHE_TTL_MS = 30L * 24 * 60 * 60 * 1000
@@ -163,6 +157,27 @@ class AuthorRepository(
     }
 }
 
+internal fun wikimediaHttpGet(url: String): String? = try {
+    val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+        requestMethod = "GET"
+        connectTimeout = 10_000
+        readTimeout = 10_000
+        setRequestProperty("Accept", "application/json")
+        setRequestProperty("User-Agent", WIKIMEDIA_USER_AGENT)
+    }
+    try {
+        if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+            connection.inputStream.bufferedReader().use { it.readText() }
+        } else {
+            null
+        }
+    } finally {
+        connection.disconnect()
+    }
+} catch (_: Exception) {
+    null
+}
+
 internal fun BundledAuthor.toAuthorInfo(name: String, language: String, allowImages: Boolean): AuthorInfo {
     val german = language == QuoteLanguage.GERMAN
     val title = if (german && dewiki != null) dewiki else title
@@ -170,7 +185,8 @@ internal fun BundledAuthor.toAuthorInfo(name: String, language: String, allowIma
         name = name,
         wikiTitle = title,
         imageUrl = image.takeIf { allowImages },
-        description = if (german) de else en,
+        // German falls back to the English description when there is no German one.
+        description = if (german) de ?: en else en,
         wikiUrl = AuthorRepository.wikiUrl(if (german && dewiki != null) "de" else "en", title)
     )
 }
