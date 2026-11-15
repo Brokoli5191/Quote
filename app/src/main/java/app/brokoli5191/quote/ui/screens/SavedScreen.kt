@@ -423,8 +423,8 @@ fun SavedScreen(viewModel: QuoteViewModel) {
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         items(quotes, key = { it.id }) { quote ->
-                            // Own quotes are stored locally only, so their author is never looked up
-                            // online; bundled names still resolve from the offline map elsewhere.
+                            // Own quotes are stored locally only, so the card never looks their author up
+                            // online; only a tap on the author opens the sheet, which does, as in Library.
                             val lookUpAuthor = authorImagesEnabled && !quote.isUserAdded && !quote.hasUnknownAuthor
                             val authorInfoFlow = remember(quote.author, lookUpAuthor) {
                                 if (lookUpAuthor) viewModel.authorInfo(quote.author) else null

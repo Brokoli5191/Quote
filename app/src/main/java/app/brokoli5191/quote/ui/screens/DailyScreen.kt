@@ -263,6 +263,8 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                                             Modifier
                                         } else {
                                             Modifier
+                                                // Without a description the row is only the 42dp avatar.
+                                                .heightIn(min = 48.dp)
                                                 .clip(RoundedCornerShape(16.dp))
                                                 .clickable(onClickLabel = exploreAuthorLabel, role = Role.Button) {
                                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
