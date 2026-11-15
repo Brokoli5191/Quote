@@ -39,7 +39,10 @@ sealed interface BackupOutcome {
         val insertedCustom: Int,
         /** Favorites the restore added, including community favorites that are favorited when the feed brings their quote. */
         val updatedFavorites: Int,
-        /** Community favorites that could not be restored: their quote is no longer published (or has no community id). */
+        /**
+         * Favorites that could not be restored: community quotes that are no longer published (or have no
+         * community id), and favorites of old backups without origins that match no stored quote.
+         */
         val skippedFavorites: Int,
         val settingsRestored: Boolean,
         /** The app language ("en" or "de") after the restore. */
@@ -234,12 +237,15 @@ class BackupManager internal constructor(
                     // Favorited by the feed when the quote arrives, unless it is no longer published.
                     quote.origin == QuoteOrigin.COMMUNITY ->
                         if (quote.serverId in pendingServerIds) updatedFavorites++ else skippedFavorites++
-                    else -> {
-                        // A favorite whose quote left the seed is kept, as the re-seed keeps it.
+                    // A favorite whose quote left the seed is kept, as the re-seed keeps it.
+                    quote.origin == QuoteOrigin.BUNDLED -> {
                         val row = quote.toKeptFavorite(now)
                         others.add(row.copy(id = dao.insertQuote(row).toInt()))
                         updatedFavorites++
                     }
+                    // No origin (format 2): it may be a community quote that is not synced yet or no longer
+                    // published, which must not come back as a curated copy of itself.
+                    else -> skippedFavorites++
                 }
             }
         }
@@ -306,8 +312,8 @@ private class BackupQuote(
     val category: String,
     val isFavorite: Boolean,
     val isUserAdded: Boolean,
-    /** personal for own quotes, else bundled or community. */
-    val origin: String,
+    /** personal for own quotes, else bundled or community; null when the backup does not say (format 2). */
+    val origin: String?,
     val serverId: String?,
     val timestamp: Long?,
     val aboutAuthor: String,
@@ -374,6 +380,7 @@ private fun parseQuote(obj: JSONObject): BackupQuote {
     val text = obj.stringOrNull("text")?.takeIf { it.isNotBlank() } ?: throw BackupException(BackupError.INVALID_FORMAT)
     val isUserAdded = obj.optBoolean("isUserAdded", false)
     val serverId = obj.stringOrNull("serverId")?.takeIf { it.isNotBlank() && !isUserAdded }
+    val writtenOrigin = obj.stringOrNull("origin")
     return BackupQuote(
         text = text,
         author = obj.stringOrNull("author").orEmpty(),
@@ -382,9 +389,10 @@ private fun parseQuote(obj: JSONObject): BackupQuote {
         isUserAdded = isUserAdded,
         origin = when {
             isUserAdded -> QuoteOrigin.PERSONAL
-            serverId != null || obj.stringOrNull("origin") == QuoteOrigin.COMMUNITY -> QuoteOrigin.COMMUNITY
-            // Format 2 has no origins; its favorites are matched like bundled ones.
-            else -> QuoteOrigin.BUNDLED
+            serverId != null || writtenOrigin == QuoteOrigin.COMMUNITY -> QuoteOrigin.COMMUNITY
+            writtenOrigin == QuoteOrigin.BUNDLED -> QuoteOrigin.BUNDLED
+            // Format 2 has no origins, also not for its community favorites.
+            else -> null
         },
         serverId = serverId,
         timestamp = obj.optLong("timestamp", 0L).takeIf { it > 0L },
@@ -499,8 +507,8 @@ private fun BackupQuote.toKeptFavorite(now: Long): QuoteEntity = QuoteEntity(
 
 /**
  * Finds the stored quote a backed-up favorite belongs to, the way the re-seed (mergeReseed) matches: by
- * community id, by (text, author), then for bundled quotes by the text alone when only one bundled quote
- * has it, for author names the seed corrected since the backup was made.
+ * community id, by (text, author), then for bundled favorites and those without an origin by the text alone
+ * when only one bundled quote has it, for author names the seed corrected since the backup was made.
  */
 private class FavoriteIndex(rows: List<QuoteEntity>) {
     private val byServerId = HashMap<String, QuoteEntity>()
@@ -522,8 +530,10 @@ private class FavoriteIndex(rows: List<QuoteEntity>) {
 
     fun find(quote: BackupQuote): QuoteEntity? {
         quote.serverId?.let(byServerId::get)?.let { return it }
-        byKey[quote.key]?.let { rows -> return rows.firstOrNull { it.origin == quote.origin } ?: rows.first() }
-        if (quote.origin != QuoteOrigin.BUNDLED) return null
+        // A favorite without an origin (format 2) is looked for like a bundled one, as it always was.
+        val origin = quote.origin ?: QuoteOrigin.BUNDLED
+        byKey[quote.key]?.let { rows -> return rows.firstOrNull { it.origin == origin } ?: rows.first() }
+        if (origin != QuoteOrigin.BUNDLED) return null
         return bundledByText[quote.key.first]?.singleOrNull()
     }
 

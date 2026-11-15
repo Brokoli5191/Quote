@@ -209,12 +209,13 @@ class BackupManagerTest {
     }
 
     @Test
-    fun legacyBackup_matchesCorrectedAuthorsAndKeepsFavoritesThatLeftTheSeed() = runBlocking {
+    fun legacyBackup_matchesStoredQuotesAndSkipsFavoritesItCannotPlace() = runBlocking {
         val device = Device()
         device.insert(
             bundled("Genius is one percent inspiration and ninety-nine percent perspiration.", "Thomas Edison"),
             bundled("We suffer more often in imagination than in reality.", "Seneca"),
             bundled("To live is the rarest thing in the world.", "Oscar Wilde"),
+            community("c-1", "Shared wisdom from a reader."),
             own("Coffee first.")
         )
         // As 1.7.0 wrote it: format 2, without origins, community ids or submission fields.
@@ -232,10 +233,13 @@ class BackupManagerTest {
                 {"text": "We suffer more often in imagination than in reality.", "author": "Seneca",
                  "category": "Wisdom", "isFavorite": true, "isUserAdded": false, "timestamp": 2, "aboutAuthor": "",
                  "tags": "wisdom", "savedDate": "1720000000001", "language": "en", "textDe": "", "isAnonymous": false},
-                {"text": "A quote that left the seed.", "author": "Old Author", "category": "Wisdom",
+                {"text": "Shared wisdom from a reader.", "author": "Reader", "category": "Life",
+                 "isFavorite": true, "isUserAdded": false, "timestamp": 6, "aboutAuthor": "", "tags": "",
+                 "savedDate": "1725000000000", "language": "en", "textDe": "", "isAnonymous": false},
+                {"text": "A quote this device does not have.", "author": "Someone", "category": "Wisdom",
                  "isFavorite": true, "isUserAdded": false, "timestamp": 3, "aboutAuthor": "",
-                 "tags": "wisdom, goodreads-noise", "savedDate": "1710000000000", "language": "en",
-                 "textDe": "Ein Quote, das ging.", "isAnonymous": false},
+                 "tags": "wisdom", "savedDate": "1710000000000", "language": "en", "textDe": "",
+                 "isAnonymous": false},
                 {"text": "Coffee first.", "author": "Me", "category": "Life", "isFavorite": true, "isUserAdded": true,
                  "timestamp": 4, "aboutAuthor": "", "tags": "", "savedDate": "1730000000000", "language": "en",
                  "textDe": "", "isAnonymous": false},
@@ -246,7 +250,7 @@ class BackupManagerTest {
             }
         """.trimIndent()
 
-        assertEquals(BackupOutcome.Imported(1, 4, 0, true, "en"), import(device, backup))
+        assertEquals(BackupOutcome.Imported(1, 4, 1, true, "en"), import(device, backup))
 
         val rows = device.quotes()
         val edison = rows.single { it.text.startsWith("Genius") }
@@ -255,13 +259,13 @@ class BackupManagerTest {
         assertEquals("1720000000000", edison.savedDate)
         assertTrue(rows.single { it.author == "Seneca" }.isFavorite)
         assertFalse(rows.single { it.author == "Oscar Wilde" }.isFavorite)
-        val kept = rows.single { it.text == "A quote that left the seed." }
-        assertEquals(QuoteOrigin.BUNDLED, kept.origin)
-        assertFalse(kept.isUserAdded)
-        assertTrue(kept.isFavorite)
-        assertEquals("1710000000000", kept.savedDate)
-        assertEquals("wisdom", kept.tags)
-        assertEquals("Ein Quote, das ging.", kept.textDe)
+        // Format 2 has no origins, yet a community favorite still finds its stored quote.
+        val shared = rows.single { it.serverId == "c-1" }
+        assertTrue(shared.isFavorite)
+        assertEquals("1725000000000", shared.savedDate)
+        // Without an origin, a favorite no stored quote matches may be a community quote that is not synced
+        // yet or no longer published: it is skipped, not turned into a curated quote the feed later doubles.
+        assertTrue(rows.none { it.text == "A quote this device does not have." })
         val coffee = rows.single { it.text == "Coffee first." }
         assertTrue(coffee.isFavorite)
         assertEquals("1730000000000", coffee.savedDate)
@@ -282,19 +286,40 @@ class BackupManagerTest {
         assertFalse(prefs.contains("auto_update_enabled"))
         // Nothing in this backup was submitted, so no full status recheck is requested.
         assertFalse(prefs.contains("submission_status_recheck_request"))
+    }
 
-        // The next re-seed keeps the restored favorites, the one whose quote left the seed included.
-        val reseeded = mergeReseed(
-            device.db.quoteDao().getBundledQuotes(),
-            listOf(
-                bundled("Genius is one percent inspiration and ninety-nine percent perspiration.", "Thomas Edison"),
-                bundled("We suffer more often in imagination than in reality.", "Seneca")
-            )
-        )
-        assertEquals(
-            setOf("Thomas Edison", "Seneca", "Old Author"),
-            reseeded.filter { it.isFavorite }.map { it.author }.toSet()
-        )
+    @Test
+    fun currentBackup_keepsBundledFavoritesThatLeftTheSeed() = runBlocking {
+        val device = Device()
+        device.insert(bundled("Know thyself.", "Socrates"))
+        val backup = """
+            {"formatVersion": 3, "quotes": [
+              {"text": "A quote that left the seed.", "author": "Old Author", "category": "Wisdom",
+               "isFavorite": true, "isUserAdded": false, "timestamp": 3, "aboutAuthor": "",
+               "tags": "wisdom, goodreads-noise", "savedDate": "1710000000000", "language": "en",
+               "textDe": "Ein Quote, das ging.", "textEn": "", "isAnonymous": false, "origin": "bundled"},
+              {"text": "A reader's quote without an id.", "author": "Reader", "category": "Life",
+               "isFavorite": true, "isUserAdded": false, "savedDate": "1710000000001", "origin": "community"}
+            ]}
+        """.trimIndent()
+
+        assertEquals(BackupOutcome.Imported(0, 1, 1, false, "en"), import(device, backup))
+
+        val rows = device.quotes()
+        val kept = rows.single { it.text == "A quote that left the seed." }
+        assertEquals(QuoteOrigin.BUNDLED, kept.origin)
+        assertFalse(kept.isUserAdded)
+        assertTrue(kept.isFavorite)
+        assertEquals("1710000000000", kept.savedDate)
+        assertEquals("wisdom", kept.tags)
+        assertEquals("Ein Quote, das ging.", kept.textDe)
+        // A community favorite without a community id cannot be found again.
+        assertTrue(rows.none { it.author == "Reader" })
+        assertEquals(2, rows.size)
+
+        // The next re-seed keeps the restored favorite although its quote left the seed.
+        val reseeded = mergeReseed(device.db.quoteDao().getBundledQuotes(), listOf(bundled("Know thyself.", "Socrates")))
+        assertEquals(setOf("Old Author"), reseeded.filter { it.isFavorite }.map { it.author }.toSet())
     }
 
     @Test
