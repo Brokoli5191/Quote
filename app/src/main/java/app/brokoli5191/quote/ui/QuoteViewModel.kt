@@ -182,7 +182,7 @@ class QuoteViewModel(
     application: Application,
     private val repository: QuoteRepository,
     // Navigation state that survives process death (tab, sub-tab, searches, filters, New Quote).
-    private val savedState: SavedStateHandle = SavedStateHandle(),
+    savedState: SavedStateHandle = SavedStateHandle(),
     private val submissionClient: QuoteSubmissionClient = QuoteSubmissionClient(),
     private val communitySyncManager: CommunitySyncManager =
         CommunitySyncManager(application, repository, submissionClient = submissionClient)
@@ -229,7 +229,7 @@ class QuoteViewModel(
     private val _dailyQuote = MutableStateFlow<QuoteEntity?>(null)
     val dailyQuote: StateFlow<QuoteEntity?> = _dailyQuote.asStateFlow()
 
-    // The day the shown daily quote belongs to.
+    // The day of the latest daily-quote request; a new day loads a new quote.
     private val _dailyDate = MutableStateFlow("")
 
     private val _canUndoCycle = MutableStateFlow(false)
@@ -900,7 +900,12 @@ class QuoteViewModel(
         updateDailyQuote(today, userAction = true) {
             // Read when it runs: an earlier "Another quote" may just have replaced the shown quote.
             val replaced = _dailyQuote.value?.id?.takeIf { shownQuoteDate == today }
-            val next = repository.cycleDailyQuote(today, _quoteSourceMode.value, _appLanguage.value, _showAnonymousQuotes.value)
+            val next = repository.cycleDailyQuote(
+                today,
+                _quoteSourceMode.value,
+                _appLanguage.value,
+                _showAnonymousQuotes.value
+            )
             if (replaced != null && next != null && next.id != replaced) rememberCycledAway(today, replaced)
             next
         }
@@ -991,7 +996,10 @@ class QuoteViewModel(
      * [consumePendingDraft].
      */
     fun setPendingDraft(text: String, author: String) {
-        _pendingDraft.value = QuoteDraft(text.trim().cappedAt(MAX_DRAFT_TEXT_LENGTH), author.trim().cappedAt(MAX_DRAFT_AUTHOR_LENGTH))
+        _pendingDraft.value = QuoteDraft(
+            text.trim().cappedAt(MAX_DRAFT_TEXT_LENGTH),
+            author.trim().cappedAt(MAX_DRAFT_AUTHOR_LENGTH)
+        )
         openDestination(AppLinks.DEST_NEW_QUOTE)
     }
 
@@ -1494,7 +1502,8 @@ class QuoteViewModel(
                 applyRestoredState()
                 onSuccess(outcome.insertedCustom, outcome.updatedFavorites, outcome.settingsRestored)
             } else {
-                onError(backupErrorMessage((outcome as? BackupOutcome.Failed)?.error ?: BackupError.WRITE_FAILED, exporting = false))
+                val error = (outcome as? BackupOutcome.Failed)?.error ?: BackupError.WRITE_FAILED
+                onError(backupErrorMessage(error, exporting = false))
             }
         }
     }
@@ -1638,7 +1647,8 @@ class QuoteViewModel(
         const val SUB_TAB_MY_QUOTES = "My Quotes"
 
         val SOURCE_MODES = setOf(QuoteSourceMode.ALL, QuoteSourceMode.CURATED, QuoteSourceMode.COMMUNITY)
-        val SELECTABLE_CATEGORIES: Set<String> = CategoryMapper.categories.toSet() + setOf("Community", "Local", "Reflections")
+        val SELECTABLE_CATEGORIES: Set<String> =
+            CategoryMapper.categories.toSet() + setOf("Community", "Local", "Reflections")
 
         // Update-check messages, in English; the Settings screen localizes them.
         const val UPDATE_ERROR_OFFLINE = "No internet connection. Check your connection and try again."

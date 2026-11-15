@@ -1,5 +1,6 @@
 package app.brokoli5191.quote
 
+import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.semantics.Role
@@ -23,7 +24,6 @@ import app.brokoli5191.quote.screenshots.ScreenshotEnvironmentRule
 import app.brokoli5191.quote.screenshots.ShotConfig
 import app.brokoli5191.quote.screenshots.awaitCondition
 import app.brokoli5191.quote.screenshots.settle
-import app.brokoli5191.quote.screenshots.tryAwait
 import app.brokoli5191.quote.ui.localizeUi
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -33,6 +33,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -185,9 +186,12 @@ class MainNavigationTest {
                 )
             }
         }
-        // Same fallback as the screenshot tests: the init load is occasionally never resumed here.
-        if (!compose.tryAwait(3_000) { app.viewModel.dailyQuote.value != null }) app.publishDailyQuote()
-        compose.awaitCondition { app.viewModel.dailyQuote.value != null }
+        // Waits for the ViewModel's own load by running the main looper. Loading the quote with a
+        // blocking call on the main thread instead can deadlock while that load holds the lock.
+        compose.awaitCondition {
+            shadowOf(Looper.getMainLooper()).idle()
+            app.viewModel.dailyQuote.value != null
+        }
         return app
     }
 }

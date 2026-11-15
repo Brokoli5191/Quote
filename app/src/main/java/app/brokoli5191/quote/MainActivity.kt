@@ -181,14 +181,8 @@ class MainActivity : ComponentActivity() {
         pendingAppLink?.let(outState::putAppLinkRequest)
     }
 
+    // openDestination keeps a New Quote form that holds a draft open, so no entry point drops it.
     private fun openAppLink(link: AppLinkRequest) {
-        // An unsaved New Quote draft stays open on top of the requested screen rather than being
-        // dropped; an empty form is closed so the requested screen shows.
-        if (link.destination != AppLinks.DEST_NEW_QUOTE &&
-            viewModel.showNewQuoteScreen.value && !viewModel.newQuoteHasDraft.value
-        ) {
-            viewModel.closeNewQuoteScreen()
-        }
         link.draft?.let { viewModel.setPendingDraft(it.text, it.author) }
         viewModel.openDestination(link.destination)
     }
