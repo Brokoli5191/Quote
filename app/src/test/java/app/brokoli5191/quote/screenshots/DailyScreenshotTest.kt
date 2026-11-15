@@ -1,6 +1,8 @@
 package app.brokoli5191.quote.screenshots
 
+import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import app.brokoli5191.quote.data.QuoteLanguage
 import org.junit.Test
@@ -45,6 +47,12 @@ class DailyScreenshotTest(configId: String) : ScreenshotTestBase(configId) {
         compose.onNodeWithContentDescription(text(toggle)).performClick()
         compose.settle()
         capture("daily", "translation_toggled")
+    }
+
+    @Test
+    fun offersAnotherQuote() {
+        showDaily(FakeQuotes.MARCUS, "Marcus Aurelius")
+        compose.onNodeWithText(text("Another quote")).assertExists()
     }
 
     companion object {

@@ -1,6 +1,9 @@
 package app.brokoli5191.quote.screenshots
 
+import androidx.compose.ui.test.assertDoesNotExist
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import app.brokoli5191.quote.data.QuoteLanguage
 import org.junit.Test
@@ -23,6 +26,17 @@ class LibraryScreenshotTest(configId: String) : ScreenshotTestBase(configId) {
         compose.setContent { TabFrame(app.viewModel, "Library") }
         compose.awaitCondition { app.viewModel.filteredQuotes.value.isNotEmpty() }
         capture("library", "search_results")
+    }
+
+    @Test
+    fun searchWithoutMatchesOffersToResetTheFilters() {
+        val app = launch()
+        app.viewModel.setSearchQuery("zzzzqqxx")
+        compose.setContent { TabFrame(app.viewModel, "Library") }
+        compose.settle()
+        compose.onNodeWithText(text("No Wisdom Matches")).assertIsDisplayed()
+        compose.onNodeWithText(text("Reset All Filters")).assertIsDisplayed()
+        compose.onNodeWithText(text("No Community Quotes Yet")).assertDoesNotExist()
     }
 
     @Test

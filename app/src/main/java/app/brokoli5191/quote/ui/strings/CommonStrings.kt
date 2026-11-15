@@ -18,10 +18,8 @@ internal val commonGermanUi: Map<String, String> = mapOf(
     "Show in English" to "Auf Englisch anzeigen",
     "Show in German" to "Auf Deutsch anzeigen",
 
-    // Author avatar
-    "Unknown author" to "Unbekannter Autor",
-
     // Author sheet
+    "Read on Wikipedia" to "Auf Wikipedia lesen",
     "More quotes by %1\$s (%2\$d)" to "Mehr Quotes von %1\$s (%2\$d)",
 
     // Sharing (utils/QuoteSharing)

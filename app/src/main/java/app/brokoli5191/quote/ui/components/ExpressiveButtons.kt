@@ -38,6 +38,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
@@ -144,6 +147,8 @@ fun ExpressiveIconButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     containerColor: Color = Color.Transparent,
+    // Read out after the label, e.g. "Saved" on a favorite toggle.
+    stateDescription: String? = null,
     content: @Composable () -> Unit
 ) {
     val source = remember { MutableInteractionSource() }
@@ -163,7 +168,12 @@ fun ExpressiveIconButton(
                 interactionSource = source,
                 indication = null,
                 enabled = enabled,
+                role = Role.Button,
                 onClick = onClick
+            )
+            .then(
+                if (stateDescription != null) Modifier.semantics { this.stateDescription = stateDescription }
+                else Modifier
             ),
         contentAlignment = Alignment.Center
     ) {
