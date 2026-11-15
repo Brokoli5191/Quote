@@ -1,9 +1,5 @@
 package app.brokoli5191.quote.ui.screens
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
-import android.content.Intent
 import androidx.compose.animation.*
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -27,9 +23,11 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -53,7 +51,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import app.brokoli5191.quote.data.AuthorInfo
 import app.brokoli5191.quote.data.QuoteEntity
 import app.brokoli5191.quote.data.alternateLanguage
 import app.brokoli5191.quote.data.alternateText
@@ -62,17 +59,18 @@ import app.brokoli5191.quote.data.QuoteSourceMode
 import app.brokoli5191.quote.data.QuoteLanguage
 import app.brokoli5191.quote.ui.QuoteViewModel
 import app.brokoli5191.quote.ui.LocalAppLanguage
-import app.brokoli5191.quote.ui.formattedQuote
 import app.brokoli5191.quote.ui.uiText
 import app.brokoli5191.quote.ui.components.ExpressiveButton
 import app.brokoli5191.quote.ui.components.ExpressiveTonalButton
 import app.brokoli5191.quote.ui.components.AuthorAvatar
+import app.brokoli5191.quote.ui.components.AuthorSheet
 import app.brokoli5191.quote.ui.components.AnimatedTranslation
 import app.brokoli5191.quote.ui.components.TranslationToggle
 import app.brokoli5191.quote.ui.components.FloatingChromeBackdrop
 import app.brokoli5191.quote.ui.components.SingleLineFitRow
 import app.brokoli5191.quote.ui.components.bottomBarContentPadding
 import app.brokoli5191.quote.data.tagLabel
+import app.brokoli5191.quote.utils.QuoteSharing
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import app.brokoli5191.quote.ui.theme.SerifFontFamily
@@ -156,8 +154,6 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                         )
                         val unknownAuthor = quote.hasUnknownAuthor
                         val authorName = if (unknownAuthor) uiText("Unknown") else quote.author
-                        // Copy/share keep a blank author blank, like before.
-                        val shareAuthor = if (quote.author.isBlank()) "" else authorName
                         val authorInfoFlow = remember(quote.author, unknownAuthor) {
                             if (unknownAuthor) null else viewModel.authorInfo(quote.author)
                         }
@@ -172,6 +168,15 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                         var showTranslation by remember(quote.id, quote.text) { mutableStateOf(false) }
                         val displayedText =
                             if (showTranslation && alternateText != null) alternateText else quote.text
+                        // Picks the quotation marks of copied and shared text.
+                        val displayedLanguage = when {
+                            alternateLanguage == null -> quote.language
+                            showTranslation -> alternateLanguage
+                            alternateLanguage == QuoteLanguage.GERMAN -> QuoteLanguage.ENGLISH
+                            else -> QuoteLanguage.GERMAN
+                        }
+                        var shareMenuOpen by remember(quote.id) { mutableStateOf(false) }
+                        var imageShareRunning by remember { mutableStateOf(false) }
                         // Shown in both languages (also for anonymous quotes); the row keeps as many as fit.
                         val tags = remember(quote.tags, uiLanguage) {
                             quote.tags.split(",")
@@ -284,19 +289,51 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                                     if (copyConfirmed) Icons.Default.Check else Icons.Default.ContentCopy,
                                     uiText(if (copyConfirmed) "Copied" else "Copy")
                                 ) {
-                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                    clipboard.setPrimaryClip(ClipData.newPlainText("quote", formattedQuote(displayedText, shareAuthor)))
+                                    QuoteSharing.copyText(context, displayedText, authorName, displayedLanguage)
                                     copyConfirmed = true
                                     feedbackScope.launch {
                                         delay(1200)
                                         copyConfirmed = false
                                     }
                                 }
-                                DailyActionButton(Icons.Default.Share, uiText("Share")) {
-                                    context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
-                                        type = "text/plain"
-                                        putExtra(Intent.EXTRA_TEXT, formattedQuote(displayedText, shareAuthor))
-                                    }, null))
+                                DailyActionButton(
+                                    Icons.Default.Share,
+                                    uiText("Share"),
+                                    menu = {
+                                        DropdownMenu(
+                                            expanded = shareMenuOpen,
+                                            onDismissRequest = { shareMenuOpen = false },
+                                            shape = RoundedCornerShape(18.dp),
+                                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                                        ) {
+                                            DropdownMenuItem(
+                                                text = { Text(uiText("Share as text")) },
+                                                leadingIcon = { Icon(Icons.Default.TextFields, contentDescription = null) },
+                                                onClick = {
+                                                    shareMenuOpen = false
+                                                    QuoteSharing.shareText(context, displayedText, authorName, uiLanguage, displayedLanguage)
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text(uiText("Share as image")) },
+                                                leadingIcon = { Icon(Icons.Default.Image, contentDescription = null) },
+                                                enabled = !imageShareRunning,
+                                                onClick = {
+                                                    shareMenuOpen = false
+                                                    imageShareRunning = true
+                                                    feedbackScope.launch {
+                                                        try {
+                                                            QuoteSharing.shareImage(context, displayedText, authorName, uiLanguage, displayedLanguage)
+                                                        } finally {
+                                                            imageShareRunning = false
+                                                        }
+                                                    }
+                                                }
+                                            )
+                                        }
+                                    }
+                                ) {
+                                    shareMenuOpen = true
                                 }
                             }
                             if (!unknownAuthor) {
@@ -315,12 +352,15 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                               }
                             }
                             if (showAuthorSheet && !unknownAuthor) {
+                                val authorQuoteCount = remember(quote.author) { viewModel.authorQuoteCount(quote.author) }
                                 AuthorSheet(
                                     name = authorName,
                                     info = authorInfo,
                                     imageUrl = authorImageUrl,
                                     language = uiLanguage,
-                                    onDismiss = { showAuthorSheet = false }
+                                    onDismiss = { showAuthorSheet = false },
+                                    quoteCount = authorQuoteCount,
+                                    onShowMoreQuotes = { viewModel.openLibrarySearch(quote.author) }
                                 )
                             }
                         }
@@ -399,50 +439,55 @@ private fun RowScope.DailyActionButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
     iconScale: Float = 1f,
+    // Drawn next to the button so a DropdownMenu opens anchored to it.
+    menu: @Composable () -> Unit = {},
     onClick: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
-    ExpressiveTonalButton(
-        onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-            onClick()
-        },
-        modifier = Modifier.weight(1f).heightIn(min = 64.dp),
-        restingCorner = 18.dp,
-        colors = ButtonDefaults.filledTonalButtonColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-        ),
-        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp)
-    ) {
-        // Icon on top gives the label the full button width; German labels ("Gespeichert")
-        // shrink slightly instead of being cut off on narrow screens or with large fonts.
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+    Box(Modifier.weight(1f)) {
+        ExpressiveTonalButton(
+            onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onClick()
+            },
+            modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp),
+            restingCorner = 18.dp,
+            colors = ButtonDefaults.filledTonalButtonColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            ),
+            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp)
         ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp).graphicsLayer {
-                    scaleX = iconScale
-                    scaleY = iconScale
-                }
-            )
-            val labelStyle = MaterialTheme.typography.labelLarge
-            val labelSize = labelStyle.fontSize.takeIf { it.isSp } ?: 14.sp
-            Text(
-                label,
-                style = labelStyle,
-                maxLines = 1,
-                textAlign = TextAlign.Center,
-                autoSize = TextAutoSize.StepBased(
-                    minFontSize = minOf(10f, labelSize.value).sp,
-                    maxFontSize = labelSize,
-                    stepSize = 0.5.sp
+            // Icon on top gives the label the full button width; German labels ("Gespeichert")
+            // shrink slightly instead of being cut off on narrow screens or with large fonts.
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp).graphicsLayer {
+                        scaleX = iconScale
+                        scaleY = iconScale
+                    }
                 )
-            )
+                val labelStyle = MaterialTheme.typography.labelLarge
+                val labelSize = labelStyle.fontSize.takeIf { it.isSp } ?: 14.sp
+                Text(
+                    label,
+                    style = labelStyle,
+                    maxLines = 1,
+                    textAlign = TextAlign.Center,
+                    autoSize = TextAutoSize.StepBased(
+                        minFontSize = minOf(10f, labelSize.value).sp,
+                        maxFontSize = labelSize,
+                        stepSize = 0.5.sp
+                    )
+                )
+            }
         }
+        menu()
     }
 }
 
@@ -456,79 +501,4 @@ private fun DailyQuoteText(text: String) {
         color = MaterialTheme.colorScheme.onSurface,
         modifier = Modifier.padding(horizontal = 12.dp, vertical = 30.dp)
     )
-}
-
-private fun wikipediaSearchUrl(author: String, language: String): String {
-    val wikipediaLanguage = if (language == QuoteLanguage.GERMAN) "de" else "en"
-    return "https://$wikipediaLanguage.wikipedia.org/w/index.php?search=" +
-        java.net.URLEncoder.encode(author, "UTF-8")
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun AuthorSheet(
-    name: String,
-    info: AuthorInfo?,
-    imageUrl: String?,
-    language: String,
-    onDismiss: () -> Unit
-) {
-    val context = LocalContext.current
-    val haptic = LocalHapticFeedback.current
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val scope = rememberCoroutineScope()
-    val description = info?.description?.takeIf { it.isNotBlank() }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        tonalElevation = 0.dp
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            AuthorAvatar(name = name, imageUrl = imageUrl, unknown = false, size = 112.dp)
-            Spacer(Modifier.height(16.dp))
-            Text(
-                name,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                textAlign = TextAlign.Center
-            )
-            if (description != null) {
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    description,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
-                )
-            }
-            Spacer(Modifier.height(24.dp))
-            ExpressiveButton(
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    val url = info?.wikiUrl ?: wikipediaSearchUrl(name, language)
-                    runCatching {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
-                    }
-                    scope.launch { sheetState.hide() }.invokeOnCompletion {
-                        if (!sheetState.isVisible) onDismiss()
-                    }
-                },
-                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-                restingCorner = 18.dp
-            ) {
-                Icon(Icons.Default.Language, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(uiText("Read on Wikipedia"), maxLines = 2, textAlign = TextAlign.Center)
-            }
-        }
-    }
 }
