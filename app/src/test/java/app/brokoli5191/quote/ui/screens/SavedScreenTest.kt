@@ -3,6 +3,7 @@ package app.brokoli5191.quote.ui.screens
 import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.activity.ComponentDialog
+import androidx.compose.runtime.remember
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsNodeInteractionCollection
 import androidx.compose.ui.test.assertIsDisplayed
@@ -28,9 +29,12 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStore
 import app.brokoli5191.quote.data.CommunitySyncManager
+import app.brokoli5191.quote.data.QuoteDao
 import app.brokoli5191.quote.data.QuoteEntity
 import app.brokoli5191.quote.data.QuoteLanguage
+import app.brokoli5191.quote.data.QuoteRepository
 import app.brokoli5191.quote.data.QuoteSubmissionStatus
 import app.brokoli5191.quote.screenshots.FakeQuotes
 import app.brokoli5191.quote.screenshots.SCREENSHOT_DEVICE
@@ -40,9 +44,13 @@ import app.brokoli5191.quote.screenshots.ShotConfig
 import app.brokoli5191.quote.screenshots.TabFrame
 import app.brokoli5191.quote.screenshots.awaitCondition
 import app.brokoli5191.quote.screenshots.settle
+import app.brokoli5191.quote.ui.QuoteViewModel
+import app.brokoli5191.quote.ui.QuoteViewModelFactory
 import app.brokoli5191.quote.ui.SavedStatusFilter
 import app.brokoli5191.quote.ui.components.QuoteEventsHost
 import app.brokoli5191.quote.ui.components.QuoteSnackbarController
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -72,9 +80,11 @@ class SavedScreenTest {
     val compose = createAndroidComposeRule<ComponentActivity>()
 
     private var app: ScreenshotApp? = null
+    private val restartedStores = ArrayList<ViewModelStore>()
 
     @After
     fun closeApp() {
+        restartedStores.forEach { it.clear() }
         app?.close()
     }
 
@@ -128,6 +138,20 @@ class SavedScreenTest {
         app!!.viewModel.userAdded.value.firstOrNull { it.text.startsWith(text) }
 
     private fun storedRow(id: Int): QuoteEntity? = runBlocking { app!!.database.quoteDao().getQuoteById(id) }
+
+    // The ViewModel after a process restart: new, on the same database, with the sub-tab its saved
+    // state brings back. Its quote lists stay empty until [listsLoad] completes, as they stay empty
+    // until the database first answers.
+    private fun restartedViewModel(app: ScreenshotApp, subTab: String, listsLoad: CompletableDeferred<Unit>): QuoteViewModel {
+        val dao = app.database.quoteDao()
+        val slowDao = object : QuoteDao by dao {
+            override fun getAllQuotes() = dao.getAllQuotes().onStart { listsLoad.await() }
+            override fun getUserAddedQuotes() = dao.getUserAddedQuotes().onStart { listsLoad.await() }
+        }
+        val store = ViewModelStore().also { restartedStores += it }
+        val factory = QuoteViewModelFactory(app.context, QuoteRepository(slowDao, 42L))
+        return ViewModelProvider(store, factory)[QuoteViewModel::class.java].also { it.selectSavedSubTab(subTab) }
+    }
 
     @Test
     fun anOwnFavoriteHasTheHeartAndNoReviewControls() {
@@ -219,6 +243,45 @@ class SavedScreenTest {
         compose.onNodeWithText("Discard").performClick()
         awaitMain { compose.onAllNodesWithText("Edit quote").count() == 0 }
         assertEquals(writeItDown.text, storedQuote("Write it down")?.text)
+    }
+
+    @Test
+    fun theEditSheetComesBackWithItsTextAfterAProcessRestart() {
+        val app = ScreenshotApp(config = config, quotes = FakeQuotes.bundledQuotes + writeItDown).also { this.app = it }
+        app.viewModel.selectSavedSubTab("My Quotes")
+        val restoration = StateRestorationTester(compose)
+        // The restored content gets a new ViewModel, as after a process restart, whose lists load later.
+        var restarted = false
+        val listsLoad = CompletableDeferred<Unit>()
+        restoration.setContent {
+            val viewModel = if (restarted) remember { restartedViewModel(app, "My Quotes", listsLoad) } else app.viewModel
+            TabFrame(viewModel, "Saved") { QuoteEventsHost(viewModel) }
+        }
+        awaitMain { app.viewModel.userAdded.value.isNotEmpty() }
+        val id = storedQuote("Write it down")!!.id
+
+        compose.onNodeWithContentDescription("Edit").performClick()
+        compose.settle()
+        val edited = "Write it down, so tomorrow remembers."
+        compose.onNode(hasSetTextAction() and hasText(writeItDown.text)).performTextReplacement(edited)
+        compose.settle()
+
+        restarted = true
+        restoration.emulateSavedInstanceStateRestore()
+        compose.settle()
+        // Nothing to find the quote in yet: the sheet waits for the lists instead of being dropped.
+        assertEquals(0, compose.onAllNodesWithText("Edit quote").count())
+        listsLoad.complete(Unit)
+        awaitMain { compose.onAllNodes(hasSetTextAction() and hasText(edited)).count() == 1 }
+        compose.onNode(hasSetTextAction() and hasText(edited)).assertIsDisplayed()
+
+        // The sheet is back for that quote with the edit unsaved: Back asks first, and Save stores it.
+        pressBackOnTheSheet()
+        compose.onNodeWithText("Discard changes?").assertIsDisplayed()
+        compose.onNodeWithText("Keep editing").performClick()
+        compose.settle()
+        compose.onNodeWithText("Save").performScrollTo().performClick()
+        awaitMain { storedRow(id)?.text == edited && compose.onAllNodesWithText("Edit quote").count() == 0 }
     }
 
     @Test

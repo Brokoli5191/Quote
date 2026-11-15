@@ -15,6 +15,7 @@ import android.widget.Toast
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.reflect.KProperty
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -277,12 +278,16 @@ fun SavedScreen(viewModel: QuoteViewModel) {
     }
 
     // An own quote by id: as My Quotes lists it, or among all own quotes when the search or the status
-    // filter hides it (an edit can move it out of the filter while its dialog is open).
+    // filter hides it (an edit can move it out of the filter while its dialog is open). All quotes are
+    // only read for such a target, so Saved does not recompose for every change to the library, and
+    // they are read as state, so a target restored before they have loaded appears once they have.
+    val allQuotes by viewModel.allQuotes.collectAsStateWithLifecycle()
     val ownQuote: (Int) -> QuoteEntity? = { id ->
         userAdded.firstOrNull { it.id == id }
-            ?: viewModel.allQuotes.value.firstOrNull { it.id == id && it.isUserAdded }
+            ?: allQuotes.firstOrNull { it.id == id && it.isUserAdded }
     }
-    // Dialog and sheet targets are kept by id, so they survive a rotation.
+    // Dialog and sheet targets are kept by id and read as the quotes' current copies, so they survive
+    // a rotation and a process restart.
     var submitTargets by rememberQuoteTargets(ownQuote)
     var submitAgain by rememberSaveable { mutableStateOf(false) }
     // The language chosen in the edit sheet before "Save and submit"; null: the quote's own.
@@ -291,8 +296,6 @@ fun SavedScreen(viewModel: QuoteViewModel) {
     var withdrawTargets by rememberQuoteTargets(ownQuote)
     var editTargets by rememberQuoteTargets(ownQuote)
     var editResubmit by rememberSaveable { mutableStateOf(false) }
-    // The current copy of a quote a dialog was opened for, or the copy it was opened with.
-    fun live(quote: QuoteEntity): QuoteEntity = ownQuote(quote.id) ?: quote
 
     fun toast(english: String, long: Boolean = false) {
         Toast.makeText(context, localizeUi(english, uiLanguage), if (long) Toast.LENGTH_LONG else Toast.LENGTH_SHORT).show()
@@ -598,8 +601,7 @@ fun SavedScreen(viewModel: QuoteViewModel) {
             }
         }
 
-        submitTargets.firstOrNull()?.let { target ->
-            val quote = live(target)
+        submitTargets.firstOrNull()?.let { quote ->
             val resubmit = submitAgain
             SubmissionConsentDialog(
                 quote = quote,
@@ -626,9 +628,10 @@ fun SavedScreen(viewModel: QuoteViewModel) {
             )
         }
 
-        if (deleteTargets.isNotEmpty()) {
+        val deleting = deleteTargets
+        if (deleting.isNotEmpty()) {
             DeleteQuotesDialog(
-                quotes = deleteTargets.map(::live),
+                quotes = deleting,
                 onDismiss = { deleteTargets = emptyList() },
                 onConfirm = { quotes ->
                     deleteTargets = emptyList()
@@ -638,7 +641,7 @@ fun SavedScreen(viewModel: QuoteViewModel) {
             )
         }
 
-        withdrawTargets.firstOrNull()?.let { target ->
+        withdrawTargets.firstOrNull()?.let { quote ->
             AlertDialog(
                 onDismissRequest = { withdrawTargets = emptyList() },
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -656,7 +659,7 @@ fun SavedScreen(viewModel: QuoteViewModel) {
                     TextButton(onClick = {
                         withdrawTargets = emptyList()
                         viewModel.withdrawSubmission(
-                            quote = live(target),
+                            quote = quote,
                             onSuccess = { toast("Submission withdrawn") },
                             onError = { code ->
                                 Toast.makeText(context, submissionErrorText(code, uiLanguage), Toast.LENGTH_LONG).show()
@@ -669,8 +672,7 @@ fun SavedScreen(viewModel: QuoteViewModel) {
             )
         }
 
-        editTargets.firstOrNull()?.let { target ->
-            val quote = live(target)
+        editTargets.firstOrNull()?.let { quote ->
             val resubmit = editResubmit
             EditQuoteSheet(
                 quote = quote,
@@ -696,18 +698,50 @@ fun SavedScreen(viewModel: QuoteViewModel) {
 }
 
 /**
- * Targets of a dialog or sheet (empty = closed). Saved as ids, and looked up again with [lookup]
- * after a rotation or process restart.
+ * Targets of a dialog or sheet (empty = closed). Only their ids are kept and saved; every read looks
+ * them up with [lookup], so a dialog shows the quote's current copy. After a process restart the lists
+ * are still empty in the first composition: a restored target appears as soon as they have loaded.
  */
+private class QuoteTargets(ids: List<Int>, var lookup: (Int) -> QuoteEntity?) {
+    var ids by mutableStateOf(ids)
+        private set
+
+    // Ids that have resolved since the targets were set. Not saved: a restored id waits for the lists.
+    private val shown = HashSet<Int>()
+
+    operator fun getValue(thisRef: Any?, property: KProperty<*>): List<QuoteEntity> = ids.mapNotNull(lookup)
+
+    operator fun setValue(thisRef: Any?, property: KProperty<*>, value: List<QuoteEntity>) {
+        shown.clear()
+        ids = value.map { it.id }
+    }
+
+    // A target that resolved and no longer does was deleted meanwhile. Its id is dropped, so the dialog
+    // cannot come back with it later (Undo restores a deleted quote under the same id).
+    fun dropDeleted() {
+        if (ids.isEmpty()) return
+        val resolved = ids.filterTo(HashSet()) { lookup(it) != null }
+        shown += resolved
+        if (ids.any { it !in resolved && it in shown }) ids = ids.filter { it in resolved || it !in shown }
+    }
+}
+
+// [lookup] must read the lists as state, so a read in composition recomposes when they change. It is
+// handed over after each composition, not kept in a state: reading a state written in every
+// composition would schedule the next one.
 @Composable
-private fun rememberQuoteTargets(lookup: (Int) -> QuoteEntity?): MutableState<List<QuoteEntity>> {
-    val currentLookup by rememberUpdatedState(lookup)
-    return rememberSaveable(
-        saver = Saver(
-            save = { state -> ArrayList(state.value.map { it.id }) },
-            restore = { ids: ArrayList<Int> -> mutableStateOf(ids.mapNotNull { id -> currentLookup(id) }) }
+private fun rememberQuoteTargets(lookup: (Int) -> QuoteEntity?): QuoteTargets {
+    val targets = rememberSaveable(
+        saver = Saver<QuoteTargets, ArrayList<Int>>(
+            save = { ArrayList(it.ids) },
+            restore = { ids -> QuoteTargets(ids, lookup) }
         )
-    ) { mutableStateOf(emptyList()) }
+    ) { QuoteTargets(emptyList(), lookup) }
+    SideEffect {
+        targets.lookup = lookup
+        targets.dropDeleted()
+    }
+    return targets
 }
 
 // Kept across sub-tab switches and rotations, and through [memory] across visits to other tabs.
