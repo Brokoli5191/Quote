@@ -29,8 +29,8 @@ Quote brings daily inspiration, a searchable quote library, and personal collect
 
 - A daily quote that changes with the calendar day, "Another quote" with undo, and a history of earlier days
 - App and quotes in English and German, with a translation toggle on each card
-- Author sheets with portrait and short bio from Wikipedia (optional) and a jump to more quotes by that author
-- Search by quote text in either language, author, or tag, browse by topic, and tap a tag or author to search for it
+- Tap an author's name for their portrait and short bio from Wikipedia (optional), the full article, and more of their quotes
+- Search by quote text in either language, author, or tag, browse by topic, and tap a tag to search for it
 - Curated and community quote sources
 - Favorites and personal quotes with search, sorting, status filters, and multi-select (copy, share, remove, with undo)
 - Share quotes as text or as an image card
