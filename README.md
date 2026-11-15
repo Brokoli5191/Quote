@@ -59,7 +59,7 @@ Quote supports Android 7.0 and newer.
 
 Requirements:
 
-- JDK 17 or newer
+- JDK 21 or newer (Robolectric needs it for the API 36 unit tests)
 - Android SDK Platform 36.1 (API 36, minor level 1)
 
 Add your Android SDK path to `local.properties`, then build with the Gradle wrapper:
