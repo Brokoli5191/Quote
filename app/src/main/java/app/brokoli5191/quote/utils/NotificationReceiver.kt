@@ -40,7 +40,8 @@ class NotificationReceiver : BroadcastReceiver() {
                         context,
                         quote.text,
                         if (quote.hasUnknownAuthor) "" else quote.author,
-                        quoteId = quote.id
+                        quoteId = quote.id,
+                        saved = quote.isFavorite
                     )
                 } else {
                     showFallback(context, language)

@@ -119,7 +119,9 @@ object NotificationHelper {
             .setStyle(NotificationCompat.BigTextStyle().bigText(quoteText))
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setContentIntent(openAppIntent(context, AppLinks.DEST_DAILY, quoteId, 0))
-            .setOnlyAlertOnce(true)
+            // Only the re-post after "Save" stays silent; a new day's reminder that replaces one still
+            // showing must alert again.
+            .setOnlyAlertOnce(saved)
             .setAutoCancel(true)
 
         if (quoteId != NO_QUOTE_ID && !saved) {
