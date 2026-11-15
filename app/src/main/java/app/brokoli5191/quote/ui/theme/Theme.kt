@@ -32,15 +32,38 @@ private val OnPrimaryGreen = androidx.compose.ui.graphics.Color(0xFF06381F)
 private val PrimaryContainerGreen = androidx.compose.ui.graphics.Color(0xFFA0D2AD)
 private val OnPrimaryContainerGreen = androidx.compose.ui.graphics.Color(0xFF2E5B3F)
 
+// Dark secondaries: each accent's hue at Material 3's secondary chroma (HCT chroma 16, tones
+// 80/20/30/90), so tonal buttons and selected chips follow the accent without competing with it.
+// Every on-colour pair stays above 7:1. Violet's set lives in Color.kt.
+private val SecondaryBlue = androidx.compose.ui.graphics.Color(0xFFBDC7DC)
+private val OnSecondaryBlue = androidx.compose.ui.graphics.Color(0xFF273141)
+private val SecondaryContainerBlue = androidx.compose.ui.graphics.Color(0xFF3D4758)
+private val OnSecondaryContainerBlue = androidx.compose.ui.graphics.Color(0xFFD8E3F8)
+
+private val SecondaryRose = androidx.compose.ui.graphics.Color(0xFFE3BDC5)
+private val OnSecondaryRose = androidx.compose.ui.graphics.Color(0xFF422930)
+private val SecondaryContainerRose = androidx.compose.ui.graphics.Color(0xFF5B3F46)
+private val OnSecondaryContainerRose = androidx.compose.ui.graphics.Color(0xFFFFD9E1)
+
+private val SecondaryAmber = androidx.compose.ui.graphics.Color(0xFFD8C4A0)
+private val OnSecondaryAmber = androidx.compose.ui.graphics.Color(0xFF3B2F15)
+private val SecondaryContainerAmber = androidx.compose.ui.graphics.Color(0xFF53452A)
+private val OnSecondaryContainerAmber = androidx.compose.ui.graphics.Color(0xFFF5E0BB)
+
+private val SecondaryGreen = androidx.compose.ui.graphics.Color(0xFFB6CCB9)
+private val OnSecondaryGreen = androidx.compose.ui.graphics.Color(0xFF213527)
+private val SecondaryContainerGreen = androidx.compose.ui.graphics.Color(0xFF374B3D)
+private val OnSecondaryContainerGreen = androidx.compose.ui.graphics.Color(0xFFD1E8D5)
+
 private val DarkColorScheme = darkColorScheme(
     primary = PrimaryViolet,
     onPrimary = OnPrimaryViolet,
     primaryContainer = PrimaryContainerViolet,
     onPrimaryContainer = OnPrimaryContainerViolet,
-    secondary = SecondaryAmber,
-    onSecondary = OnSecondaryAmber,
-    secondaryContainer = SecondaryContainerAmber,
-    onSecondaryContainer = OnSecondaryContainerAmber,
+    secondary = SecondaryViolet,
+    onSecondary = OnSecondaryViolet,
+    secondaryContainer = SecondaryContainerViolet,
+    onSecondaryContainer = OnSecondaryContainerViolet,
     tertiary = TertiaryGreen,
     onTertiary = OnTertiaryGreen,
     tertiaryContainer = TertiaryContainerGreen,
@@ -110,6 +133,22 @@ private data class QuadrupleColors(
     val primaryContainer: androidx.compose.ui.graphics.Color,
     val onPrimaryContainer: androidx.compose.ui.graphics.Color
 )
+
+private data class SecondaryColors(
+    val secondary: androidx.compose.ui.graphics.Color,
+    val onSecondary: androidx.compose.ui.graphics.Color,
+    val secondaryContainer: androidx.compose.ui.graphics.Color,
+    val onSecondaryContainer: androidx.compose.ui.graphics.Color
+)
+
+// A fixed secondary would tint every tonal button and selected chip one colour whatever the accent.
+private fun darkSecondaries(accent: String): SecondaryColors = when (accent) {
+    "Amber" -> SecondaryColors(SecondaryAmber, OnSecondaryAmber, SecondaryContainerAmber, OnSecondaryContainerAmber)
+    "Green" -> SecondaryColors(SecondaryGreen, OnSecondaryGreen, SecondaryContainerGreen, OnSecondaryContainerGreen)
+    "Blue" -> SecondaryColors(SecondaryBlue, OnSecondaryBlue, SecondaryContainerBlue, OnSecondaryContainerBlue)
+    "Rose" -> SecondaryColors(SecondaryRose, OnSecondaryRose, SecondaryContainerRose, OnSecondaryContainerRose)
+    else -> SecondaryColors(SecondaryViolet, OnSecondaryViolet, SecondaryContainerViolet, OnSecondaryContainerViolet)
+}
 
 /**
  * Tonal surface roles. Sheets use [containerLow], dialogs [containerHigh]; the rest follows Material 3.
@@ -219,6 +258,7 @@ fun MyApplicationTheme(
                 "Rose" -> QuadrupleColors(PrimaryRose, OnPrimaryRose, PrimaryContainerRose, OnPrimaryContainerRose)
                 else -> QuadrupleColors(PrimaryViolet, OnPrimaryViolet, PrimaryContainerViolet, OnPrimaryContainerViolet) // Violet
             }
+            val secondaries = darkSecondaries(themeAccent)
             val surfaces = if (isAmoled) amoledSurfaces(colors.primary) else darkSurfaces(colors.primary)
 
             darkColorScheme(
@@ -226,10 +266,10 @@ fun MyApplicationTheme(
                 onPrimary = colors.onPrimary,
                 primaryContainer = colors.primaryContainer,
                 onPrimaryContainer = colors.onPrimaryContainer,
-                secondary = SecondaryAmber,
-                onSecondary = OnSecondaryAmber,
-                secondaryContainer = SecondaryContainerAmber,
-                onSecondaryContainer = OnSecondaryContainerAmber,
+                secondary = secondaries.secondary,
+                onSecondary = secondaries.onSecondary,
+                secondaryContainer = secondaries.secondaryContainer,
+                onSecondaryContainer = secondaries.onSecondaryContainer,
                 tertiary = TertiaryGreen,
                 onTertiary = OnTertiaryGreen,
                 background = surfaces.background,
