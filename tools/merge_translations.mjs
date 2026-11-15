@@ -1,11 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // Merges translation batches ([{quote, quote_de}]) into res/raw/quotes_de.json in seed order.
 // Usage: node tools/merge_translations.mjs <batch-dir> [seed.json] [quotes_de.json]
 const batchDir = process.argv[2];
-const seedPath = process.argv[3] || 'app/src/main/res/raw/quotes_seed.json';
-const outPath = process.argv[4] || 'app/src/main/res/raw/quotes_de.json';
+const rawDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../app/src/main/res/raw');
+const seedPath = process.argv[3] || path.join(rawDir, 'quotes_seed.json');
+const outPath = process.argv[4] || path.join(rawDir, 'quotes_de.json');
 
 if (!batchDir) {
   console.error('Usage: node tools/merge_translations.mjs <batch-dir> [seed.json] [quotes_de.json]');
