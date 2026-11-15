@@ -931,7 +931,7 @@ fun CategoryBrowseViewInPlace(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(quotes, key = { it.id }, contentType = { BrowseQuoteContentType }) { quote ->
-                    val animateEntry = remember(quote.id) {
+                    val animateEntry = remember(quote.id, filterKey) {
                         !lowPerformanceMode && animatedQuoteIds.add(quote.id)
                     }
                     QuoteBrowseItemCard(
