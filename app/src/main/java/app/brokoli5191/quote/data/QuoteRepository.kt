@@ -1,9 +1,11 @@
 package app.brokoli5191.quote.data
 
 import android.content.Context
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -149,7 +151,7 @@ class QuoteRepository(
             e.printStackTrace()
             return
         }
-        writeLock.withLock {
+        locked {
             quoteDao.replaceBundledQuotes(mergeReseed(quoteDao.getBundledQuotes(), fresh))
         }
     }
@@ -163,14 +165,14 @@ class QuoteRepository(
     }
 
     /** Returns false when the quote no longer exists, so the caller can reload what it shows. */
-    suspend fun toggleFavorite(id: Int, isFav: Boolean): Boolean = writeLock.withLock {
+    suspend fun toggleFavorite(id: Int, isFav: Boolean): Boolean = locked {
         val savedString = if (isFav) System.currentTimeMillis().toString() else null
         quoteDao.updateFavorite(id, isFav, savedString) > 0
     }
 
     /** Marks a quote as favorite with a given saved date (e.g. from a backup). */
     suspend fun setFavorite(id: Int, savedDate: String?) {
-        writeLock.withLock { quoteDao.updateFavorite(id, true, savedDate ?: System.currentTimeMillis().toString()) }
+        locked { quoteDao.updateFavorite(id, true, savedDate ?: System.currentTimeMillis().toString()) }
     }
 
     suspend fun insertQuote(quote: QuoteEntity): Long {
@@ -378,7 +380,7 @@ class QuoteRepository(
         sourceMode: String = QuoteSourceMode.ALL,
         language: String = QuoteLanguage.ENGLISH,
         showAnonymous: Boolean = false
-    ): QuoteEntity? = writeLock.withLock {
+    ): QuoteEntity? = locked {
         val filter = dailyFilter(sourceMode, language, showAnonymous)
         todaysPick(date, filter) ?: pickNew(date, filter)
     }
@@ -394,13 +396,13 @@ class QuoteRepository(
         sourceMode: String = QuoteSourceMode.ALL,
         language: String = QuoteLanguage.ENGLISH,
         showAnonymous: Boolean = false
-    ): QuoteEntity? = writeLock.withLock {
+    ): QuoteEntity? = locked {
         val filter = dailyFilter(sourceMode, language, showAnonymous)
         val current = todaysPick(date, filter)
         val candidates = candidateIds(filter)
         val others = candidates.filter { it != current?.id }
         val nextId = notRecentlyShown(candidates).filter { it != current?.id }.ifEmpty { others }.randomOrNull()
-        val next = nextId?.let { quoteDao.getQuoteById(it) } ?: return@withLock current?.localized(language)
+        val next = nextId?.let { quoteDao.getQuoteById(it) } ?: return@locked current?.localized(language)
         quoteDao.storeDailySelection(filter.key(date), next.id)
         next.localized(language)
     }
@@ -415,9 +417,9 @@ class QuoteRepository(
         language: String,
         showAnonymous: Boolean,
         quoteId: Int
-    ): QuoteEntity? = writeLock.withLock {
+    ): QuoteEntity? = locked {
         val filter = dailyFilter(sourceMode, language, showAnonymous)
-        val quote = quoteDao.getQuoteById(quoteId)?.takeIf(filter::accepts) ?: return@withLock null
+        val quote = quoteDao.getQuoteById(quoteId)?.takeIf(filter::accepts) ?: return@locked null
         quoteDao.storeDailySelection(filter.key(date), quote.id)
         quote.localized(language)
     }
@@ -526,6 +528,14 @@ class QuoteRepository(
         // Shared by every instance in the process (app, widget, reminder, workers), so the daily
         // pick, the re-seed and favorite changes never interleave.
         private val writeLock = Mutex()
+
+        /**
+         * Runs [block] under [writeLock] on a background dispatcher. The holder never needs the
+         * main thread, so a caller that blocks the main thread while waiting for the lock cannot
+         * deadlock with a main-thread coroutine (e.g. the ViewModel) that holds it.
+         */
+        private suspend fun <T> locked(block: suspend () -> T): T =
+            withContext(Dispatchers.IO) { writeLock.withLock { block() } }
     }
 }
 
