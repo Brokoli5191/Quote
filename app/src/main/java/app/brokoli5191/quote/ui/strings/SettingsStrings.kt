@@ -64,7 +64,6 @@ internal val settingsGermanUi: Map<String, String> = mapOf(
     "This backup was made by a newer version of Quote." to "Diese Sicherung stammt von einer neueren Version von Quote.",
     "The backup could not be saved." to "Die Sicherung konnte nicht gespeichert werden.",
     "The backup could not be restored." to "Die Sicherung konnte nicht wiederhergestellt werden.",
-    "Unknown error" to "Unbekannter Fehler",
 
     // Developer options
     "Show onboarding again" to "Onboarding erneut anzeigen"
