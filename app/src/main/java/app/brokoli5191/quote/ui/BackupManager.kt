@@ -219,7 +219,11 @@ class BackupManager internal constructor(
                     updatedFavorites++
                 }
                 val submission = quote.submission
-                if (submission != null && existing.submissionId == null) {
+                // A not submitted quote may keep the id of a submission this device could not find (see
+                // CommunitySyncManager.applyFetchedStatus); a submission the backup knows replaces it.
+                if (submission != null && (existing.submissionId == null ||
+                        existing.submissionStatus == QuoteSubmissionStatus.NOT_SUBMITTED)
+                ) {
                     // The local copy lost its submission (e.g. re-created by hand): take it from the backup.
                     dao.updateSubmission(existing.id, submission.status, submission.submissionId, submission.submittedAt)
                     dao.updateSubmissionState(existing.id, submission.status, submission.reviewNote, submission.linkedServerId)

@@ -420,6 +420,25 @@ class BackupManagerTest {
         assertEquals(setOf(A_ID.uppercase()), extraIds())
     }
 
+    @Test
+    fun restore_replacesASubmissionIdKeptAfterA404() = runBlocking {
+        // A pending quote that answered 404 for every known installation id is not submitted but keeps its id
+        // (CommunitySyncManager.applyFetchedStatus). A backup that knows its real submission wins.
+        val device = Device()
+        device.insert(own("Kept after a 404.", submissionId = "sub-1"))
+        val backup = """
+            {"formatVersion": 3, "quotes": [
+              {"text": "Kept after a 404.", "author": "Me", "isUserAdded": true, "origin": "personal",
+               "submissionStatus": "pending", "submissionId": "sub-2", "submittedAt": 20}
+            ]}
+        """.trimIndent()
+        assertEquals(BackupOutcome.Imported(0, 0, 0, false, "en"), import(device, backup))
+        val restored = device.quotes().single()
+        assertEquals("sub-2", restored.submissionId)
+        assertEquals(QuoteSubmissionStatus.PENDING, restored.submissionStatus)
+        assertTrue(prefs.getLong("submission_status_recheck_request", 0L) > 0L)
+    }
+
     private companion object {
         const val A_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
         const val B_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
