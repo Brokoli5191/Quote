@@ -432,6 +432,27 @@ class QuoteViewModelTest {
     }
 
     @Test
+    fun editingANotSubmittedQuoteDropsAKeptSubmissionIdOnlyWhenTheContentChanges() {
+        // A 404 from an unknown installation id leaves a quote not submitted with its id (see
+        // CommunitySyncManager.applyFetchedStatus), so the feed can still link it.
+        val id = insert(own("Be kind.", QuoteSubmissionStatus.NOT_SUBMITTED, "s-1"))[0]
+        val vm = newViewModel()
+        val displayed = vm.userAdded.await { it.isNotEmpty() }.single()
+
+        val saved = CompletableDeferred<Boolean>()
+        vm.updateUserQuote(displayed, displayed.text, displayed.author, displayed.category, "calm") { saved.complete(it) }
+        assertTrue(runBlocking { withTimeout(5_000) { saved.await() } })
+        val tagged = runBlocking { dao.getQuoteById(id) }!!
+        assertEquals("calm", tagged.tags)
+        assertEquals("s-1", tagged.submissionId)
+
+        assertTrue(update(vm, displayed, "Be kinder.", displayed.author))
+        val rewritten = runBlocking { dao.getQuoteById(id) }!!
+        assertEquals(QuoteSubmissionStatus.NOT_SUBMITTED, rewritten.submissionStatus)
+        assertNull(rewritten.submissionId)
+    }
+
+    @Test
     fun editingKeepsTheReviewUnlessTheSubmittedContentChanges() {
         val id = insert(own("Be kind.", QuoteSubmissionStatus.REJECTED, "s-1", author = "Anonymous"))[0]
         val vm = newViewModel()
@@ -615,6 +636,34 @@ class QuoteViewModelTest {
         awaitTrue { app.refreshes.size >= 2 }
         vm.dailyQuote.await { it?.id == earlier.id }
         assertEquals(listOf(later.id, earlier.id), app.refreshes.toList())
+    }
+
+    @Test
+    fun aNewDayNoticedWhileTheFirstLoadRunsReachesTheWidgetOnce() {
+        insert(*(1..5).map { bundled("Quote $it") }.toTypedArray())
+        TimeZone.setDefault(TimeZone.getTimeZone("Etc/GMT+12"))
+        val earlierDay = dailyDateKey()
+        val gated = GatedDao(dao).apply { holdKeysContaining = "${earlierDay}_" }
+        holdSyncs()
+        val app = WidgetRecordingApp()
+        val vm = newViewModel(app = app, repository = QuoteRepository(gated, 42L))
+        try {
+            // The first load holds the repository lock while it stores its pick.
+            runBlocking { withTimeout(5_000) { gated.held.await() } }
+            val readsBefore = gated.dayReads.get()
+            TimeZone.setDefault(TimeZone.getTimeZone("Etc/GMT-14"))
+            vm.loadDailyQuote()
+            // The new day's load gets the lock: the first load was cancelled.
+            awaitTrue { gated.dayReads.get() > readsBefore }
+        } finally {
+            gated.release.complete(Unit)
+        }
+        val later = vm.dailyQuote.await { it != null }!!
+        awaitTrue { app.refreshes.isNotEmpty() }
+        // The refresh the new day asks for is sent once, after the new day's pick is stored; the cancelled
+        // first load neither stores its pick nor sends one.
+        assertEquals(listOf(later.id), app.refreshes.toList())
+        assertTrue(runBlocking { dao.getDailySelectionsForDay("${earlierDay}_") }.isEmpty())
     }
 
     @Test

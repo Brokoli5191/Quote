@@ -59,10 +59,12 @@ import app.brokoli5191.quote.utils.UpdateChecker
 import app.brokoli5191.quote.utils.UpdateStatus
 import app.brokoli5191.quote.widget.WidgetRefreshScheduler
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -208,6 +210,10 @@ class QuoteViewModel(
     // The day of the quote in _dailyQuote.
     private var shownQuoteDate = ""
     private var widgetRefreshPending = false
+    // Guards the hand-over between daily-quote changes (the jobs, the pending widget refresh, the day),
+    // which can run on different threads when Main is not the only dispatcher. Never held across a
+    // suspension.
+    private val dailyQuoteLock = Any()
     // Quotes that "Another quote" replaced today, newest last, for undoCycleDailyQuote.
     private val cycledAway = ArrayDeque<Int>()
     private var cycledAwayDate = ""
@@ -867,8 +873,7 @@ class QuoteViewModel(
      */
     fun loadDailyQuote(refreshWidget: Boolean = false) {
         val today = dailyDateKey()
-        if (refreshWidget) widgetRefreshPending = true
-        updateDailyQuote(today, userAction = false) {
+        updateDailyQuote(today, userAction = false, refreshWidget = refreshWidget) {
             repository.getDailyQuote(today, _quoteSourceMode.value, _appLanguage.value, _showAnonymousQuotes.value)
         }
     }
@@ -876,32 +881,48 @@ class QuoteViewModel(
     // Every change of the shown daily quote goes through here, so the last one asked for is the one
     // shown. A newer change cancels a load still running (a slow pick made under earlier settings never
     // lands last) but waits for "Another quote" and its undo, which the user asked for. A widget refresh
-    // that a cancelled load asked for is sent by the change that replaced it, after its pick is stored.
-    private fun updateDailyQuote(today: String, userAction: Boolean, pick: suspend () -> QuoteEntity?) {
-        if (today != _dailyDate.value) {
-            // The day changed while the app ran: whichever load notices it (resume, sync, Try again),
-            // the widget follows without waiting for its midnight alarm. The first load after start
-            // leaves the widget to that alarm.
-            if (_dailyDate.value.isNotEmpty()) widgetRefreshPending = true
-            _dailyDate.value = today
-            clearCycleUndo()
-        }
-        val running = dailyQuoteJob
-        if (running !== dailyUserActionJob) running?.cancel()
-        val userActionBefore = dailyUserActionJob
-        val job = viewModelScope.launch {
-            userActionBefore?.join()
-            val quote = pick()
-            // Before the quote is published: whoever sees the new quote also sees its day.
-            shownQuoteDate = today
-            _dailyQuote.value = quote
-            if (widgetRefreshPending) {
-                widgetRefreshPending = false
-                WidgetRefreshScheduler.requestUpdate(app)
+    // that a cancelled load asked for is sent by the change that replaced it, after its pick is stored;
+    // [refreshWidget] asks for one for this change.
+    private fun updateDailyQuote(
+        today: String,
+        userAction: Boolean,
+        refreshWidget: Boolean,
+        pick: suspend () -> QuoteEntity?
+    ) {
+        val job = synchronized(dailyQuoteLock) {
+            val running = dailyQuoteJob
+            if (running !== dailyUserActionJob) running?.cancel()
+            if (refreshWidget) widgetRefreshPending = true
+            if (today != _dailyDate.value) {
+                // The day changed while the app ran: whichever load notices it (resume, sync, Try
+                // again), the widget follows without waiting for its midnight alarm. The first load
+                // after start leaves the widget to that alarm.
+                if (_dailyDate.value.isNotEmpty()) widgetRefreshPending = true
+                _dailyDate.value = today
+                clearCycleUndo()
+            }
+            val userActionBefore = dailyUserActionJob
+            // Started once the lock is released, so none of the job runs under it.
+            viewModelScope.launch(start = CoroutineStart.LAZY) {
+                userActionBefore?.join()
+                val quote = pick()
+                val refresh = synchronized(dailyQuoteLock) {
+                    // Cancelled since its pick returned (this part can run on another thread): neither
+                    // show the quote nor take the refresh. The change that replaced it does both, once
+                    // its own pick is stored.
+                    ensureActive()
+                    // Before the quote is published: whoever sees the new quote also sees its day.
+                    shownQuoteDate = today
+                    _dailyQuote.value = quote
+                    widgetRefreshPending.also { widgetRefreshPending = false }
+                }
+                if (refresh) WidgetRefreshScheduler.requestUpdate(app)
+            }.also {
+                dailyQuoteJob = it
+                if (userAction) dailyUserActionJob = it
             }
         }
-        dailyQuoteJob = job
-        if (userAction) dailyUserActionJob = job
+        job.start()
     }
 
     /** Picks up a new day; the widget follows, since the app now shows the new day's quote. */
@@ -915,8 +936,7 @@ class QuoteViewModel(
      */
     fun cycleDailyQuote() {
         val today = dailyDateKey()
-        widgetRefreshPending = true
-        updateDailyQuote(today, userAction = true) {
+        updateDailyQuote(today, userAction = true, refreshWidget = true) {
             // Read when it runs: an earlier "Another quote" may just have replaced the shown quote.
             val replaced = _dailyQuote.value?.id?.takeIf { shownQuoteDate == today }
             val next = repository.cycleDailyQuote(
@@ -934,8 +954,7 @@ class QuoteViewModel(
     fun undoCycleDailyQuote() {
         if (!_canUndoCycle.value) return
         val today = dailyDateKey()
-        widgetRefreshPending = true
-        updateDailyQuote(today, userAction = true) {
+        updateDailyQuote(today, userAction = true, refreshWidget = true) {
             if (cycledAwayDate != today) cycledAway.clear()
             val previous = cycledAway.removeLastOrNull()
             _canUndoCycle.value = cycledAway.isNotEmpty()
@@ -1249,9 +1268,15 @@ class QuoteViewModel(
                 tags = tagList.joinToString(", "),
                 language = language?.let(::supportedLanguage) ?: raw.language
             )
-            val resetSubmission = (raw.submissionStatus == QuoteSubmissionStatus.REJECTED ||
-                raw.submissionStatus == QuoteSubmissionStatus.REMOVED) &&
-                !raw.editKeepsReview(normalizedText, author)
+            val resetSubmission = when (raw.submissionStatus) {
+                QuoteSubmissionStatus.REJECTED, QuoteSubmissionStatus.REMOVED ->
+                    !raw.editKeepsReview(normalizedText, author)
+                // A not submitted quote may keep the id of a submission the server still has (see
+                // CommunitySyncManager.applyFetchedStatus); new content is no longer that submission.
+                QuoteSubmissionStatus.NOT_SUBMITTED -> raw.submissionId != null &&
+                    submissionContentKey(updated.text, updated.author) != submissionContentKey(raw.text, raw.author)
+                else -> false
+            }
             repository.insertQuote(if (resetSubmission) updated.withoutSubmission() else updated)
             onDone(true)
         }

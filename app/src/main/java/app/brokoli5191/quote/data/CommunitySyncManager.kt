@@ -275,7 +275,9 @@ class CommunitySyncManager(
             return when (quote.submissionStatus) {
                 // Only a withdrawal deletes a pending submission (a lost response, another device with the
                 // same installation id), and the server accepts the quote again: it is just not submitted.
-                QuoteSubmissionStatus.PENDING -> repository.clearSubmissionIfUnchanged(quote)
+                // The id stays: the 404 may come from an installation id this device does not know, with
+                // the submission still in review, and the feed then links the quote when it is published.
+                QuoteSubmissionStatus.PENDING -> repository.clearSubmissionKeepingIdIfUnchanged(quote)
                 QuoteSubmissionStatus.APPROVED -> if (feedDecidesPublication(quote)) {
                     false
                 } else {
@@ -285,7 +287,8 @@ class CommunitySyncManager(
                         SubmissionStatusInfo(QuoteSubmissionStatus.REMOVED, quote.reviewNote)
                     )
                 }
-                // A deleted rejected submission stays rejected: it was never published.
+                // A deleted rejected submission stays rejected: it was never published. A not submitted
+                // quote that kept its id (a full pass checks it) stays as it is.
                 else -> false
             }
         }

@@ -280,7 +280,8 @@ class CommunitySyncLinkingTest {
         assertTrue(result.complete)
         dao.getQuoteById(pending)!!.let {
             assertEquals(QuoteSubmissionStatus.NOT_SUBMITTED, it.submissionStatus)
-            assertNull(it.submissionId)
+            // Kept for the feed (statusRefresh_404ForAPendingQuoteStillLetsTheFeedLinkIt).
+            assertEquals("sub-1", it.submissionId)
         }
         assertEquals(QuoteSubmissionStatus.REMOVED, dao.getQuoteById(approved)!!.submissionStatus)
         dao.getQuoteById(rejected)!!.let {
@@ -289,6 +290,51 @@ class CommunitySyncLinkingTest {
         }
         // A withdrawal is not a review decision.
         assertEquals(listOf(approved to QuoteSubmissionStatus.REMOVED), result.updates.map { it.quoteId to it.newStatus })
+    }
+
+    @Test
+    fun statusRefresh_404ForAPendingQuoteStillLetsTheFeedLinkIt() = runBlocking {
+        // Sent with an installation id this device does not know: every status request answers 404,
+        // although the submission is still in review.
+        installationIds("11111111-1111-4111-8111-111111111111")
+        afterV2Upgrade()
+        val id = insertPending("sub-1")
+        val feed = FakeFeed()
+        val submissions = FakeSubmissions()
+        val manager = manager(feed, submissions)
+
+        val first = manager.syncWithResult()
+
+        dao.getQuoteById(id)!!.let {
+            assertEquals(QuoteSubmissionStatus.NOT_SUBMITTED, it.submissionStatus)
+            assertEquals("sub-1", it.submissionId)
+        }
+        assertTrue(first.submissions.updates.isEmpty())
+
+        // A moderator approves it with an edit.
+        feed.pages += page(1, quotes = listOf(community("c-1", "sub-1", text = "My own thought, edited")))
+        val second = manager.syncWithResult()
+
+        dao.getQuoteById(id)!!.let {
+            assertEquals(QuoteSubmissionStatus.APPROVED, it.submissionStatus)
+            assertEquals("c-1", it.linkedServerId)
+        }
+        assertEquals(
+            listOf(
+                SubmissionUpdate(
+                    id,
+                    "My own thought",
+                    QuoteSubmissionStatus.NOT_SUBMITTED,
+                    QuoteSubmissionStatus.APPROVED,
+                    null
+                )
+            ),
+            second.submissions.updates
+        )
+        // The note recheck answers 404 too and leaves the link to the feed; nothing is polled afterwards.
+        assertTrue(manager.syncWithResult().submissions.updates.isEmpty())
+        assertEquals(QuoteSubmissionStatus.APPROVED, dao.getQuoteById(id)!!.submissionStatus)
+        assertEquals(listOf("sub-1", "sub-1"), submissions.statusRequests.map { it.first })
     }
 
     @Test

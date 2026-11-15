@@ -210,7 +210,10 @@ class QuoteRepository(
         return quoteDao.getSubmissionsToRefresh(since)
     }
 
-    /** Own quotes that carry a submission id, whatever their state or age. */
+    /**
+     * Own quotes that carry a submission id, whatever their state or age; not submitted ones too, after
+     * [clearSubmissionKeepingIdIfUnchanged].
+     */
     suspend fun getSubmittedQuotes(): List<QuoteEntity> = quoteDao.getSubmittedQuotes()
 
     suspend fun getPersonalQuotesBySubmissionId(submissionId: String): List<QuoteEntity> =
@@ -272,6 +275,21 @@ class QuoteRepository(
     /** [clearSubmission], but only while the row still has [snapshot]'s submission id and status. */
     suspend fun clearSubmissionIfUnchanged(snapshot: QuoteEntity): Boolean =
         quoteDao.clearSubmissionIf(snapshot.id, snapshot.submissionId, snapshot.submissionStatus) > 0
+
+    /**
+     * [clearSubmissionIfUnchanged] for a submission the server may still have: the quote shows as not
+     * submitted and can be submitted again (which replaces the id), but keeps its submission id, so the
+     * feed still links it if that submission is published.
+     */
+    suspend fun clearSubmissionKeepingIdIfUnchanged(snapshot: QuoteEntity): Boolean =
+        quoteDao.updateSubmissionStateIf(
+            snapshot.id,
+            snapshot.submissionId,
+            snapshot.submissionStatus,
+            QuoteSubmissionStatus.NOT_SUBMITTED,
+            null,
+            null
+        ) > 0
 
     /**
      * Applies one community feed page. Personal rows whose submission was published get linked to
