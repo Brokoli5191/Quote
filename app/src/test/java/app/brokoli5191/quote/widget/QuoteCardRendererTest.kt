@@ -98,6 +98,18 @@ class QuoteCardRendererTest {
         assertEquals(text.length, quote.getLineEnd(quote.lineCount - 1))
     }
 
+    @Test
+    fun `a hyphenated compound breaks at its hyphens instead of shrinking to the minimum`() {
+        val card = layout(NETTES_MAEDCHEN, 130f, 180f, 3f)
+        val quote = card.quote
+        assertTrue("drawn at ${quote.paint.textSize / 3f} dp", quote.paint.textSize > 8f * 3f)
+        assertEquals(0, quote.getEllipsisCount(quote.lineCount - 1))
+        for (line in 1 until quote.lineCount) {
+            val before = quote.text.subSequence(0, quote.getLineStart(line)).last { it != '​' }
+            assertTrue("line $line starts inside a word", before.isWhitespace() || before == '-')
+        }
+    }
+
     private companion object {
         const val AUTHOR = "Friedrich Nietzsche"
         const val SHORT = "Be yourself."

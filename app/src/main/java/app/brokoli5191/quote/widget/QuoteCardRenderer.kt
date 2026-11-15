@@ -49,6 +49,10 @@ object QuoteCardRenderer {
     /** Space between the quote's descenders and the author line, relative to the author text size. */
     private const val AUTHOR_GAP = 0.4f
 
+    /** The position after a hyphen or en dash between two letters, as in "Nettes-Mädchen". */
+    private val COMPOUND_HYPHEN = Regex("(?<=\\p{L}[-\u2010\u2013])(?=\\p{L})")
+    private const val ZERO_WIDTH_SPACE = "\u200B"
+
     /**
      * The card at [widthPx] x [heightPx]. [label] is drawn when the config shows it and the card
      * is large enough; null leaves it out. [author] is drawn as "— author" unless blank.
@@ -179,10 +183,10 @@ object QuoteCardRenderer {
 
     /**
      * The largest size (in [step]s from [maxSize] down to [minSize]) at which the whole quote fits
-     * the box and every line starts at a line-break opportunity (after a space, or after the
-     * hyphen of a compound like "Nettes-Mädchen-von-nebenan-itis"). If none does, the quote is
-     * drawn at [minSize] with hyphenation, so words wider than the line are hyphenated rather than
-     * cut anywhere, and the last line that fits ends with "…".
+     * the box and every line starts at a line-break opportunity: after a space, a slash or a dash,
+     * or after the hyphen of a compound like "Nettes-Mädchen-von-nebenan-itis". If none does, the
+     * quote is drawn at [minSize] with hyphenation, so words wider than the line are hyphenated
+     * rather than cut anywhere, and the last line that fits ends with "…".
      */
     private fun fitQuote(
         text: String,
@@ -193,10 +197,15 @@ object QuoteCardRenderer {
         minSize: Float,
         step: Float
     ): StaticLayout {
-        // StaticLayout breaks at the same ICU opportunities, so a line start that is not one is a
-        // word that had to be cut because it is wider than the line.
-        val breaks = BreakIterator.getLineInstance(paint.textLocale).apply { setText(text) }
+        // Without hyphenation StaticLayout never breaks after a hyphen (it leaves that to the
+        // hyphenator), so a zero-width space after each compound hyphen lets the line break there.
+        val layoutText = text.replace(COMPOUND_HYPHEN, ZERO_WIDTH_SPACE)
+        // StaticLayout breaks at ICU's line-break opportunities, so a line start that is not one
+        // is a word that had to be cut because it is wider than the line.
+        val breaks = BreakIterator.getLineInstance(paint.textLocale).apply { setText(layoutText) }
         fun sizeAt(index: Int) = (maxSize - index * step).coerceAtLeast(minSize)
+        fun layoutAt(index: Int, hyphenate: Boolean) =
+            quoteLayout(layoutText, paint, sizeAt(index), width, boxHeight, hyphenate)
         fun StaticLayout.fitsCompletely(): Boolean =
             getEllipsisCount(lineCount - 1) == 0 &&
                 blockHeight() <= boxHeight &&
@@ -206,14 +215,14 @@ object QuoteCardRenderer {
         var high = ceil((maxSize - minSize) / step).toInt()
         while (low < high) {
             val middle = (low + high) / 2
-            if (quoteLayout(text, paint, sizeAt(middle), width, boxHeight, hyphenate = false).fitsCompletely()) {
+            if (layoutAt(middle, hyphenate = false).fitsCompletely()) {
                 high = middle
             } else {
                 low = middle + 1
             }
         }
-        val layout = quoteLayout(text, paint, sizeAt(low), width, boxHeight, hyphenate = false)
-        return if (layout.fitsCompletely()) layout else quoteLayout(text, paint, sizeAt(low), width, boxHeight, hyphenate = true)
+        val layout = layoutAt(low, hyphenate = false)
+        return if (layout.fitsCompletely()) layout else layoutAt(low, hyphenate = true)
     }
 
     /**

@@ -157,7 +157,6 @@ private val germanUi = mapOf(
     "Slate" to "Schiefer",
     "Paper" to "Papier",
     "Pure Black" to "Tiefschwarz",
-    "QUOTE" to "ZITAT",
     "App Info" to "App-Info",
     "Data Health" to "Datenzustand",
     "Actions" to "Aktionen",

@@ -634,7 +634,7 @@ class WidgetConfigureActivity : ComponentActivity() {
                 if (visibility.label) {
                     DraggablePreviewElement(WidgetElement.LABEL, config.labelX, config.labelY, onLabelPosition) {
                         Text(
-                            if (language == QuoteLanguage.GERMAN) "ZITAT" else "QUOTE",
+                            QuoteCardRenderer.LABEL,
                             color = widgetColor(config.labelColor, DEFAULT_CONFIG.labelColor),
                             fontSize = sp(labelSize),
                             fontWeight = FontWeight.Bold,
