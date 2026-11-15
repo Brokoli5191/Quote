@@ -3,6 +3,7 @@ package app.brokoli5191.quote.data
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import java.util.Locale
 
 @Entity(
     tableName = "quotes",
@@ -63,9 +64,26 @@ fun QuoteEntity.isAvailableIn(language: String): Boolean = when (language) {
     else -> this.language != QuoteLanguage.GERMAN || !textEn.isNullOrBlank()
 }
 
+/**
+ * Whether the Library lists this row for [language] and the anonymous setting. Own quotes are the
+ * user's data and are listed in every language; [localized] shows their original text when there
+ * is no translation. Every other row needs a version in [language].
+ */
+fun QuoteEntity.isListedIn(language: String, showAnonymous: Boolean): Boolean =
+    isUserAdded || (isAvailableIn(language) && (showAnonymous || !isAnonymous))
+
+private val PLACEHOLDER_AUTHORS = setOf("unknown", "unbekannt", "anonymous", "anonym")
+
+/** True for author names that only say the author is not known ("Unknown", "Anonymous", German forms). */
+fun isPlaceholderAuthor(name: String): Boolean = name.trim().lowercase(Locale.ROOT) in PLACEHOLDER_AUTHORS
+
+/** The label shown for an unknown author. */
+fun unknownAuthorLabel(language: String): String =
+    if (language == QuoteLanguage.GERMAN) "Unbekannt" else "Unknown"
+
 /** True when the UI should show "Unknown" and a question-mark avatar instead of a name. */
 val QuoteEntity.hasUnknownAuthor: Boolean
-    get() = isAnonymous || author.isBlank() || author == "Unknown" || author == "Unbekannt"
+    get() = isAnonymous || author.isBlank() || isPlaceholderAuthor(author)
 
 // The English / German versions of a quote. Works on raw rows and on localized() copies,
 // which keep both versions in textEn / textDe.
@@ -82,14 +100,15 @@ private fun QuoteEntity.displayedLanguage(): String = when (text) {
 }
 
 /**
- * Display copy for [language]: `text` is the translation when one exists. The copy carries both
- * versions so [alternateText] still works on it. Display only: never write it back or submit it.
+ * Display copy for [language]: `text` is the translation when one exists, otherwise the original
+ * text. The copy carries both versions so [alternateText] still works on it, and a placeholder
+ * author reads "Unknown"/"Unbekannt". Display only: never write it back or submit it.
  */
 fun QuoteEntity.localized(language: String): QuoteEntity {
     val english = englishVersion()
     val german = germanVersion()
     val display = (if (language == QuoteLanguage.GERMAN) german else english) ?: text
-    val displayAuthor = if (language == QuoteLanguage.GERMAN && author == "Unknown") "Unbekannt" else author
+    val displayAuthor = if (isPlaceholderAuthor(author)) unknownAuthorLabel(language) else author
     if (display == text && displayAuthor == author) return this
     return copy(text = display, author = displayAuthor, textEn = english, textDe = german)
 }

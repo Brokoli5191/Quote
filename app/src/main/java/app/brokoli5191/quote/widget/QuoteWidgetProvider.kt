@@ -6,31 +6,42 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.graphics.Bitmap
-import android.graphics.BlurMaskFilter
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.LinearGradient
-import android.graphics.Paint
-import android.graphics.Path
-import android.graphics.RectF
-import android.graphics.Shader
-import android.graphics.Typeface
+import android.os.Build
+import android.os.Bundle
+import android.util.DisplayMetrics
+import android.util.Log
+import android.util.SizeF
 import android.widget.RemoteViews
+import androidx.core.os.BundleCompat
 import app.brokoli5191.quote.MainActivity
 import app.brokoli5191.quote.R
 import app.brokoli5191.quote.data.AppDatabase
+import app.brokoli5191.quote.data.FallbackQuote
 import app.brokoli5191.quote.data.InstallationSeed
 import app.brokoli5191.quote.data.QuoteEntity
+import app.brokoli5191.quote.data.QuoteLanguage
 import app.brokoli5191.quote.data.QuoteRepository
 import app.brokoli5191.quote.data.QuoteSourceMode
-import app.brokoli5191.quote.data.QuoteLanguage
 import app.brokoli5191.quote.data.dailyDateKey
+import app.brokoli5191.quote.data.hasUnknownAuthor
+import app.brokoli5191.quote.ui.formattedQuote
+import app.brokoli5191.quote.ui.localizeUi
+import app.brokoli5191.quote.utils.AppLinks
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlin.math.sqrt
 
 class QuoteWidgetProvider : AppWidgetProvider() {
+    override fun onEnabled(context: Context) {
+        WidgetRefreshScheduler.scheduleMidnightRefresh(context)
+    }
+
+    override fun onDisabled(context: Context) {
+        WidgetRefreshScheduler.cancel(context)
+    }
+
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
         updateWidgets(context, manager, ids)
     }
@@ -39,7 +50,7 @@ class QuoteWidgetProvider : AppWidgetProvider() {
         context: Context,
         appWidgetManager: AppWidgetManager,
         appWidgetId: Int,
-        newOptions: android.os.Bundle
+        newOptions: Bundle
     ) {
         updateWidgets(context, appWidgetManager, intArrayOf(appWidgetId))
     }
@@ -48,34 +59,30 @@ class QuoteWidgetProvider : AppWidgetProvider() {
         appWidgetIds.forEach { WidgetConfig.delete(context, it) }
     }
 
+    // AppWidgetProvider calls onUpdate for the new ids right after this, which renders them.
+    override fun onRestored(context: Context, oldWidgetIds: IntArray, newWidgetIds: IntArray) {
+        restoreWidgetConfigs(context, oldWidgetIds, newWidgetIds, placedWidgetIds(context).toSet())
+    }
+
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
-        if (intent.action == "app.brokoli5191.quote.UPDATE_WIDGET") {
-            val manager = AppWidgetManager.getInstance(context)
-            val ids = manager.getAppWidgetIds(ComponentName(context, QuoteWidgetProvider::class.java))
-            updateWidgets(context, manager, ids)
+        when (intent.action) {
+            AppLinks.ACTION_UPDATE_WIDGET, WidgetRefreshScheduler.ACTION_MIDNIGHT_REFRESH ->
+                updateWidgets(context, AppWidgetManager.getInstance(context), placedWidgetIds(context))
         }
     }
 
     private fun updateWidgets(context: Context, manager: AppWidgetManager, ids: IntArray) {
+        // Without a placed widget nothing may pick (and store) today's quote for it.
+        if (ids.isEmpty()) {
+            WidgetRefreshScheduler.cancel(context)
+            return
+        }
+        WidgetRefreshScheduler.scheduleMidnightRefresh(context)
         val pendingResult = goAsync()
-        val repository = QuoteRepository(
-            AppDatabase.getInstance(context).quoteDao(),
-            InstallationSeed.get(context)
-        )
-        val date = dailyDateKey()
         CoroutineScope(Dispatchers.Default).launch {
             try {
-                val prefs = context.getSharedPreferences("aura_prefs", Context.MODE_PRIVATE)
-                val sourceMode = prefs.getString("quote_source_mode", QuoteSourceMode.ALL) ?: QuoteSourceMode.ALL
-                val language = prefs.getString("app_language", QuoteLanguage.ENGLISH) ?: QuoteLanguage.ENGLISH
-                val showAnonymous = prefs.getBoolean("show_anonymous_quotes", false)
-                val quote = runCatching { repository.getDailyQuote(date, sourceMode, language, showAnonymous) }.getOrNull()
-                    ?: QuoteEntity(
-                        text = if (language == QuoteLanguage.GERMAN) "Bleib neugierig. Bleib mutig." else if (sourceMode == QuoteSourceMode.COMMUNITY) "No community quotes available yet." else "Stay hungry. Stay foolish.",
-                        author = if (language == QuoteLanguage.GERMAN) "" else if (sourceMode == QuoteSourceMode.COMMUNITY) "Open Quote to sync" else "Steve Jobs",
-                        category = "Life"
-                    )
+                val quote = widgetQuote(context)
                 ids.forEach { updateAppWidget(context, manager, it, quote) }
             } finally {
                 pendingResult.finish()
@@ -84,235 +91,179 @@ class QuoteWidgetProvider : AppWidgetProvider() {
     }
 
     companion object {
+        private const val TAG = "QuoteWidget"
+        private const val PREFS = "aura_prefs"
+
+        /** Action of the widget's tap intent; keeps its PendingIntent apart from the notifications' ones. */
+        const val ACTION_OPEN_DAILY = "app.brokoli5191.quote.widget.OPEN_DAILY"
+
+        /** RemoteViews(Map) takes at most 16 sizes. */
+        private const val MAX_SIZED_LAYOUTS = 16
+
+        /**
+         * Today's quote in the app's language and source settings, or [FallbackQuote] when the
+         * database is empty (before the first app start seeds it), nothing matches, or it fails.
+         */
+        suspend fun widgetQuote(context: Context): QuoteEntity {
+            val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            val language = appLanguage(context)
+            val quote = try {
+                QuoteRepository(AppDatabase.getInstance(context).quoteDao(), InstallationSeed.get(context))
+                    .getDailyQuote(
+                        dailyDateKey(),
+                        prefs.getString("quote_source_mode", QuoteSourceMode.ALL) ?: QuoteSourceMode.ALL,
+                        language,
+                        prefs.getBoolean("show_anonymous_quotes", false)
+                    )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Daily quote could not be loaded", e)
+                null
+            }
+            return quote ?: QuoteEntity(text = FallbackQuote.text(language), author = FallbackQuote.AUTHOR, category = "Life")
+        }
+
+        /**
+         * Renders [quote] into widget [appWidgetId] at every size the launcher may show it. Never
+         * throws: a failed update is logged and leaves the widget as it was.
+         */
         fun updateAppWidget(
             context: Context,
             appWidgetManager: AppWidgetManager,
             appWidgetId: Int,
             quote: QuoteEntity
         ) {
-            val views = RemoteViews(context.packageName, R.layout.quote_widget_layout)
-            val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
-            val portrait = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT
-            val minWidth = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH)
-            val minHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT)
-            val maxWidth = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH)
-            val maxHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT)
-            val widthDp = (if (portrait) minWidth else maxWidth).takeIf { it > 0 } ?: 280
-            val heightDp = (if (portrait) maxHeight else minHeight).takeIf { it > 0 } ?: 140
-            val scale = 3f
-            val language = context.getSharedPreferences("aura_prefs", Context.MODE_PRIVATE)
-                .getString("app_language", QuoteLanguage.ENGLISH)
-                ?: QuoteLanguage.ENGLISH
-            val bitmap = drawWidgetBitmap(
-                quote,
-                WidgetConfig.read(context, appWidgetId),
-                (widthDp * scale).toInt().coerceAtLeast(120),
-                (heightDp * scale).toInt().coerceAtLeast(100),
-                scale,
-                label = if (language == QuoteLanguage.GERMAN) "ZITAT" else "QUOTE"
-            )
-            views.setImageViewBitmap(R.id.widget_image, bitmap)
-            val intent = Intent(context, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            try {
+                val language = appLanguage(context)
+                val author = if (quote.hasUnknownAuthor) "" else quote.author
+                val config = WidgetConfig.read(context, appWidgetId)
+                val description = widgetContentDescription(quote.text, author, language)
+                val openDaily = openDailyIntent(context, appWidgetId)
+                val views = sizedViews(appWidgetManager.getAppWidgetOptions(appWidgetId), context.resources.displayMetrics) { size ->
+                    RemoteViews(context.packageName, R.layout.quote_widget_layout).apply {
+                        setImageViewBitmap(
+                            R.id.widget_image,
+                            QuoteCardRenderer.render(
+                                context,
+                                quote.text,
+                                author,
+                                QuoteCardRenderer.LABEL,
+                                config,
+                                size.widthPx,
+                                size.heightPx,
+                                size.density
+                            )
+                        )
+                        setContentDescription(R.id.widget_image, description)
+                        setOnClickPendingIntent(R.id.widget_image, openDaily)
+                    }
+                }
+                appWidgetManager.updateAppWidget(appWidgetId, views)
+            } catch (e: Exception) {
+                Log.w(TAG, "Widget $appWidgetId could not be updated", e)
             }
-            views.setOnClickPendingIntent(
-                R.id.widget_image,
-                PendingIntent.getActivity(
-                    context,
-                    appWidgetId,
-                    intent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-            )
-            appWidgetManager.updateAppWidget(appWidgetId, views)
         }
 
-        private fun drawWidgetBitmap(
-            quote: QuoteEntity,
-            config: WidgetConfig,
-            width: Int,
-            height: Int,
-            density: Float,
-            label: String
-        ): Bitmap {
-            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-            val canvas = Canvas(bitmap)
-            val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-            val scale = config.visualScale.coerceIn(0.65f, 1f)
-            val insetX = width * (1f - scale) / 2f
-            val insetY = height * (1f - scale) / 2f
-            val rect = RectF(
-                insetX,
-                insetY,
-                width - insetX,
-                height - insetY
-            )
-            val radius = config.cornerRadius.coerceIn(0f, 48f) * density * scale
-            val bgStart = parseColor(config.backgroundStart, "#594983")
-            val bgEnd = parseColor(config.backgroundEnd, "#37265E")
+        /**
+         * One layout per size the launcher may show: the size list on Android 12+, otherwise the
+         * portrait (min width x max height) and landscape (max width x min height) pair, of which
+         * the launcher picks the one for its own orientation.
+         */
+        private fun sizedViews(
+            options: Bundle,
+            metrics: DisplayMetrics,
+            cardViews: (WidgetBitmapSize) -> RemoteViews
+        ): RemoteViews {
+            fun bitmapSizes(sizesDp: List<Pair<Float, Float>>) =
+                widgetBitmapSizes(sizesDp, metrics.density, metrics.widthPixels, metrics.heightPixels)
 
-            paint.shader = LinearGradient(0f, 0f, width.toFloat(), height.toFloat(), bgStart, bgEnd, Shader.TileMode.CLAMP)
-            canvas.drawRoundRect(rect, radius, radius, paint)
-            paint.shader = null
-
-            if (config.blurBackground) {
-                val clip = Path().apply { addRoundRect(rect, radius, radius, Path.Direction.CW) }
-                canvas.save()
-                canvas.clipPath(clip)
-                paint.maskFilter = BlurMaskFilter(28f * density, BlurMaskFilter.Blur.NORMAL)
-                paint.color = withAlpha(lighten(bgStart), 115)
-                canvas.drawCircle(width * 0.18f, height * 0.2f, width * 0.24f, paint)
-                paint.color = withAlpha(lighten(bgEnd), 105)
-                canvas.drawCircle(width * 0.85f, height * 0.8f, width * 0.32f, paint)
-                paint.maskFilter = null
-                canvas.restore()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val sizes = BundleCompat.getParcelableArrayList(options, AppWidgetManager.OPTION_APPWIDGET_SIZES, SizeF::class.java)
+                    .orEmpty()
+                    .distinct()
+                    .take(MAX_SIZED_LAYOUTS)
+                if (sizes.isNotEmpty()) {
+                    val bitmaps = bitmapSizes(sizes.map { it.width to it.height })
+                    return if (sizes.size == 1) {
+                        cardViews(bitmaps.single())
+                    } else {
+                        RemoteViews(sizes.zip(bitmaps).associate { (size, bitmap) -> size to cardViews(bitmap) })
+                    }
+                }
             }
-
-            if (config.borderEnabled) {
-                paint.style = Paint.Style.STROKE
-                paint.strokeWidth = 1.5f * density
-                paint.color = parseColor(config.borderColor, "#2DFFFFFF")
-                canvas.drawRoundRect(rect, radius, radius, paint)
-                paint.style = Paint.Style.FILL
-            }
-
-            val cardWidth = rect.width()
-            val cardHeight = rect.height()
-            val padX = if (cardWidth < 160 * density) 12f * density else 20f * density
-            val padY = if (cardHeight < 100 * density) 8f * density else 16f * density
-            val canShowLabel = config.showLabel && cardHeight >= 90 * density && cardWidth >= 130 * density
-            val canShowIcon = config.showIcon && cardHeight >= 80 * density && cardWidth >= 120 * density
-            val canShowAuthor = config.showAuthor && cardHeight >= 65 * density
-            val labelSize = (cardHeight * 0.07f).coerceIn(11f * density, 18f * density)
-            val authorSize = ((cardHeight * 0.08f) * config.authorSizeScale).coerceIn(9f * density, 28f * density)
-            val labelX = rect.left + cardWidth * config.labelX.coerceIn(0f, 0.9f)
-            val labelY = rect.top + cardHeight * config.labelY.coerceIn(0.08f, 0.9f) + labelSize
-            val iconX = rect.left + cardWidth * config.iconX.coerceIn(0.1f, 0.98f)
-            val iconY = rect.top + cardHeight * config.iconY.coerceIn(0.08f, 0.9f) + labelSize
-            val quoteX = rect.left + cardWidth * config.quoteX.coerceIn(0f, 0.85f)
-            val quoteY = rect.top + cardHeight * config.quoteY.coerceIn(0.12f, 0.9f)
-            val authorX = rect.left + cardWidth * config.authorX.coerceIn(0f, 0.85f)
-            val authorY = rect.top + cardHeight * config.authorY.coerceIn(0.2f, 0.98f)
-            val quoteTypeface = quoteTypeface(config.font)
-            val authorTypeface = authorTypeface(config.font)
-            var quoteSize = ((if (cardWidth < cardHeight) cardWidth * 0.14f else cardHeight * 0.20f) * config.quoteSizeScale)
-                .coerceIn(12f * density, 42f * density)
-            var lineHeight = quoteSize * 1.2f
-            val availableWidth = (rect.right - padX - quoteX).toInt().coerceAtLeast(80)
-            val maxHeight = (rect.bottom - padY - quoteY).coerceAtLeast(quoteSize)
-            val quotePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = quoteTypeface }
-            while (quoteSize > 8f * density) {
-                quotePaint.textSize = quoteSize
-                if (wrappedLineCount(quote.text, availableWidth, quotePaint) * lineHeight <= maxHeight) break
-                quoteSize -= 0.5f * density
-                lineHeight = quoteSize * 1.2f
-            }
-
-            if (canShowLabel) {
-                paint.color = parseColor(config.labelColor, "#D0BCFF")
-                paint.textSize = labelSize
-                paint.typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
-                canvas.drawText(label, labelX, labelY, paint)
-            }
-            if (canShowIcon) {
-                paint.color = parseColor(config.labelColor, "#D0BCFF")
-                paint.textSize = labelSize * 1.35f
-                paint.typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
-                paint.textAlign = Paint.Align.RIGHT
-                canvas.drawText("✦", iconX, iconY, paint)
-                paint.textAlign = Paint.Align.LEFT
-            }
-
-            paint.color = parseColor(config.quoteColor, "#E9DDFF")
-            paint.textSize = quoteSize
-            paint.typeface = quoteTypeface
-            drawWrappedText(canvas, quote.text, quoteX, quoteY + quoteSize, availableWidth, paint, lineHeight, maxHeight)
-
-            if (canShowAuthor && quote.author.isNotBlank()) {
-                paint.color = parseColor(config.authorColor, "#A0D2AD")
-                paint.textSize = authorSize
-                paint.typeface = authorTypeface
-                val authorWidth = (rect.right - padX - authorX).toInt().coerceAtLeast(80)
-                drawSingleLineEllipsized(canvas, "— ${quote.author}", authorX, authorY, authorWidth, paint)
-            }
-            return bitmap
+            val portrait = widgetSizeDpFromOptions(options, portrait = true).let { (w, h) -> w.toFloat() to h.toFloat() }
+            val landscape = widgetSizeDpFromOptions(options, portrait = false).let { (w, h) -> w.toFloat() to h.toFloat() }
+            if (portrait == landscape) return cardViews(bitmapSizes(listOf(portrait)).single())
+            val (landscapeBitmap, portraitBitmap) = bitmapSizes(listOf(landscape, portrait))
+            return RemoteViews(cardViews(landscapeBitmap), cardViews(portraitBitmap))
         }
 
-        private fun quoteTypeface(font: String): Typeface = when (font) {
-            "Sans" -> Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
-            "Monospace" -> Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL)
-            "Serif Bold" -> Typeface.create(Typeface.SERIF, Typeface.BOLD)
-            else -> Typeface.create(Typeface.SERIF, Typeface.ITALIC)
-        }
-
-        private fun authorTypeface(font: String): Typeface = when (font) {
-            "Monospace" -> Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-            "Serif", "Serif Bold" -> Typeface.create(Typeface.SERIF, Typeface.BOLD)
-            else -> Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
-        }
-
-        private fun parseColor(value: String, fallback: String): Int = runCatching {
-            Color.parseColor(if (value.startsWith("#")) value else "#$value")
-        }.getOrElse { Color.parseColor(fallback) }
-
-        private fun lighten(color: Int): Int = Color.rgb(
-            (Color.red(color) + 75).coerceAtMost(255),
-            (Color.green(color) + 75).coerceAtMost(255),
-            (Color.blue(color) + 75).coerceAtMost(255)
+        private fun openDailyIntent(context: Context, appWidgetId: Int): PendingIntent = PendingIntent.getActivity(
+            context,
+            appWidgetId,
+            Intent(context, MainActivity::class.java).apply {
+                action = ACTION_OPEN_DAILY
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                putExtra(AppLinks.EXTRA_DEST, AppLinks.DEST_DAILY)
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        private fun withAlpha(color: Int, alpha: Int) = Color.argb(alpha, Color.red(color), Color.green(color), Color.blue(color))
+        private fun placedWidgetIds(context: Context): IntArray =
+            AppWidgetManager.getInstance(context).getAppWidgetIds(ComponentName(context, QuoteWidgetProvider::class.java))
 
-        private fun drawWrappedText(
-            canvas: Canvas,
-            text: String,
-            x: Float,
-            y: Float,
-            maxWidth: Int,
-            paint: Paint,
-            lineHeight: Float,
-            maxHeight: Float
-        ) {
-            val words = text.split(" ")
-            var line = ""
-            var currentY = y
-            for (word in words) {
-                val candidate = if (line.isEmpty()) word else "$line $word"
-                if (paint.measureText(candidate) > maxWidth && line.isNotEmpty()) {
-                    if (currentY - y + lineHeight > maxHeight) {
-                        canvas.drawText(ellipsize(line, maxWidth, paint), x, currentY, paint)
-                        return
-                    }
-                    canvas.drawText(line, x, currentY, paint)
-                    line = word
-                    currentY += lineHeight
-                } else line = candidate
-            }
-            if (line.isNotEmpty() && currentY - y + lineHeight <= maxHeight) canvas.drawText(line, x, currentY, paint)
-        }
-
-        private fun drawSingleLineEllipsized(canvas: Canvas, text: String, x: Float, y: Float, width: Int, paint: Paint) {
-            canvas.drawText(ellipsize(text, width, paint), x, y, paint)
-        }
-
-        private fun ellipsize(text: String, width: Int, paint: Paint): String {
-            if (paint.measureText(text) <= width) return text
-            var shortened = text
-            while (shortened.isNotEmpty() && paint.measureText("$shortened…") > width) shortened = shortened.dropLast(1)
-            return "$shortened…"
-        }
-
-        private fun wrappedLineCount(text: String, maxWidth: Int, paint: Paint): Int {
-            var count = 1
-            var line = ""
-            text.split(" ").forEach { word ->
-                val candidate = if (line.isEmpty()) word else "$line $word"
-                if (paint.measureText(candidate) > maxWidth && line.isNotEmpty()) {
-                    count++
-                    line = word
-                } else line = candidate
-            }
-            return count
-        }
+        private fun appLanguage(context: Context): String =
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getString("app_language", QuoteLanguage.ENGLISH)
+                ?: QuoteLanguage.ENGLISH
     }
+}
+
+/** What TalkBack reads for the widget: "Daily Quote: "text" — author" in the app language. */
+internal fun widgetContentDescription(text: String, author: String, language: String): String =
+    "${localizeUi("Daily Quote", language)}: ${formattedQuote(text, author, language)}"
+
+/** One bitmap of a widget update: its size in px and the density the card is drawn with. */
+internal data class WidgetBitmapSize(val widthPx: Int, val heightPx: Int, val density: Float)
+
+/** Share of AppWidgetService's bitmap memory limit that one widget update may use. */
+private const val BITMAP_MEMORY_SHARE = 0.5
+
+/**
+ * Bitmap sizes for one widget update that shows the card at each of [sizesDp] (width to height).
+ * AppWidgetService rejects an update whose bitmaps together need more than 6 bytes per screen
+ * pixel (4 bytes per ARGB_8888 pixel here). All bitmaps are therefore scaled down together to
+ * [BITMAP_MEMORY_SHARE] of that limit; the scaled density keeps the card's dp layout unchanged.
+ */
+internal fun widgetBitmapSizes(
+    sizesDp: List<Pair<Float, Float>>,
+    density: Float,
+    screenWidthPx: Int,
+    screenHeightPx: Int
+): List<WidgetBitmapSize> {
+    val budgetBytes = 6.0 * screenWidthPx * screenHeightPx * BITMAP_MEMORY_SHARE
+    val neededBytes = sizesDp.sumOf { (width, height) -> 4.0 * width * density * height * density }
+    val scale = if (budgetBytes > 0 && neededBytes > budgetBytes) sqrt(budgetBytes / neededBytes).toFloat() else 1f
+    val renderDensity = density * scale
+    return sizesDp.map { (width, height) ->
+        WidgetBitmapSize(
+            (width * renderDensity).toInt().coerceAtLeast(1),
+            (height * renderDensity).toInt().coerceAtLeast(1),
+            renderDensity
+        )
+    }
+}
+
+/**
+ * Moves the settings of widgets restored from a backup from their old ids to the new ones. Every
+ * old setting is read before anything is deleted or written, because an old id can be the new id
+ * of another restored widget. Old ids of widgets placed on this device ([placedIds]) keep theirs.
+ */
+internal fun restoreWidgetConfigs(context: Context, oldIds: IntArray, newIds: IntArray, placedIds: Set<Int>) {
+    val restored = oldIds.zip(newIds).map { (oldId, newId) ->
+        newId to oldId.takeIf { WidgetConfig.exists(context, it) }?.let { WidgetConfig.read(context, it) }
+    }
+    (oldIds.filter { it !in placedIds } + newIds.toList()).forEach { WidgetConfig.delete(context, it) }
+    restored.forEach { (newId, config) -> if (config != null) WidgetConfig.write(context, newId, config) }
 }

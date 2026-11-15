@@ -8,7 +8,7 @@ import java.nio.charset.StandardCharsets
 
 private val WINDOWS_1252: Charset = Charset.forName("windows-1252")
 private val WHITESPACE_REGEX = Regex("\\s+")
-private val DIALOGUE_SPACING_REGEX = Regex("([.!?,”])(?=“)")
+private const val DIALOGUE_END = ".!?,”"
 private const val STRAIGHT_QUOTE = '"'
 
 internal fun normalizeAuthorName(value: String): String {
@@ -37,7 +37,7 @@ internal fun normalizeQuoteText(value: String): String {
         .replace('�'.toString(), "")
         .replace(' ', ' ')
         .replace(WHITESPACE_REGEX, " ")
-        .replace(DIALOGUE_SPACING_REGEX, "$1 ")
+        .let(::spaceBeforeOpeningQuotes)
         .trim()
     return spaceAfterClosingQuotes(stripWrappingQuotes(balanceQuoteMarks(stripWrappingQuotes(text))))
 }
@@ -116,6 +116,28 @@ internal fun balanceQuoteMarks(text: String): String {
     val prefix = marks.unmatchedClose.map { openingMarkFor(text[it]) }.reversed().joinToString("")
     val suffix = marks.unmatchedOpen.map { closingMarkFor(text[it]) }.reversed().joinToString("")
     return prefix + text + suffix
+}
+
+// “Why?”“Because” → “Why?” “Because”: the space goes only before a “ that opens a quote. In German
+// „…“ the same mark closes, so „Real.“ keeps it next to the text, and the space that earlier
+// versions put there („Real. “) is taken out again.
+private fun spaceBeforeOpeningQuotes(text: String): String {
+    if ('“' !in text) return text
+    val closers = pairQuoteMarks(text).pairs.values.toHashSet()
+    val result = StringBuilder(text.length + 4)
+    for (i in text.indices) {
+        val char = text[i]
+        if (char == '“') {
+            val last = result.lastOrNull()
+            if (i !in closers) {
+                if (last != null && last in DIALOGUE_END) result.append(' ')
+            } else if (last == ' ' && result.length >= 2 && result[result.length - 2] in DIALOGUE_END) {
+                result.setLength(result.length - 1)
+            }
+        }
+        result.append(char)
+    }
+    return result.toString()
 }
 
 // "Hi?"She said → "Hi?" She said: only after closing straight marks that end a sentence or clause.

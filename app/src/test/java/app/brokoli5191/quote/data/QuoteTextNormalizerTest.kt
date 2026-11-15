@@ -38,12 +38,30 @@ class QuoteTextNormalizerTest {
     }
 
     @Test
+    fun spacesOnlyOpeningCurlyMarks() {
+        assertEquals("“Why?” “Because.”", normalizeQuoteText("“Why?”“Because.”"))
+        // In German „…“ the “ closes, so it stays next to the punctuation.
+        assertEquals("Ich sage ihm: „Real.“", normalizeQuoteText("Ich sage ihm: „Real.“"))
+        assertEquals("„Warum?“ „Darum.“", normalizeQuoteText("„Warum?“ „Darum.“"))
+        assertEquals("„Ja,“ sagte er.", normalizeQuoteText("„Ja,“ sagte er."))
+        assertEquals("Er sagte: „Komm!“ und ging.", normalizeQuoteText("Er sagte: „Komm!“ und ging."))
+    }
+
+    @Test
+    fun removesTheSpaceEarlierVersionsPutBeforeAGermanClosingMark() {
+        assertEquals("Ich sage ihm: „Real.“", normalizeQuoteText("Ich sage ihm: „Real. “"))
+        assertEquals("„Warum?“ „Darum.“", normalizeQuoteText("„Warum? “ „Darum. “"))
+    }
+
+    @Test
     fun isIdempotent() {
         listOf(
             "He said “hello",
             "You’re dangerous,” he says. “Why?” “Because",
             "\"Hi?\"She said",
-            "„Guten Tag“, sagte er."
+            "„Guten Tag“, sagte er.",
+            "„Du liebst mich. Real oder nicht real?“ Ich sage ihm: „Real.“",
+            "“Why?”“Because.”"
         ).forEach { input ->
             val once = normalizeQuoteText(input)
             assertEquals(once, normalizeQuoteText(once))

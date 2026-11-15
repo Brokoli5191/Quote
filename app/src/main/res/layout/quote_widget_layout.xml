@@ -8,6 +8,6 @@
         android:id="@+id/widget_image"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:scaleType="fitXY"
-        android:contentDescription="Quote Daily Quote Widget" />
+        android:scaleType="fitCenter"
+        android:contentDescription="@string/widget_description" />
 </FrameLayout>

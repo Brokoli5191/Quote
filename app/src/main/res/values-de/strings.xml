@@ -2,4 +2,6 @@
 <resources>
     <string name="app_name">Quote</string>
     <string name="widget_name">Quote-Widget</string>
+    <string name="widget_description">Tägliches Quote</string>
+    <string name="widget_preview_text">Das Glück deines Lebens hängt von der Qualität deiner Gedanken ab.</string>
 </resources>

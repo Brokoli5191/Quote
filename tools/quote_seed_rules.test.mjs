@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
   applyQuoteTags, authorKey, buildSeed, cleanAuthor, cleanText, isProbablyEnglish, MAX_TAGS, pairQuoteMarks,
 } from './quote_seed_rules.mjs';
+
+const readRaw = name => JSON.parse(readFileSync(new URL(`../app/src/main/res/raw/${name}`, import.meta.url), 'utf8'));
 
 test('language check accepts short English quotes and rejects common non-English examples', () => {
   assert.equal(isProbablyEnglish('Stay hungry. Stay foolish.'), true);
@@ -58,6 +61,25 @@ test('cleanText balances unmatched quotation marks', () => {
   assert.equal(cleanText('The sign read “Keep out'), 'The sign read “Keep out”');
   assert.equal(cleanText('“Quote without an end'), 'Quote without an end');
   assert.equal(cleanText('Bought a 12" record.'), 'Bought a 12" record.');
+});
+
+test('cleanText spaces only opening marks, so German closing marks stay next to the text', () => {
+  assert.equal(cleanText('“Why?”“Because.”'), '“Why?” “Because.”');
+  assert.equal(cleanText('Ich sage ihm: „Real.“'), 'Ich sage ihm: „Real.“');
+  assert.equal(cleanText('„Warum?“ „Darum.“'), '„Warum?“ „Darum.“');
+  assert.equal(cleanText('Er sagte: „Komm!“ und ging.'), 'Er sagte: „Komm!“ und ging.');
+  assert.equal(cleanText('„Ja,“ sagte er.'), '„Ja,“ sagte er.');
+  // Repairs the space that earlier versions put before the closing mark.
+  assert.equal(cleanText('Ich sage ihm: „Real. “'), 'Ich sage ihm: „Real.“');
+});
+
+test('cleanText keeps the German translations as they are, apart from a pair wrapping the whole text', () => {
+  const translations = [...readRaw('quotes_de.json'), ...readRaw('anonymous_quotes.json')].map(item => item.quote_de);
+  const changed = translations.filter(text => {
+    const cleaned = cleanText(text);
+    return cleaned !== text && cleaned !== text.slice(1, -1).trim();
+  });
+  assert.deepEqual(changed, []);
 });
 
 test('cleaned quote marks are always balanced', () => {

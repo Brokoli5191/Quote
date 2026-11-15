@@ -8,7 +8,13 @@ interface QuoteDao {
     @Query("SELECT * FROM quotes ORDER BY timestamp DESC")
     fun getAllQuotes(): Flow<List<QuoteEntity>>
 
-    @Query("SELECT * FROM quotes WHERE isFavorite = 1 ORDER BY timestamp DESC")
+    // Newest save first. savedDate holds epoch millis as text; legacy "dd MMM yyyy" values and rows
+    // without one sort last.
+    @Query(
+        "SELECT * FROM quotes WHERE isFavorite = 1 ORDER BY " +
+            "CASE WHEN savedDate GLOB '[0-9]*' AND savedDate NOT GLOB '*[^0-9]*' THEN CAST(savedDate AS INTEGER) ELSE 0 END DESC, " +
+            "timestamp DESC, id DESC"
+    )
     fun getFavoriteQuotes(): Flow<List<QuoteEntity>>
 
     @Query("SELECT * FROM quotes WHERE isUserAdded = 1 ORDER BY timestamp DESC")
@@ -36,6 +42,9 @@ interface QuoteDao {
     )
     suspend fun getSubmissionsToRefresh(since: Long): List<QuoteEntity>
 
+    @Query("SELECT * FROM quotes WHERE isUserAdded = 1 AND submissionId IS NOT NULL")
+    suspend fun getSubmittedQuotes(): List<QuoteEntity>
+
     @Query("SELECT * FROM quotes WHERE isUserAdded = 1 AND submissionId IN (:submissionIds)")
     suspend fun getPersonalQuotesBySubmissionIds(submissionIds: List<String>): List<QuoteEntity>
 
@@ -59,11 +68,22 @@ interface QuoteDao {
     )
     suspend fun getDailyCandidateIds(origins: List<String>, language: String, showAnonymous: Boolean): List<Int>
 
+    // Community quotes in any language, for Community-only mode when none has a version in the app language.
+    @Query("SELECT id FROM quotes WHERE origin = 'community' AND (:showAnonymous = 1 OR isAnonymous = 0) ORDER BY id")
+    suspend fun getCommunityCandidateIdsAnyLanguage(showAnonymous: Boolean): List<Int>
+
+    @Query("SELECT * FROM quotes WHERE id IN (:ids)")
+    suspend fun getQuotesByIds(ids: List<Int>): List<QuoteEntity>
+
+    @Query("SELECT * FROM quotes WHERE isUserAdded = 0 AND origin != 'community'")
+    suspend fun getBundledQuotes(): List<QuoteEntity>
+
     @Query("SELECT * FROM quotes WHERE category = :category ORDER BY timestamp DESC")
     fun getQuotesByCategory(category: String): Flow<List<QuoteEntity>>
 
+    // Returns the rows written: 0 when the row is gone.
     @Query("UPDATE quotes SET isFavorite = :isFav, savedDate = :savedDate WHERE id = :id")
-    suspend fun updateFavorite(id: Int, isFav: Boolean, savedDate: String?)
+    suspend fun updateFavorite(id: Int, isFav: Boolean, savedDate: String?): Int
 
     @Query("UPDATE quotes SET text = :text, author = :author, textDe = :textDe, textEn = :textEn WHERE id = :id")
     suspend fun updateText(id: Int, text: String, author: String, textDe: String?, textEn: String?)
@@ -108,18 +128,64 @@ interface QuoteDao {
     )
     suspend fun clearSubmission(id: Int)
 
+    // Conditional writes for a state read before a network call: they apply only while the row still
+    // has the submission id and status that were read (IS also matches NULL). Return the rows written.
+    @Query(
+        "UPDATE quotes SET submissionStatus = :status, reviewNote = :reviewNote, linkedServerId = :linkedServerId " +
+            "WHERE id = :id AND isUserAdded = 1 AND submissionId IS :expectedSubmissionId " +
+            "AND submissionStatus = :expectedStatus"
+    )
+    suspend fun updateSubmissionStateIf(
+        id: Int,
+        expectedSubmissionId: String?,
+        expectedStatus: String,
+        status: String,
+        reviewNote: String?,
+        linkedServerId: String?
+    ): Int
+
+    @Query(
+        "UPDATE quotes SET submissionStatus = 'not_submitted', submissionId = NULL, submittedAt = NULL, " +
+            "reviewNote = NULL, linkedServerId = NULL WHERE id = :id AND isUserAdded = 1 " +
+            "AND submissionId IS :expectedSubmissionId AND submissionStatus = :expectedStatus"
+    )
+    suspend fun clearSubmissionIf(id: Int, expectedSubmissionId: String?, expectedStatus: String): Int
+
     @Query("DELETE FROM quotes WHERE origin = 'community' AND serverId IN (:serverIds)")
     suspend fun deleteCommunityQuotes(serverIds: List<String>)
 
-    // Daily selections
-    @Query("SELECT * FROM daily_selections WHERE date = :date LIMIT 1")
-    suspend fun getDailySelection(date: String): DailySelectionEntity?
-
+    // Daily selections. Keys are "<yyyy-MM-dd>_<language>_<anonymous 0/1>_<source mode>"; a pick that
+    // was replaced under its key stays in the history as "<key>#<quote id>". REPLACE writes a new
+    // row, so rowid order is the order in which picks were made.
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertDailySelection(selection: DailySelectionEntity)
 
-    @Query("SELECT quoteId FROM daily_selections")
-    suspend fun getAllDailySelectionIds(): List<Int>
+    // Stores [quoteId] as the pick under [key]. A different quote stored there before stays in the
+    // no-repeat history: its row is renamed to "<key>#<quote id>", which keeps its rowid and so its
+    // place in the history.
+    @Transaction
+    suspend fun storeDailySelection(key: String, quoteId: Int) {
+        retireDailySelection(key, quoteId)
+        insertDailySelection(DailySelectionEntity(key, quoteId))
+    }
+
+    @Query("UPDATE OR REPLACE daily_selections SET date = date || '#' || quoteId WHERE date = :key AND quoteId != :quoteId")
+    suspend fun retireDailySelection(key: String, quoteId: Int)
+
+    // The current picks of one day (keyPrefix = "<yyyy-MM-dd>_"), most recent first.
+    @Query(
+        "SELECT * FROM daily_selections WHERE substr(date, 1, length(:keyPrefix)) = :keyPrefix " +
+            "AND instr(date, '#') = 0 ORDER BY rowid DESC"
+    )
+    suspend fun getDailySelectionsForDay(keyPrefix: String): List<DailySelectionEntity>
+
+    // The current picks of every day, most recent first.
+    @Query("SELECT * FROM daily_selections WHERE instr(date, '#') = 0 ORDER BY rowid DESC")
+    suspend fun getCurrentDailySelections(): List<DailySelectionEntity>
+
+    // Every quote ever picked, replaced picks included, oldest first: the no-repeat history.
+    @Query("SELECT quoteId FROM daily_selections ORDER BY rowid")
+    suspend fun getDailySelectionIdsOldestFirst(): List<Int>
 
     // Static synchronous helpers
     @Query("SELECT * FROM quotes")

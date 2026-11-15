@@ -1,4 +1,8 @@
 <resources>
     <string name="app_name">Quote</string>
     <string name="widget_name">Quote Widget</string>
+    <string name="widget_description">Daily Quote</string>
+    <string name="widget_preview_label" translatable="false">QUOTE</string>
+    <string name="widget_preview_text">The happiness of your life depends upon the quality of your thoughts.</string>
+    <string name="widget_preview_author" translatable="false">— Marcus Aurelius</string>
 </resources>
