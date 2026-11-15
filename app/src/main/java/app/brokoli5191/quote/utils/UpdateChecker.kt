@@ -130,18 +130,36 @@ object UpdateChecker {
         for (i in 0 until maxOf(va.preRelease.size, vb.preRelease.size)) {
             val x = va.preRelease.getOrNull(i) ?: return -1
             val y = vb.preRelease.getOrNull(i) ?: return 1
-            val xn = x.toIntOrNull()
-            val yn = y.toIntOrNull()
-            val cmp = when {
-                xn != null && yn != null -> xn.compareTo(yn)
-                xn != null -> -1
-                yn != null -> 1
-                else -> x.compareTo(y)
-            }
+            val cmp = comparePreReleaseIdentifier(x, y)
             if (cmp != 0) return cmp
         }
         return 0
     }
+
+    /**
+     * Numeric identifiers sort before alphanumeric ones (SemVer); alphanumeric identifiers compare
+     * in natural order, so "beta2" < "beta10" as release tags are usually written.
+     */
+    private fun comparePreReleaseIdentifier(x: String, y: String): Int {
+        val xn = x.toIntOrNull()
+        val yn = y.toIntOrNull()
+        if (xn != null && yn != null) return xn.compareTo(yn)
+        if (xn != null) return -1
+        if (yn != null) return 1
+        val xs = NATURAL_CHUNK.findAll(x).map { it.value }.toList()
+        val ys = NATURAL_CHUNK.findAll(y).map { it.value }.toList()
+        for (i in 0 until minOf(xs.size, ys.size)) {
+            val a = xs[i]
+            val b = ys[i]
+            val an = a.toBigIntegerOrNull()
+            val bn = b.toBigIntegerOrNull()
+            val cmp = if (an != null && bn != null) an.compareTo(bn) else a.compareTo(b)
+            if (cmp != 0) return cmp
+        }
+        return xs.size.compareTo(ys.size)
+    }
+
+    private val NATURAL_CHUNK = Regex("\\d+|\\D+")
 
     private class ParsedVersion(val numbers: List<Int>, val preRelease: List<String>) {
         companion object {
