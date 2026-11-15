@@ -59,6 +59,48 @@ class QuoteRepositoryTest {
     }
 
     @Test
+    fun noRepeatCycle_coversEveryCandidateBeforeRepeating() {
+        val candidates = setOf(1, 2, 3)
+        assertEquals(emptySet<Int>(), currentNoRepeatCycle(emptyList(), candidates))
+        assertEquals(setOf(1, 2), currentNoRepeatCycle(listOf(1, 2), candidates))
+        // A finished cycle starts over, but never with the quote that closed it.
+        assertEquals(setOf(3), currentNoRepeatCycle(listOf(1, 2, 3), candidates))
+        assertEquals(setOf(2), currentNoRepeatCycle(listOf(1, 2, 3, 2), candidates))
+        // Picks that are no longer candidates (other mode, deleted quote) do not count.
+        assertEquals(setOf(1), currentNoRepeatCycle(listOf(7, 1, 9), candidates))
+        assertEquals(emptySet<Int>(), currentNoRepeatCycle(listOf(5, 5), setOf(5)))
+    }
+
+    @Test
+    fun mergeReseed_keepsIdsFavoritesAndRetiredFavorites() {
+        val old = listOf(
+            QuoteEntity(id = 10, text = "Alpha.", author = "Ann", category = "Life", isFavorite = true, savedDate = "5", timestamp = 1),
+            QuoteEntity(id = 11, text = "Beta", author = "Bob Smiht", category = "Life", timestamp = 1),
+            QuoteEntity(id = 12, text = "Gone", author = "Cy", category = "Life"),
+            QuoteEntity(id = 13, text = "Retired", author = "Di", category = "Life", isFavorite = true, savedDate = "7", tags = "love, misattributed-to-x")
+        )
+        val fresh = listOf(
+            QuoteEntity(text = "Alpha", author = "Ann", category = "Wisdom", textDe = "Alpha auf Deutsch", timestamp = 99),
+            // The new seed corrected the author's spelling: matched by text alone.
+            QuoteEntity(text = "Beta", author = "Bob Smith", category = "Life", timestamp = 99),
+            QuoteEntity(text = "New", author = "Ed", category = "Life", timestamp = 99)
+        )
+
+        val merged = mergeReseed(old, fresh)
+
+        assertEquals(listOf(10, 11, 0, 13), merged.map { it.id })
+        assertTrue(merged[0].isFavorite)
+        assertEquals("5", merged[0].savedDate)
+        assertEquals("Wisdom", merged[0].category)
+        assertEquals("Alpha auf Deutsch", merged[0].textDe)
+        assertEquals(1L, merged[0].timestamp)
+        assertEquals("Bob Smith", merged[1].author)
+        assertFalse(merged[1].isFavorite)
+        assertEquals(99L, merged[2].timestamp)
+        assertEquals("love", merged[3].tags)
+    }
+
+    @Test
     fun sourceModes_excludePersonalQuotesFromAutomaticCollections() {
         val bundled = QuoteEntity(text = "Bundled", author = "Author", category = "Life")
         val community = QuoteEntity(

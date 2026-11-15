@@ -72,7 +72,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -107,6 +106,7 @@ import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import app.brokoli5191.quote.ui.components.QuoteTimePickerDialog
 import app.brokoli5191.quote.ui.theme.SerifFontFamily
+import app.brokoli5191.quote.ui.theme.accentSwatchColor
 import app.brokoli5191.quote.ui.uiText
 import kotlinx.coroutines.launch
 import java.util.Calendar
@@ -551,6 +551,7 @@ private fun AppearancePage(viewModel: QuoteViewModel) {
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val themeAccent by viewModel.themeAccent.collectAsStateWithLifecycle()
     val isDynamic = themeMode == "DYNAMIC" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    val lightSurface = MaterialTheme.colorScheme.background.luminance() > 0.5f
 
     OnboardingPageLayout(
         icon = Icons.Outlined.Palette,
@@ -619,7 +620,7 @@ private fun AppearancePage(viewModel: QuoteViewModel) {
                     listOf("Violet", "Amber", "Green", "Blue", "Rose").forEach { accent ->
                         val selected = themeAccent == accent
                         val label = uiText(accent)
-                        val swatch = accentSwatch(accent)
+                        val swatch = accentSwatchColor(accent, lightSurface)
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -654,14 +655,6 @@ private fun AppearancePage(viewModel: QuoteViewModel) {
             }
         }
     }
-}
-
-private fun accentSwatch(accent: String): Color = when (accent) {
-    "Violet" -> Color(0xFFD0BCFF)
-    "Amber" -> Color(0xFFFFDB9C)
-    "Green" -> Color(0xFFA0D2AD)
-    "Blue" -> Color(0xFFADC6FF)
-    else -> Color(0xFFFFB2C5) // Rose
 }
 
 /** Small, compact version of the daily quote card; follows the live theme. */
@@ -825,6 +818,9 @@ private fun ReminderPage(
 @Composable
 private fun AuthorsPage(viewModel: QuoteViewModel) {
     val imagesEnabled by viewModel.authorImagesEnabled.collectAsStateWithLifecycle()
+    // The portrait is a request to Wikimedia, so it is only fetched once the user has seen the switch
+    // below and asked for the preview; turning images off never has to undo a request.
+    var previewRequested by rememberSaveable { mutableStateOf(false) }
     val authorInfoFlow = remember(viewModel) { viewModel.authorInfo(PREVIEW_AUTHOR) }
     val authorInfo by authorInfoFlow.collectAsStateWithLifecycle()
 
@@ -836,7 +832,7 @@ private fun AuthorsPage(viewModel: QuoteViewModel) {
         OptionSurface(selected = false) {
             AuthorAvatar(
                 name = PREVIEW_AUTHOR,
-                imageUrl = authorInfo?.imageUrl,
+                imageUrl = authorInfo?.imageUrl?.takeIf { imagesEnabled && previewRequested },
                 unknown = false,
                 size = 52.dp
             )
@@ -862,6 +858,11 @@ private fun AuthorsPage(viewModel: QuoteViewModel) {
             checked = imagesEnabled,
             onCheckedChange = viewModel::setAuthorImagesEnabled
         )
+        if (imagesEnabled && !previewRequested) {
+            ExpressiveTextButton(onClick = { previewRequested = true }) {
+                Text(uiText("Show portrait preview"))
+            }
+        }
     }
 }
 

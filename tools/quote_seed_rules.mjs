@@ -84,6 +84,7 @@ function repairMojibakeSegments(value) {
 }
 
 const STRAIGHT_QUOTE = '"';
+const DIALOGUE_END = '.!?,”';
 const OPENING_CONTEXT = /[\s([{\u2014\u2013\-\/“„]/;
 
 // Pairs double quotation marks. Curly („ “ ”) and straight (") marks are tracked separately, so a
@@ -152,13 +153,35 @@ export function balanceQuoteMarks(text) {
 }
 
 export function cleanText(value) {
-  const text = repairMojibake(value)
-    .replace(/\uFFFD/g, '')
-    .replace(/\u00a0/g, ' ')
-    .replace(/\s+/g, ' ')
-    .replace(/([.!?,”])(?=“)/g, '$1 ')
-    .trim();
+  const text = spaceBeforeOpeningQuotes(
+    repairMojibake(value)
+      .replace(/\uFFFD/g, '')
+      .replace(/\u00a0/g, ' ')
+      .replace(/\s+/g, ' '),
+  ).trim();
   return spaceAfterClosingQuotes(stripWrappingQuotes(balanceQuoteMarks(stripWrappingQuotes(text))));
+}
+
+// “Why?”“Because” → “Why?” “Because”: the space goes only before a “ that opens a quote. In German
+// „…“ the same mark closes, so „Real.“ keeps it next to the text, and the space that earlier
+// versions put there („Real. “) is taken out again.
+function spaceBeforeOpeningQuotes(text) {
+  if (!text.includes('“')) return text;
+  const closers = new Set(pairQuoteMarks(text).pairs.values());
+  const result = [];
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (char === '“') {
+      const last = result.at(-1);
+      if (!closers.has(i)) {
+        if (last !== undefined && DIALOGUE_END.includes(last)) result.push(' ');
+      } else if (last === ' ' && result.length >= 2 && DIALOGUE_END.includes(result.at(-2))) {
+        result.pop();
+      }
+    }
+    result.push(char);
+  }
+  return result.join('');
 }
 
 // "Hi?"She said → "Hi?" She said: only after closing straight marks that end a sentence or clause.

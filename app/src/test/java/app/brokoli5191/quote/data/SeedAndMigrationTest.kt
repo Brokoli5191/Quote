@@ -5,7 +5,11 @@ import android.database.sqlite.SQLiteDatabase
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import app.brokoli5191.quote.R
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -30,6 +34,21 @@ class SeedAndMigrationTest {
         val changed = (0 until seed.length())
             .map { seed.getJSONObject(it).getString("quote") }
             .filter { normalizeQuoteText(it) != it }
+        assertEquals(emptyList<String>(), changed)
+    }
+
+    @Test
+    fun germanTranslations_keepTheirQuotationMarks() {
+        // German „…“ closes with “; normalization must not put a space before it. The only allowed
+        // change is dropping a pair that wraps the whole text, as for the English seed.
+        val translations = listOf(R.raw.quotes_de, R.raw.anonymous_quotes).flatMap { id ->
+            val array = rawArray(id)
+            (0 until array.length()).map { array.getJSONObject(it).getString("quote_de") }
+        }
+        val changed = translations.filter {
+            val normalized = normalizeQuoteText(it)
+            normalized != it && normalized != it.substring(1, it.length - 1).trim()
+        }
         assertEquals(emptyList<String>(), changed)
     }
 
@@ -111,6 +130,55 @@ class SeedAndMigrationTest {
         assertNotNull(after.singleOrNull { it.text == "Mine" })
         assertNotNull(after.singleOrNull { it.serverId == "c-1" })
         assertTrue(after.filter { it.isAnonymous }.all { it.author == "" && it.textDe != null })
+        db.close()
+    }
+
+    @Test
+    fun reseed_keepsIdsSoTodaysQuoteStaysAndRepairsTranslations() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).allowMainThreadQueries().build()
+        val dao = db.quoteDao()
+        val repository = QuoteRepository(dao, 1L)
+        repository.preseedDatabase(context)
+        val today = repository.getDailyQuote("2026-11-15", QuoteSourceMode.ALL, QuoteLanguage.GERMAN, false)!!
+        val idsBefore = dao.getBundledQuotes().associate { it.id to quoteMatchKey(it.text) }
+        // A translation stored by an older normalizer, with a space before the closing mark.
+        val dialogue = dao.getBundledQuotes().first { it.textDe?.endsWith(".“") == true }
+        dao.updateText(dialogue.id, dialogue.text, dialogue.author, dialogue.textDe!!.dropLast(1) + " “", dialogue.textEn)
+
+        repository.reseedPreservingFavorites(context)
+
+        assertEquals(idsBefore, dao.getBundledQuotes().associate { it.id to quoteMatchKey(it.text) })
+        assertEquals(today.id, repository.getDailyQuote("2026-11-15", QuoteSourceMode.ALL, QuoteLanguage.GERMAN, false)!!.id)
+        assertEquals(dialogue.textDe, dao.getQuoteById(dialogue.id)!!.textDe)
+        db.close()
+    }
+
+    @Test
+    fun reseed_keepsAFavoriteTappedBetweenItsSnapshotAndSwap() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).allowMainThreadQueries().build()
+        val dao = db.quoteDao()
+        QuoteRepository(dao, 1L).preseedDatabase(context)
+        val target = dao.getBundledQuotes().first()
+        val snapshotTaken = CompletableDeferred<Unit>()
+        val tapReturned = CompletableDeferred<Unit>()
+        // Holds the re-seed between its snapshot and its swap until the tap returns. A tap written
+        // in that window would be overwritten by the stale snapshot; with the lock it waits for the
+        // swap instead, so the pause ends after a moment and the tap lands on the swapped row.
+        val pausingDao = object : QuoteDao by dao {
+            override suspend fun getBundledQuotes(): List<QuoteEntity> = dao.getBundledQuotes().also {
+                snapshotTaken.complete(Unit)
+                withTimeoutOrNull(500) { tapReturned.await() }
+            }
+        }
+        val repository = QuoteRepository(pausingDao, 1L)
+
+        val reseed = launch(Dispatchers.Default) { repository.reseedPreservingFavorites(context) }
+        snapshotTaken.await()
+        assertTrue(repository.toggleFavorite(target.id, true))
+        tapReturned.complete(Unit)
+        reseed.join()
+
+        assertTrue(dao.getQuoteById(target.id)!!.isFavorite)
         db.close()
     }
 

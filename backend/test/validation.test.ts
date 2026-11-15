@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { validateSubmission } from "../src/index";
 import { validateModeration } from "../src/admin";
 import {
+  blockedTextHash,
+  characterCount,
   cleanText,
   ipRateLimitKey,
   parseLanguage,
@@ -57,6 +59,16 @@ describe("validateSubmission", () => {
       ok: false,
       message: "quoteText must contain between 3 and 500 characters."
     });
+  });
+
+  it("counts characters as code points like the database does", () => {
+    expect(validateSubmission({ ...validSubmission, quoteText: "a😀" })).toEqual({
+      ok: false,
+      message: "quoteText must contain between 3 and 500 characters."
+    });
+    expect(validateSubmission({ ...validSubmission, quoteText: "😀".repeat(500) }).ok).toBe(true);
+    expect(validateSubmission({ ...validSubmission, author: "😀".repeat(100) }).ok).toBe(true);
+    expect(validateSubmission({ ...validSubmission, author: "😀".repeat(101) }).ok).toBe(false);
   });
 
   it("rejects missing quote text", () => {
@@ -142,6 +154,16 @@ describe("validateModeration", () => {
     expect(result.ok && result.value.language).toBeUndefined();
   });
 
+  it("checks lengths in code points", () => {
+    const base = { action: "approve", quoteText: "Short and sweet.", author: "", category: "Wisdom", tags: [] };
+    expect(validateModeration({ ...base, translation: "😀😀" })).toEqual({
+      ok: false,
+      message: "translation must contain between 3 and 500 characters."
+    });
+    expect(validateModeration({ ...base, note: "😀".repeat(500) }).ok).toBe(true);
+    expect(validateModeration({ ...base, note: "😀".repeat(501) }).ok).toBe(false);
+  });
+
   it("rejects a null body", () => {
     expect(validateModeration(null)).toEqual({
       ok: false,
@@ -182,6 +204,25 @@ describe("quoteComparisonKey", () => {
 
   it("keeps letters from other scripts", () => {
     expect(quoteComparisonKey("Größe zählt.")).toBe("größezählt");
+  });
+});
+
+describe("characterCount", () => {
+  it("counts code points, not UTF-16 code units", () => {
+    expect(characterCount("abc")).toBe(3);
+    expect(characterCount("a😀")).toBe(2);
+    expect(characterCount("👍🏽")).toBe(2);
+  });
+});
+
+describe("blockedTextHash", () => {
+  it("is the same for texts that differ only in case, punctuation and spacing", async () => {
+    expect(await blockedTextHash("Buy cheap pills now")).toBe(await blockedTextHash("buy cheap  pills, now!"));
+    expect(await blockedTextHash("Buy cheap pills now")).not.toBe(await blockedTextHash("Buy cheap pills later"));
+  });
+
+  it("is missing for texts without letters or digits", async () => {
+    expect(await blockedTextHash("😀😀😀")).toBeNull();
   });
 });
 

@@ -1,6 +1,9 @@
 package app.brokoli5191.quote.widget
 
+import android.appwidget.AppWidgetManager
 import android.content.Context
+import android.graphics.Color
+import android.os.Bundle
 
 data class WidgetConfig(
     val showAuthor: Boolean = true,
@@ -103,10 +106,52 @@ data class WidgetConfig(
                 .forEach(editor::remove)
             editor.apply()
         }
+
+        /** True once a configuration was saved for [widgetId], i.e. configuring it again is a reconfiguration. */
+        fun exists(context: Context, widgetId: Int): Boolean =
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .contains("widget_show_author_$widgetId")
+
+        /**
+         * Moves every stored setting of [oldWidgetId] to [newWidgetId] (the launcher hands out new
+         * ids when it restores widgets from a backup). The old id's settings are removed unless
+         * [keepSource] is set. A no-op when the ids are equal or the old id has no settings.
+         */
+        fun transfer(context: Context, oldWidgetId: Int, newWidgetId: Int, keepSource: Boolean = false) {
+            if (oldWidgetId == newWidgetId) return
+            val oldSuffix = "_$oldWidgetId"
+            val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            val editor = prefs.edit()
+            prefs.all.forEach { (key, value) ->
+                if (!key.startsWith("widget_") || !key.endsWith(oldSuffix)) return@forEach
+                val target = key.removeSuffix(oldSuffix) + "_$newWidgetId"
+                when (value) {
+                    is Boolean -> editor.putBoolean(target, value)
+                    is String -> editor.putString(target, value)
+                    is Float -> editor.putFloat(target, value)
+                    is Int -> editor.putInt(target, value)
+                    is Long -> editor.putLong(target, value)
+                }
+                if (!keepSource) editor.remove(key)
+            }
+            editor.apply()
+        }
     }
 }
 
-data class WidgetBackgroundPreset(val name: String, val start: String, val end: String)
+/**
+ * A background gradient together with the text colours that stay readable on it. Dark presets
+ * keep the default light text; light presets (Paper) bring dark text and border.
+ */
+data class WidgetBackgroundPreset(
+    val name: String,
+    val start: String,
+    val end: String,
+    val labelColor: String = WidgetConfig().labelColor,
+    val quoteColor: String = WidgetConfig().quoteColor,
+    val authorColor: String = WidgetConfig().authorColor,
+    val borderColor: String = WidgetConfig().borderColor
+)
 
 val widgetBackgroundPresets = listOf(
     WidgetBackgroundPreset("Violet", "#594983", "#37265E"),
@@ -117,6 +162,91 @@ val widgetBackgroundPresets = listOf(
     WidgetBackgroundPreset("Sunset", "#9A3412", "#431407"),
     WidgetBackgroundPreset("Gold", "#713F12", "#291804"),
     WidgetBackgroundPreset("Slate", "#334155", "#0F172A"),
-    WidgetBackgroundPreset("Paper", "#F5F1E8", "#D8D0C2"),
+    WidgetBackgroundPreset(
+        "Paper", "#F5F1E8", "#D8D0C2",
+        labelColor = "#594983",
+        quoteColor = "#1C1B1F",
+        authorColor = "#2E5E3A",
+        borderColor = "#33000000"
+    ),
     WidgetBackgroundPreset("Pure Black", "#000000", "#000000")
 )
+
+private val HEX_COLOR = Regex("^#?([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$")
+
+/** "#RRGGBB" / "#AARRGGBB" (upper case, leading # optional on input), or null when [value] is no such colour. */
+fun normalizeWidgetColor(value: String): String? =
+    HEX_COLOR.matchEntire(value.trim())?.let { "#" + it.groupValues[1].uppercase() }
+
+/**
+ * Colour of a stored widget colour string. Invalid input falls back to [fallbackHex], so the
+ * configure preview and the widget renderer always agree.
+ */
+fun parseWidgetColor(value: String, fallbackHex: String): Int =
+    Color.parseColor(normalizeWidgetColor(value) ?: fallbackHex)
+
+/** Lighter variant of a background colour used for the blur glows. */
+fun lightenWidgetColor(color: Int): Int = Color.rgb(
+    (Color.red(color) + 75).coerceAtMost(255),
+    (Color.green(color) + 75).coerceAtMost(255),
+    (Color.blue(color) + 75).coerceAtMost(255)
+)
+
+/** Soft glow of the Background Blur option; centre and radius are fractions of the card width/height. */
+data class WidgetGlow(val centerX: Float, val centerY: Float, val radiusOfWidth: Float, val color: Int)
+
+/** Blur radius of [widgetBlurGlows] in dp (scaled with the card in the preview). */
+const val WIDGET_BLUR_RADIUS_DP = 28f
+
+fun widgetBlurGlows(backgroundStart: Int, backgroundEnd: Int): List<WidgetGlow> = listOf(
+    WidgetGlow(0.18f, 0.20f, 0.24f, withAlpha(lightenWidgetColor(backgroundStart), 115)),
+    WidgetGlow(0.85f, 0.80f, 0.32f, withAlpha(lightenWidgetColor(backgroundEnd), 105))
+)
+
+private fun withAlpha(color: Int, alpha: Int) =
+    Color.argb(alpha, Color.red(color), Color.green(color), Color.blue(color))
+
+/** The draggable elements with the position limits the renderer applies to their stored fractions. */
+enum class WidgetElement(val minX: Float, val maxX: Float, val minY: Float, val maxY: Float) {
+    LABEL(0f, 0.9f, 0.08f, 0.9f),
+    ICON(0.1f, 0.98f, 0.08f, 0.9f),
+    QUOTE(0f, 0.85f, 0.12f, 0.9f),
+    AUTHOR(0f, 0.85f, 0.2f, 0.98f);
+
+    fun clampX(x: Float): Float = x.coerceIn(minX, maxX)
+    fun clampY(y: Float): Float = y.coerceIn(minY, maxY)
+}
+
+/** Which optional elements are actually drawn; the single source of the size rules. */
+data class WidgetElementVisibility(val label: Boolean, val icon: Boolean, val author: Boolean)
+
+/** Size of the visible card in dp: the widget area shrunk by the Visual Widget Size setting. */
+fun widgetCardSizeDp(widgetWidthDp: Float, widgetHeightDp: Float, visualScale: Float): Pair<Float, Float> {
+    val scale = visualScale.coerceIn(0.65f, 1f)
+    return widgetWidthDp * scale to widgetHeightDp * scale
+}
+
+/**
+ * The renderer hides the label below 90dp card height / 130dp width, the icon below 80dp / 120dp
+ * and the author below 65dp height. [widgetWidthDp]/[widgetHeightDp] are the full widget area
+ * (before the visual scale is applied).
+ */
+fun widgetElementVisibility(config: WidgetConfig, widgetWidthDp: Float, widgetHeightDp: Float): WidgetElementVisibility {
+    val (cardWidth, cardHeight) = widgetCardSizeDp(widgetWidthDp, widgetHeightDp, config.visualScale)
+    return WidgetElementVisibility(
+        label = config.showLabel && cardHeight >= 90f && cardWidth >= 130f,
+        icon = config.showIcon && cardHeight >= 80f && cardWidth >= 120f,
+        author = config.showAuthor && cardHeight >= 65f
+    )
+}
+
+/** Widget area in dp as the provider computes it from the launcher's size options (280x140 when unknown). */
+fun widgetSizeDpFromOptions(options: Bundle, portrait: Boolean): Pair<Int, Int> {
+    val width = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH).let { min ->
+        if (portrait) min else options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH)
+    }
+    val height = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT).let { max ->
+        if (portrait) max else options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT)
+    }
+    return (width.takeIf { it > 0 } ?: 280) to (height.takeIf { it > 0 } ?: 140)
+}

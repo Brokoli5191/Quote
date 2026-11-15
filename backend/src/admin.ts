@@ -1,7 +1,18 @@
 import { verifyAccess } from "./access";
 import { dashboardPage } from "./dashboard";
 import type { Env } from "./index";
-import { cleanText, parseLanguage, quoteComparisonKey, type QuoteLanguage } from "./validation";
+import { keepRateLimitSlots } from "./limits";
+import {
+  blockedTextHash,
+  characterCount,
+  cleanText,
+  isCheckViolation,
+  isReadRequest,
+  isUniqueViolation,
+  parseLanguage,
+  quoteComparisonKey,
+  type QuoteLanguage
+} from "./validation";
 
 interface ModerationInput {
   action: "approve" | "reject";
@@ -24,7 +35,7 @@ type ModerationValidation =
   | { ok: false; message: string };
 
 const ADMIN_PAGE_SIZE = 100;
-const UNIQUE_VIOLATION = "UNIQUE constraint failed";
+const DUPLICATE_MESSAGE = "A published community quote with the same text already exists.";
 
 function optionalText(value: unknown): string | null | undefined {
   if (value === undefined) return undefined;
@@ -53,20 +64,23 @@ export function validateModeration(input: unknown): ModerationValidation {
   const reviewNote = optionalText(body.reviewNote);
   const translation = optionalText(body.translation);
   const language = parseLanguage(body.language);
-  if (quoteText.length < 3 || quoteText.length > 500) {
+  const quoteLength = characterCount(quoteText);
+  if (quoteLength < 3 || quoteLength > 500) {
     return { ok: false, message: "quoteText must contain between 3 and 500 characters." };
   }
-  if (author.length > 100) return { ok: false, message: "author must not exceed 100 characters." };
-  if (category.length < 1 || category.length > 50) {
+  if (characterCount(author) > 100) return { ok: false, message: "author must not exceed 100 characters." };
+  const categoryLength = characterCount(category);
+  if (categoryLength < 1 || categoryLength > 50) {
     return { ok: false, message: "category must contain between 1 and 50 characters." };
   }
-  if (note !== undefined && note.length > 500) {
+  if (note !== undefined && characterCount(note) > 500) {
     return { ok: false, message: "note must not exceed 500 characters." };
   }
-  if (reviewNote && reviewNote.length > 500) {
+  if (reviewNote && characterCount(reviewNote) > 500) {
     return { ok: false, message: "reviewNote must not exceed 500 characters." };
   }
-  if (translation && (translation.length < 3 || translation.length > 500)) {
+  const translationLength = translation ? characterCount(translation) : 0;
+  if (translation && (translationLength < 3 || translationLength > 500)) {
     return { ok: false, message: "translation must contain between 3 and 500 characters." };
   }
   if (!language.ok) return { ok: false, message: language.message };
@@ -78,7 +92,7 @@ export function validateModeration(input: unknown): ModerationValidation {
   const seen = new Set<string>();
   for (const value of body.tags) {
     const tag = cleanText(value);
-    if (tag.length < 1 || tag.length > 30) {
+    if (tag.length < 1 || characterCount(tag) > 30) {
       return { ok: false, message: "Each tag must contain between 1 and 30 characters." };
     }
     const key = tag.toLocaleLowerCase("en-US");
@@ -110,8 +124,14 @@ function adminJson(body: unknown, status = 200): Response {
   });
 }
 
-function adminError(status: number, code: string, error: string): Response {
-  return adminJson({ error, code }, status);
+function adminError(status: number, code: string, error: string, details: Record<string, unknown> = {}): Response {
+  return adminJson({ ...details, error, code }, status);
+}
+
+function methodNotAllowed(allow: string): Response {
+  const response = adminError(405, "method_not_allowed", "Method not allowed.");
+  response.headers.set("Allow", allow);
+  return response;
 }
 
 async function readJsonObject(request: Request): Promise<Record<string, unknown> | null> {
@@ -152,8 +172,10 @@ async function listSubmissions(url: URL, env: Env): Promise<Response> {
         COALESCE(c.language, s.language) AS language,
         c.translation AS translation,
         s.status, s.app_version AS appVersion, s.submitted_at AS submittedAt,
-        s.reviewed_at AS reviewedAt, s.reviewer_note AS reviewerNote, s.review_note AS reviewNote,
-        c.id AS communityQuoteId, c.active AS communityActive, c.revision AS communityRevision
+        s.reviewed_at AS reviewedAt, s.reviewed_by AS reviewedBy,
+        s.reviewer_note AS reviewerNote, s.review_note AS reviewNote,
+        c.id AS communityQuoteId, c.active AS communityActive, c.revision AS communityRevision,
+        c.updated_at AS communityUpdatedAt, c.updated_by AS communityUpdatedBy
        FROM submissions s LEFT JOIN community_quotes c ON c.submission_id = s.id
        WHERE s.status = ? ${cursorFilter}
        ORDER BY s.submitted_at ${order}, s.id ${order} LIMIT ${ADMIN_PAGE_SIZE + 1}`
@@ -165,6 +187,29 @@ async function listSubmissions(url: URL, env: Env): Promise<Response> {
   const last = submissions[submissions.length - 1];
   const nextCursor = rows.results.length > ADMIN_PAGE_SIZE && last ? `${last.submittedAt}.${last.id}` : null;
   return adminJson({ submissions, counts: counts.results, nextCursor });
+}
+
+// True for a published community quote other than the one with the given id that has the
+// given comparison key. A null key (text without letters or digits) never matches.
+const OTHER_PUBLISHED_WITH_KEY =
+  "EXISTS (SELECT 1 FROM community_quotes WHERE active = 1 AND normalized_text = ? AND id <> ?)";
+
+interface Assignment {
+  sql: string;
+  bindings: unknown[];
+}
+
+function updateStatement(
+  env: Env,
+  table: "community_quotes" | "submissions",
+  assignments: Assignment[],
+  id: string,
+  guard: string,
+  guardBindings: unknown[]
+): D1PreparedStatement {
+  return env.DB.prepare(
+    `UPDATE ${table} SET ${assignments.map(assignment => assignment.sql).join(", ")} WHERE id = ? AND ${guard}`
+  ).bind(...assignments.flatMap(assignment => assignment.bindings), id, ...guardBindings);
 }
 
 async function updateCommunityQuote(
@@ -180,59 +225,67 @@ async function updateCommunityQuote(
     return adminError(400, "invalid_request", "action must be update, unpublish, or republish.");
   }
   const existing = await env.DB.prepare(
-    "SELECT id, submission_id AS submissionId, active FROM community_quotes WHERE id = ? LIMIT 1"
-  ).bind(id).first<{ id: string; submissionId: string; active: number }>();
+    "SELECT id, submission_id AS submissionId FROM community_quotes WHERE id = ? LIMIT 1"
+  ).bind(id).first<{ id: string; submissionId: string }>();
   if (!existing) return adminError(404, "not_found", "Community quote not found.");
 
-  const statements: D1PreparedStatement[] = [
-    env.DB.prepare("UPDATE sync_state SET revision = revision + 1 WHERE id = 1")
-  ];
+  // Two published quotes must never share a comparison key. The condition is part of every
+  // statement of the batch, so a concurrent approval or republish cannot slip in between a
+  // check and the write. It reads the same before and after the community quote changes.
+  let guard = "1";
+  let guardBindings: unknown[] = [];
+  let quoteChanges: Assignment[] = [{ sql: "active = ?", bindings: [action === "republish" ? 1 : 0] }];
+  const submissionChanges: Assignment[] = [];
   if (action === "update") {
     const validation = validateModeration({ ...input, action: "approve" });
     if (!validation.ok) return adminError(400, "validation", validation.message);
     const value = validation.value;
-    statements.push(
-      env.DB.prepare(
-        `UPDATE community_quotes SET quote_text = ?, author = ?, category = ?, tags_json = ?,
-          normalized_text = ?, language = COALESCE(?, language),
-          translation = CASE WHEN ? = 1 THEN ? ELSE translation END,
-          revision = (SELECT revision FROM sync_state WHERE id = 1), updated_at = unixepoch()
-         WHERE id = ?`
-      ).bind(
-        value.quoteText,
-        value.author,
-        value.category,
-        JSON.stringify(value.tags),
-        quoteComparisonKey(value.quoteText),
-        value.language ?? null,
-        value.translation === undefined ? 0 : 1,
-        value.translation ?? null,
-        id
-      )
-    );
-    // Notes only change when the moderator actually wrote something; an edit without a
-    // note keeps the original review history.
-    if (value.note) {
-      statements.push(
-        env.DB.prepare("UPDATE submissions SET reviewer_note = ? WHERE id = ?")
-          .bind(`${value.note} [edited by ${reviewer}]`, existing.submissionId)
-      );
-    }
+    const comparisonKey = quoteComparisonKey(value.quoteText);
+    guard = `(NOT EXISTS (SELECT 1 FROM community_quotes WHERE id = ? AND active = 1)
+      OR NOT ${OTHER_PUBLISHED_WITH_KEY})`;
+    guardBindings = [id, comparisonKey || null, id];
+    quoteChanges = [
+      { sql: "quote_text = ?", bindings: [value.quoteText] },
+      { sql: "author = ?", bindings: [value.author] },
+      { sql: "category = ?", bindings: [value.category] },
+      { sql: "tags_json = ?", bindings: [JSON.stringify(value.tags)] },
+      { sql: "normalized_text = ?", bindings: [comparisonKey] },
+      { sql: "language = COALESCE(?, language)", bindings: [value.language ?? null] },
+      {
+        sql: "translation = CASE WHEN ? = 1 THEN ? ELSE translation END",
+        bindings: [value.translation === undefined ? 0 : 1, value.translation ?? null]
+      }
+    ];
+    // The private note only changes when the moderator wrote a new one.
+    if (value.note) submissionChanges.push({ sql: "reviewer_note = ?", bindings: [value.note] });
     if (value.reviewNote !== undefined) {
-      statements.push(
-        env.DB.prepare("UPDATE submissions SET review_note = ? WHERE id = ?")
-          .bind(value.reviewNote, existing.submissionId)
-      );
+      submissionChanges.push({ sql: "review_note = ?", bindings: [value.reviewNote] });
     }
-  } else {
-    statements.push(
-      env.DB.prepare(
-        `UPDATE community_quotes SET active = ?, revision = (SELECT revision FROM sync_state WHERE id = 1),
-          updated_at = unixepoch() WHERE id = ?`
-      ).bind(action === "republish" ? 1 : 0, id)
-    );
+  } else if (action === "republish") {
+    guard = `NOT EXISTS (SELECT 1 FROM community_quotes self JOIN community_quotes other
+      ON other.normalized_text = self.normalized_text AND other.id <> self.id
+      WHERE self.id = ? AND self.normalized_text <> '' AND other.active = 1)`;
+    guardBindings = [id];
   }
-  await env.DB.batch(statements);
+  quoteChanges.push(
+    { sql: "updated_by = ?", bindings: [reviewer] },
+    { sql: "revision = (SELECT revision FROM sync_state WHERE id = 1), updated_at = unixepoch()", bindings: [] }
+  );
+
+  const statements: D1PreparedStatement[] = [
+    env.DB.prepare(`UPDATE sync_state SET revision = revision + 1 WHERE id = 1 AND ${guard}`).bind(...guardBindings),
+    updateStatement(env, "community_quotes", quoteChanges, id, guard, guardBindings)
+  ];
+  if (submissionChanges.length > 0) {
+    statements.push(updateStatement(env, "submissions", submissionChanges, existing.submissionId, guard, guardBindings));
+  }
+  const results = await env.DB.batch(statements);
+  if (results[1].meta.changes === 0) {
+    const stillExists = await env.DB.prepare("SELECT 1 AS found FROM community_quotes WHERE id = ?")
+      .bind(id).first<{ found: number }>();
+    if (!stillExists) return adminError(404, "not_found", "Community quote not found.");
+    return adminError(409, "duplicate", DUPLICATE_MESSAGE);
+  }
   return adminJson({
     id,
     status: action === "unpublish" ? "unpublished" : action === "republish" ? "published" : "updated"
@@ -251,38 +304,38 @@ async function moderate(request: Request, env: Env, id: string, reviewer: string
   if (!existing) return adminError(404, "not_found", "Submission not found.");
   const canApproveRejected = existing.status === "rejected" && validation.value.action === "approve";
   if (existing.status !== "pending" && !canApproveRejected) {
-    return adminError(409, "already_reviewed", "Submission cannot be changed from its current state.");
+    // The status lets the dashboard recognise a repeated approval as already done.
+    return adminError(409, "already_reviewed", "Submission cannot be changed from its current state.", {
+      status: existing.status
+    });
   }
 
   const value = validation.value;
-  const note = value.note ? `${value.note} [reviewed by ${reviewer}]` : `Reviewed by ${reviewer}`;
+  const note = value.note || null;
   if (value.action === "reject") {
     const result = await env.DB.prepare(
-      `UPDATE submissions SET status = 'rejected', reviewed_at = unixepoch(), reviewer_note = ?, review_note = ?
+      `UPDATE submissions SET status = 'rejected', reviewed_at = unixepoch(), reviewed_by = ?,
+        reviewer_note = ?, review_note = ?
        WHERE id = ? AND status = 'pending'`
-    ).bind(note, value.reviewNote ?? null, id).run();
+    ).bind(reviewer, note, value.reviewNote ?? null, id).run();
     if (result.meta.changes === 0) {
       return adminError(409, "already_reviewed", "Submission was already reviewed.");
     }
     return adminJson({ id, status: "rejected" });
   }
 
+  // The state and duplicate checks are part of the batch, so a second concurrent approval,
+  // or an approval or republish of the same text, changes nothing and is reported below.
   const comparisonKey = quoteComparisonKey(value.quoteText);
-  const published = await env.DB.prepare(
-    "SELECT id FROM community_quotes WHERE active = 1 AND normalized_text = ? LIMIT 1"
-  ).bind(comparisonKey || null).first<{ id: string }>();
-  if (published) {
-    return adminError(409, "duplicate", "A published community quote with the same text already exists.");
-  }
-
-  // Every statement re-checks the submission state, so a second concurrent approval
-  // changes nothing and is reported as a conflict.
-  const approvable = "EXISTS (SELECT 1 FROM submissions WHERE id = ? AND status IN ('pending', 'rejected'))";
+  const approvable = `EXISTS (SELECT 1 FROM submissions WHERE id = ? AND status IN ('pending', 'rejected'))
+    AND NOT EXISTS (SELECT 1 FROM community_quotes WHERE active = 1 AND normalized_text = ?)`;
+  const approvableBindings = [id, comparisonKey || null];
   const communityQuoteId = crypto.randomUUID();
   let results: D1Result[];
   try {
     results = await env.DB.batch([
-      env.DB.prepare(`UPDATE sync_state SET revision = revision + 1 WHERE id = 1 AND ${approvable}`).bind(id),
+      env.DB.prepare(`UPDATE sync_state SET revision = revision + 1 WHERE id = 1 AND ${approvable}`)
+        .bind(...approvableBindings),
       env.DB.prepare(
         `INSERT INTO community_quotes (
           id, submission_id, quote_text, author, category, tags_json, language, translation,
@@ -300,46 +353,81 @@ async function moderate(request: Request, env: Env, id: string, reviewer: string
         value.language ?? existing.language,
         value.translation ?? null,
         comparisonKey,
-        id
+        ...approvableBindings
       ),
       env.DB.prepare(
-        `UPDATE submissions SET status = 'approved', reviewed_at = unixepoch(), reviewer_note = ?, review_note = ?
-         WHERE id = ? AND status IN ('pending', 'rejected')`
-      ).bind(note, value.reviewNote ?? null, id)
+        `UPDATE submissions SET status = 'approved', reviewed_at = unixepoch(), reviewed_by = ?,
+          reviewer_note = ?, review_note = ?
+         WHERE id = ? AND status IN ('pending', 'rejected')
+           AND EXISTS (SELECT 1 FROM community_quotes WHERE id = ? AND submission_id = ?)`
+      ).bind(reviewer, note, value.reviewNote ?? null, id, communityQuoteId, id)
     ]);
   } catch (error) {
-    if (String(error).includes(UNIQUE_VIOLATION)) {
-      return adminError(409, "already_reviewed", "Submission was already approved.");
+    if (isUniqueViolation(error)) {
+      return adminError(409, "already_reviewed", "Submission was already approved.", { status: "approved" });
     }
     throw error;
   }
-  if (results[1].meta.changes === 0) {
-    return adminError(409, "already_reviewed", "Submission was already approved.");
-  }
+  if (results[1].meta.changes === 0) return approvalConflict(env, id, comparisonKey);
   return adminJson({ id, status: "approved", communityQuoteId });
 }
 
-// Permanent deletes keep the content hash in blocked_content_hashes, so removing a row does
-// not reopen the door for the same text.
-function blockContentHash(env: Env, submissionId: string): D1PreparedStatement {
-  return env.DB.prepare(
-    "INSERT OR IGNORE INTO blocked_content_hashes (content_hash) SELECT content_hash FROM submissions WHERE id = ?"
-  ).bind(submissionId);
+async function approvalConflict(env: Env, id: string, comparisonKey: string): Promise<Response> {
+  const state = await env.DB.prepare(
+    `SELECT (SELECT status FROM submissions WHERE id = ?) AS status,
+      EXISTS (SELECT 1 FROM community_quotes WHERE active = 1 AND normalized_text = ?) AS duplicate`
+  ).bind(id, comparisonKey || null).first<{ status: string | null; duplicate: number }>();
+  if (!state?.status) return adminError(404, "not_found", "Submission not found.");
+  // A concurrent approval of this submission also published its text, so the state decides first.
+  if (state.status === "approved") {
+    return adminError(409, "already_reviewed", "Submission was already approved.", { status: "approved" });
+  }
+  if (state.duplicate) return adminError(409, "duplicate", DUPLICATE_MESSAGE);
+  return adminError(409, "already_reviewed", "Submission was already reviewed.", { status: state.status });
+}
+
+// Permanent deletes keep the content hash and a hash of the text's comparison key, so
+// removing a row does not reopen the door for the same text, with any author. The rate-limit
+// slot is kept as well. Every statement only acts while `condition` still holds.
+async function blockAndKeepSlot(
+  env: Env,
+  submissionId: string,
+  texts: Array<string | null>,
+  condition: string,
+  conditionBindings: unknown[]
+): Promise<D1PreparedStatement[]> {
+  const textHashes = new Set<string>();
+  for (const text of texts) {
+    const textHash = text ? await blockedTextHash(text) : null;
+    if (textHash) textHashes.add(textHash);
+  }
+  return [
+    env.DB.prepare(
+      `INSERT OR IGNORE INTO blocked_content_hashes (content_hash)
+       SELECT content_hash FROM submissions WHERE id = ? AND ${condition}`
+    ).bind(submissionId, ...conditionBindings),
+    ...[...textHashes].map(textHash =>
+      env.DB.prepare(`INSERT OR IGNORE INTO blocked_text_hashes (text_hash) SELECT ? WHERE ${condition}`)
+        .bind(textHash, ...conditionBindings)
+    ),
+    keepRateLimitSlots(env.DB, `id = ? AND ${condition}`, submissionId, ...conditionBindings)
+  ];
 }
 
 async function deleteRejectedSubmission(env: Env, id: string): Promise<Response> {
   const existing = await env.DB.prepare(
-    "SELECT status FROM submissions WHERE id = ? LIMIT 1"
-  ).bind(id).first<{ status: string }>();
+    "SELECT status, quote_text AS quoteText FROM submissions WHERE id = ? LIMIT 1"
+  ).bind(id).first<{ status: string; quoteText: string }>();
   if (!existing) return adminError(404, "not_found", "Submission not found.");
   if (existing.status !== "rejected") {
     return adminError(409, "conflict", "Only rejected submissions can be deleted.");
   }
-  const [, deleted] = await env.DB.batch([
-    blockContentHash(env, id),
+  const rejected = "EXISTS (SELECT 1 FROM submissions WHERE id = ? AND status = 'rejected')";
+  const results = await env.DB.batch([
+    ...await blockAndKeepSlot(env, id, [existing.quoteText], rejected, [id]),
     env.DB.prepare("DELETE FROM submissions WHERE id = ? AND status = 'rejected'").bind(id)
   ]);
-  if (deleted.meta.changes === 0) {
+  if (results[results.length - 1].meta.changes === 0) {
     return adminError(409, "conflict", "Only rejected submissions can be deleted.");
   }
   return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
@@ -347,52 +435,86 @@ async function deleteRejectedSubmission(env: Env, id: string): Promise<Response>
 
 async function deleteUnpublishedCommunityQuote(env: Env, id: string): Promise<Response> {
   const existing = await env.DB.prepare(
-    "SELECT id, submission_id AS submissionId, active FROM community_quotes WHERE id = ? LIMIT 1"
-  ).bind(id).first<{ id: string; submissionId: string; active: number }>();
+    `SELECT c.submission_id AS submissionId, c.active, c.quote_text AS quoteText, s.quote_text AS submittedText
+     FROM community_quotes c LEFT JOIN submissions s ON s.id = c.submission_id WHERE c.id = ? LIMIT 1`
+  ).bind(id).first<{ submissionId: string; active: number; quoteText: string; submittedText: string | null }>();
   if (!existing) return adminError(404, "not_found", "Community quote not found.");
   if (existing.active !== 0) {
     return adminError(409, "conflict", "Only unpublished community quotes can be deleted.");
   }
 
-  await env.DB.batch([
-    env.DB.prepare("UPDATE sync_state SET revision = revision + 1 WHERE id = 1"),
+  // Nothing happens if the quote was republished in the meantime.
+  const unpublished = "EXISTS (SELECT 1 FROM community_quotes WHERE id = ? AND active = 0)";
+  const results = await env.DB.batch([
+    env.DB.prepare(`UPDATE sync_state SET revision = revision + 1 WHERE id = 1 AND ${unpublished}`).bind(id),
     env.DB.prepare(
-      "INSERT INTO community_quote_deletions (id, revision) VALUES (?, (SELECT revision FROM sync_state WHERE id = 1))"
-    ).bind(id),
+      `INSERT INTO community_quote_deletions (id, revision)
+       SELECT ?, (SELECT revision FROM sync_state WHERE id = 1) WHERE ${unpublished}`
+    ).bind(id, id),
+    ...await blockAndKeepSlot(
+      env,
+      existing.submissionId,
+      [existing.quoteText, existing.submittedText],
+      unpublished,
+      [id]
+    ),
     env.DB.prepare("DELETE FROM community_quotes WHERE id = ? AND active = 0").bind(id),
-    blockContentHash(env, existing.submissionId),
-    env.DB.prepare("DELETE FROM submissions WHERE id = ?").bind(existing.submissionId)
+    env.DB.prepare(
+      "DELETE FROM submissions WHERE id = ? AND NOT EXISTS (SELECT 1 FROM community_quotes WHERE submission_id = ?)"
+    ).bind(existing.submissionId, existing.submissionId)
   ]);
+  if (results[results.length - 2].meta.changes === 0) {
+    return adminError(409, "conflict", "Only unpublished community quotes can be deleted.");
+  }
   return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
+}
+
+async function routeAdmin(request: Request, env: Env, reviewer: string): Promise<Response> {
+  const url = new URL(request.url);
+  if (url.pathname === "/admin" || url.pathname === "/admin/") {
+    return isReadRequest(request) ? dashboardPage() : methodNotAllowed("GET, HEAD");
+  }
+  if (url.pathname === "/admin/api/submissions") {
+    return isReadRequest(request) ? listSubmissions(url, env) : methodNotAllowed("GET, HEAD");
+  }
+  const match = url.pathname.match(/^\/admin\/api\/submissions\/([0-9a-f-]+)$/i);
+  if (match) {
+    if (request.method === "PATCH") return moderate(request, env, match[1], reviewer);
+    if (request.method === "DELETE") return deleteRejectedSubmission(env, match[1]);
+    return methodNotAllowed("PATCH, DELETE");
+  }
+  const communityMatch = url.pathname.match(/^\/admin\/api\/community\/([0-9a-f-]+)$/i);
+  if (communityMatch) {
+    if (request.method === "PATCH") return updateCommunityQuote(request, env, communityMatch[1], reviewer);
+    if (request.method === "DELETE") return deleteUnpublishedCommunityQuote(env, communityMatch[1]);
+    return methodNotAllowed("PATCH, DELETE");
+  }
+  return adminError(404, "not_found", "Not found.");
 }
 
 export async function handleAdmin(request: Request, env: Env): Promise<Response> {
   if (!env.ACCESS_TEAM_DOMAIN || !env.ACCESS_AUD) {
     return new Response("Cloudflare Access is not configured for this dashboard.", { status: 503 });
   }
-  const reviewer = await verifyAccess(request, env);
-  if (!reviewer) return adminError(401, "unauthorized", "Unauthorized.");
+  const access = await verifyAccess(request, env);
+  if (access.status === "unavailable") {
+    return adminError(
+      503,
+      "access_unavailable",
+      "Cloudflare Access keys could not be loaded, so the login cannot be checked. Please try again in a minute."
+    );
+  }
+  if (access.status !== "verified") return adminError(401, "unauthorized", "Unauthorized.");
 
-  const url = new URL(request.url);
-  if ((url.pathname === "/admin" || url.pathname === "/admin/") && request.method === "GET") {
-    return dashboardPage();
+  try {
+    return await routeAdmin(request, env, access.email);
+  } catch (error) {
+    // validateModeration mirrors the schema's CHECK constraints; should they ever disagree,
+    // the moderator gets a validation error instead of a generic server error.
+    if (isCheckViolation(error)) {
+      console.error("Admin write violated a CHECK constraint", error);
+      return adminError(400, "validation", "A field is outside the allowed length.");
+    }
+    throw error;
   }
-  if (url.pathname === "/admin/api/submissions" && request.method === "GET") {
-    return listSubmissions(url, env);
-  }
-  const match = url.pathname.match(/^\/admin\/api\/submissions\/([0-9a-f-]+)$/i);
-  if (match && request.method === "PATCH") {
-    return moderate(request, env, match[1], reviewer);
-  }
-  if (match && request.method === "DELETE") {
-    return deleteRejectedSubmission(env, match[1]);
-  }
-  const communityMatch = url.pathname.match(/^\/admin\/api\/community\/([0-9a-f-]+)$/i);
-  if (communityMatch && request.method === "PATCH") {
-    return updateCommunityQuote(request, env, communityMatch[1], reviewer);
-  }
-  if (communityMatch && request.method === "DELETE") {
-    return deleteUnpublishedCommunityQuote(env, communityMatch[1]);
-  }
-  return adminError(404, "not_found", "Not found.");
 }

@@ -81,6 +81,8 @@ class QuoteLocalizationTest {
         assertTrue(englishOriginal.copy(author = "Unknown").hasUnknownAuthor)
         assertTrue(englishOriginal.copy(author = "Unbekannt").hasUnknownAuthor)
         assertTrue(englishOriginal.copy(isAnonymous = true).hasUnknownAuthor)
+        assertTrue(englishOriginal.copy(author = "Anonymous").hasUnknownAuthor)
+        assertTrue(englishOriginal.copy(author = " anonym ").hasUnknownAuthor)
         assertFalse(englishOriginal.hasUnknownAuthor)
     }
 
@@ -89,5 +91,19 @@ class QuoteLocalizationTest {
         val raw = englishOriginal.copy(author = "Unknown")
         assertEquals("Unbekannt", raw.localized(QuoteLanguage.GERMAN).author)
         assertEquals("Unknown", raw.author)
+        assertEquals("Unbekannt", raw.copy(author = "Anonymous").localized(QuoteLanguage.GERMAN).author)
+        assertEquals("Unknown", raw.copy(author = "Anonymous").localized(QuoteLanguage.ENGLISH).author)
+    }
+
+    @Test
+    fun ownQuotes_areListedInEveryLanguageWithTheirOriginalText() {
+        val own = germanOriginal.copy(textEn = null, isUserAdded = true, origin = QuoteOrigin.PERSONAL)
+        assertTrue(own.isListedIn(QuoteLanguage.ENGLISH, showAnonymous = false))
+        assertEquals("Ein eigener Gedanke.", own.localized(QuoteLanguage.ENGLISH).text)
+
+        val untranslatedCommunity = germanOriginal.copy(textEn = null)
+        assertFalse(untranslatedCommunity.isListedIn(QuoteLanguage.ENGLISH, showAnonymous = true))
+        assertTrue(untranslatedCommunity.isListedIn(QuoteLanguage.GERMAN, showAnonymous = true))
+        assertFalse(englishOriginal.copy(isAnonymous = true).isListedIn(QuoteLanguage.ENGLISH, showAnonymous = false))
     }
 }

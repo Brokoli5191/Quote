@@ -1,7 +1,11 @@
 package app.brokoli5191.quote.data
 
 import android.content.Context
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -20,7 +24,10 @@ data class SubmissionStatusInfo(
     val status: String,
     val reviewNote: String? = null,
     val communityQuoteId: String? = null,
-    /** The status endpoint answered 404 (withdrawn or deleted); [status] is then removed. */
+    /**
+     * The status endpoint answered 404 for every installation id (withdrawn or deleted on the server);
+     * [status] is then removed, and the stored state decides what that means.
+     */
     val notFound: Boolean = false,
     /** The answer came from a pre-v2 backend, which never reports "removed". */
     val legacy: Boolean = false
@@ -28,6 +35,12 @@ data class SubmissionStatusInfo(
 
 /** Day key for daily selections. Fixed locale so the key never contains non-ASCII digits. */
 fun dailyDateKey(date: Date = Date()): String = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(date)
+
+/** One day of the daily-quote history. */
+data class DailyHistoryEntry(
+    val date: String, // yyyy-MM-dd
+    val quote: QuoteEntity // Localized display copy
+)
 
 class QuoteRepository(
     private val quoteDao: QuoteDao,
@@ -125,39 +138,22 @@ class QuoteRepository(
     }
 
     /**
-     * Re-seeds the bundled quotes without destroying user data: user-added and community rows
-     * are left untouched, favorites on seed rows are carried over by a loose (text, author) key
-     * before the single batch insert, and favorited quotes that left the seed are kept as they were.
+     * Re-seeds the bundled quotes without losing user data: user-added and community rows are left
+     * untouched, and bundled rows keep their ids, favorites and saved dates (see [mergeReseed]), so
+     * today's quote and the no-repeat history stay attached. The swap runs under the lock that
+     * favorite changes and the daily pick take, so a heart tapped meanwhile is applied afterwards
+     * to the same row instead of being overwritten.
      */
     suspend fun reseedPreservingFavorites(context: Context) {
-        val oldFavorites = quoteDao.getAllQuotesSync()
-            .filter { it.isFavorite && !it.isUserAdded && it.origin != QuoteOrigin.COMMUNITY }
-        val byTextAndAuthor = oldFavorites.associateBy { quoteMatchKey(it.text) to quoteMatchKey(it.author) }
-        // Fallback for author names whose spelling was corrected in the new seed.
-        val byText = oldFavorites.groupBy { quoteMatchKey(it.text) }
-            .filterValues { it.size == 1 }
-            .mapValues { it.value.single() }
         val fresh = try {
             loadBundledQuotes(context)
         } catch (e: Exception) {
             e.printStackTrace()
             return
         }
-        val matched = HashSet<Int>()
-        val seeded = fresh.map { quote ->
-            val textKey = quoteMatchKey(quote.text)
-            val favorite = (byTextAndAuthor[textKey to quoteMatchKey(quote.author)] ?: byText[textKey])
-                ?.takeIf { it.id !in matched }
-                ?: return@map quote
-            matched += favorite.id
-            quote.copy(isFavorite = true, savedDate = favorite.savedDate ?: System.currentTimeMillis().toString())
+        locked {
+            quoteDao.replaceBundledQuotes(mergeReseed(quoteDao.getBundledQuotes(), fresh))
         }
-        // Kept favorites drop the noisy source tags of older seeds and keep only curated ones.
-        val keptFavorites = oldFavorites.filter { it.id !in matched }.map { favorite ->
-            val tags = favorite.tags.split(',').map { it.trim() }.filter { isVocabularyTag(it) }
-            favorite.copy(id = 0, tags = tags.joinToString(", "))
-        }
-        quoteDao.replaceBundledQuotes(seeded + keptFavorites)
     }
 
     fun getQuotesByCategory(category: String): Flow<List<QuoteEntity>> {
@@ -168,14 +164,15 @@ class QuoteRepository(
         return quoteDao.getQuoteById(id)
     }
 
-    suspend fun toggleFavorite(id: Int, isFav: Boolean) {
+    /** Returns false when the quote no longer exists, so the caller can reload what it shows. */
+    suspend fun toggleFavorite(id: Int, isFav: Boolean): Boolean = locked {
         val savedString = if (isFav) System.currentTimeMillis().toString() else null
-        quoteDao.updateFavorite(id, isFav, savedString)
+        quoteDao.updateFavorite(id, isFav, savedString) > 0
     }
 
     /** Marks a quote as favorite with a given saved date (e.g. from a backup). */
     suspend fun setFavorite(id: Int, savedDate: String?) {
-        quoteDao.updateFavorite(id, true, savedDate ?: System.currentTimeMillis().toString())
+        locked { quoteDao.updateFavorite(id, true, savedDate ?: System.currentTimeMillis().toString()) }
     }
 
     suspend fun insertQuote(quote: QuoteEntity): Long {
@@ -213,6 +210,19 @@ class QuoteRepository(
         return quoteDao.getSubmissionsToRefresh(since)
     }
 
+    /**
+     * Own quotes that carry a submission id, whatever their state or age; not submitted ones too, after
+     * [clearSubmissionKeepingIdIfUnchanged].
+     */
+    suspend fun getSubmittedQuotes(): List<QuoteEntity> = quoteDao.getSubmittedQuotes()
+
+    suspend fun getPersonalQuotesBySubmissionId(submissionId: String): List<QuoteEntity> =
+        quoteDao.getPersonalQuotesBySubmissionIds(listOf(submissionId))
+
+    /** Whether the community copy [serverId] (e.g. a personal quote's [QuoteEntity.linkedServerId]) is stored. */
+    suspend fun hasCommunityQuote(serverId: String): Boolean =
+        quoteDao.getQuoteByServerId(serverId)?.origin == QuoteOrigin.COMMUNITY
+
     suspend fun deleteQuote(id: Int) {
         quoteDao.deleteQuoteById(id)
     }
@@ -244,6 +254,42 @@ class QuoteRepository(
     suspend fun clearSubmission(id: Int) {
         quoteDao.clearSubmission(id)
     }
+
+    /**
+     * [applySubmissionStatus] for a state fetched after [snapshot] was read: it is written only while the
+     * row still has the snapshot's submission id and status, so a slow status request never overwrites a
+     * withdrawal, edit or resubmission made meanwhile. Returns whether the row was written.
+     */
+    suspend fun applySubmissionStatusIfUnchanged(snapshot: QuoteEntity, info: SubmissionStatusInfo): Boolean {
+        val linked = info.communityQuoteId?.takeIf { info.status == QuoteSubmissionStatus.APPROVED }
+        return quoteDao.updateSubmissionStateIf(
+            snapshot.id,
+            snapshot.submissionId,
+            snapshot.submissionStatus,
+            info.status,
+            info.reviewNote?.takeIf { it.isNotBlank() },
+            linked
+        ) > 0
+    }
+
+    /** [clearSubmission], but only while the row still has [snapshot]'s submission id and status. */
+    suspend fun clearSubmissionIfUnchanged(snapshot: QuoteEntity): Boolean =
+        quoteDao.clearSubmissionIf(snapshot.id, snapshot.submissionId, snapshot.submissionStatus) > 0
+
+    /**
+     * [clearSubmissionIfUnchanged] for a submission the server may still have: the quote shows as not
+     * submitted and can be submitted again (which replaces the id), but keeps its submission id, so the
+     * feed still links it if that submission is published.
+     */
+    suspend fun clearSubmissionKeepingIdIfUnchanged(snapshot: QuoteEntity): Boolean =
+        quoteDao.updateSubmissionStateIf(
+            snapshot.id,
+            snapshot.submissionId,
+            snapshot.submissionStatus,
+            QuoteSubmissionStatus.NOT_SUBMITTED,
+            null,
+            null
+        ) > 0
 
     /**
      * Applies one community feed page. Personal rows whose submission was published get linked to
@@ -298,8 +344,10 @@ class QuoteRepository(
                     if (personal.linkedServerId != serverId ||
                         personal.submissionStatus != QuoteSubmissionStatus.APPROVED
                     ) {
-                        quoteDao.updateSubmissionState(
+                        quoteDao.updateSubmissionStateIf(
                             personal.id,
+                            personal.submissionId,
+                            personal.submissionStatus,
                             QuoteSubmissionStatus.APPROVED,
                             personal.reviewNote,
                             serverId
@@ -313,8 +361,10 @@ class QuoteRepository(
             deletedIds.chunked(400).forEach { chunk ->
                 quoteDao.getFavoriteCommunityQuotes(chunk).forEach { removedFavorites[it.serverId!!] = it.savedDate }
                 quoteDao.getPersonalQuotesByLinkedServerIds(chunk).forEach { personal ->
-                    quoteDao.updateSubmissionState(
+                    quoteDao.updateSubmissionStateIf(
                         personal.id,
+                        personal.submissionId,
+                        personal.submissionStatus,
                         QuoteSubmissionStatus.REMOVED,
                         personal.reviewNote,
                         null
@@ -330,7 +380,7 @@ class QuoteRepository(
         )
     }
 
-    // Daily quote selector
+    // Daily quote. App, widget and reminder all read the pick stored here, so they show the same quote.
     suspend fun getDailyQuote(
         date: String,
         sourceMode: String = QuoteSourceMode.ALL,
@@ -338,83 +388,227 @@ class QuoteRepository(
         showAnonymous: Boolean = false
     ): QuoteEntity? = getDailyQuoteRaw(date, sourceMode, language, showAnonymous)?.localized(language)
 
-    /** Same as [getDailyQuote] but returns the stored row, not a localized display copy. */
+    /**
+     * Same as [getDailyQuote] but returns the stored row, not a localized display copy. Today's quote
+     * stays when the language, source or anonymous setting changes, as long as it fits the new
+     * settings; otherwise a quote not shown in the current no-repeat cycle is picked and stored.
+     */
     suspend fun getDailyQuoteRaw(
         date: String,
         sourceMode: String = QuoteSourceMode.ALL,
         language: String = QuoteLanguage.ENGLISH,
         showAnonymous: Boolean = false
-    ): QuoteEntity? {
-        val selectionKey = "${date}_${language}_${if (showAnonymous) 1 else 0}_${sourceMode}"
-        // Check if there is already a selection for today
-        val selection = quoteDao.getDailySelection(selectionKey)
-        if (selection != null) {
-            val q = quoteDao.getQuoteById(selection.quoteId)
-            if (q != null && q.matchesSourceMode(sourceMode) && q.isAvailableIn(language) && (showAnonymous || !q.isAnonymous)) {
-                return q
-            }
-        }
-
-        // Otherwise select a random quote
-        val all = candidateIds(sourceMode, language, showAnonymous)
-        if (all.isEmpty()) {
-            return null
-        }
-
-        // Exclude previously used daily quotes to avoid repeats
-        val usedIds = quoteDao.getAllDailySelectionIds().toHashSet()
-        val available = all.filter { it !in usedIds }
-        val pool = if (available.isEmpty()) all else available
-
-        val selectedId = pool[dailyQuoteIndex(installationSeed, date, pool.size)]
-        val selectedQuote = quoteDao.getQuoteById(selectedId) ?: return null
-
-        // Save selection for today
-        quoteDao.insertDailySelection(DailySelectionEntity(selectionKey, selectedQuote.id))
-        return selectedQuote
+    ): QuoteEntity? = locked {
+        val filter = dailyFilter(sourceMode, language, showAnonymous)
+        todaysPick(date, filter) ?: pickNew(date, filter)
     }
 
+    /**
+     * "Another quote": replaces today's quote with one not shown in the current no-repeat cycle. The
+     * replaced quote stays in the history, so it does not come back as a later daily quote, and
+     * [restoreDailySelection] can bring it back today. Returns the new quote (localized), today's
+     * quote when there is no other candidate, or null when there are no candidates.
+     */
     suspend fun cycleDailyQuote(
         date: String,
         sourceMode: String = QuoteSourceMode.ALL,
         language: String = QuoteLanguage.ENGLISH,
         showAnonymous: Boolean = false
-    ): QuoteEntity? {
-        val selectionKey = "${date}_${language}_${if (showAnonymous) 1 else 0}_${sourceMode}"
-        val all = candidateIds(sourceMode, language, showAnonymous)
-        if (all.isEmpty()) {
-            return null
-        }
-
-        val selection = quoteDao.getDailySelection(selectionKey)
-        val currentQuoteId = selection?.quoteId ?: -1
-
-        // Filter out the current one so it rotates to another
-        val choices = all.filter { it != currentQuoteId }
-        val finalChoices = if (choices.isEmpty()) all else choices
-
-        val nextQuote = quoteDao.getQuoteById(finalChoices.random()) ?: return null
-
-        quoteDao.insertDailySelection(DailySelectionEntity(selectionKey, nextQuote.id))
-        return nextQuote.localized(language)
+    ): QuoteEntity? = locked {
+        val filter = dailyFilter(sourceMode, language, showAnonymous)
+        val current = todaysPick(date, filter)
+        val candidates = candidateIds(filter)
+        val others = candidates.filter { it != current?.id }
+        val nextId = notRecentlyShown(candidates).filter { it != current?.id }.ifEmpty { others }.randomOrNull()
+        val next = nextId?.let { quoteDao.getQuoteById(it) } ?: return@locked current?.localized(language)
+        quoteDao.storeDailySelection(filter.key(date), next.id)
+        next.localized(language)
     }
 
-    private suspend fun candidateIds(sourceMode: String, language: String, showAnonymous: Boolean): List<Int> {
-        val origins = when (sourceMode) {
+    /**
+     * Undo for [cycleDailyQuote]: makes [quoteId] today's quote again for these settings. Returns it
+     * (localized), or null without changing anything when it no longer exists or does not fit them.
+     */
+    suspend fun restoreDailySelection(
+        date: String,
+        sourceMode: String,
+        language: String,
+        showAnonymous: Boolean,
+        quoteId: Int
+    ): QuoteEntity? = locked {
+        val filter = dailyFilter(sourceMode, language, showAnonymous)
+        val quote = quoteDao.getQuoteById(quoteId)?.takeIf(filter::accepts) ?: return@locked null
+        quoteDao.storeDailySelection(filter.key(date), quote.id)
+        quote.localized(language)
+    }
+
+    /**
+     * The daily quotes of the last [limit] days that have a pick fitting these settings, newest
+     * first and today included, as localized copies. A day lists the quote it ended with, so one
+     * replaced by "Another quote" is not listed.
+     */
+    suspend fun dailyHistory(
+        sourceMode: String,
+        language: String,
+        showAnonymous: Boolean,
+        limit: Int = 30
+    ): List<DailyHistoryEntry> {
+        if (limit <= 0) return emptyList()
+        val filter = dailyFilter(sourceMode, language, showAnonymous)
+        val picksByDay = quoteDao.getCurrentDailySelections().groupBy { it.date.substringBefore('_') }
+        val quotes = HashMap<Int, QuoteEntity>()
+        val history = ArrayList<DailyHistoryEntry>(limit)
+        for (days in picksByDay.keys.sortedDescending().chunked(limit)) {
+            days.flatMap { day -> picksByDay.getValue(day).map { it.quoteId } }
+                .filter { it !in quotes }
+                .distinct()
+                .chunked(500)
+                .forEach { ids -> quoteDao.getQuotesByIds(ids).associateByTo(quotes) { it.id } }
+            for (day in days) {
+                val quote = picksByDay.getValue(day)
+                    .firstNotNullOfOrNull { pick -> quotes[pick.quoteId]?.takeIf(filter::accepts) }
+                    ?: continue
+                history += DailyHistoryEntry(day, quote.localized(language))
+                if (history.size == limit) return history
+            }
+        }
+        return history
+    }
+
+    // What the daily quote may be for one combination of settings, and the key its pick is stored
+    // under: "<yyyy-MM-dd>_<language>_<anonymous 0/1>_<source mode>".
+    private class DailyFilter(
+        val sourceMode: String,
+        val language: String,
+        val showAnonymous: Boolean,
+        // Community-only mode without a single community quote in [language]: community quotes in
+        // any language qualify and show their original text, so the mode only comes up empty when
+        // there are no community quotes at all.
+        val anyLanguage: Boolean
+    ) {
+        fun key(date: String) = "${date}_${language}_${if (showAnonymous) 1 else 0}_${sourceMode}"
+
+        fun accepts(quote: QuoteEntity): Boolean =
+            quote.matchesSourceMode(sourceMode) && (showAnonymous || !quote.isAnonymous) &&
+                (anyLanguage || quote.isAvailableIn(language))
+    }
+
+    private suspend fun dailyFilter(sourceMode: String, language: String, showAnonymous: Boolean): DailyFilter {
+        val anyLanguage = sourceMode == QuoteSourceMode.COMMUNITY &&
+            quoteDao.getDailyCandidateIds(listOf(QuoteOrigin.COMMUNITY), language, showAnonymous).isEmpty()
+        return DailyFilter(sourceMode, language, showAnonymous, anyLanguage)
+    }
+
+    private suspend fun candidateIds(filter: DailyFilter): List<Int> {
+        if (filter.anyLanguage) return quoteDao.getCommunityCandidateIdsAnyLanguage(filter.showAnonymous)
+        val origins = when (filter.sourceMode) {
             QuoteSourceMode.CURATED -> listOf(QuoteOrigin.BUNDLED)
             QuoteSourceMode.COMMUNITY -> listOf(QuoteOrigin.COMMUNITY)
             else -> listOf(QuoteOrigin.BUNDLED, QuoteOrigin.COMMUNITY)
         }
-        return quoteDao.getDailyCandidateIds(origins, language, showAnonymous)
+        return quoteDao.getDailyCandidateIds(origins, filter.language, filter.showAnonymous)
+    }
+
+    // Today's quote: the most recent pick of the day that fits these settings, whatever settings it
+    // was made under, so switching language, source or the anonymous setting keeps the quote. It is
+    // stored under this key too, which makes it the most recent pick again; a different quote this
+    // key held stays in the no-repeat history.
+    private suspend fun todaysPick(date: String, filter: DailyFilter): QuoteEntity? {
+        val picks = quoteDao.getDailySelectionsForDay("${date}_")
+        if (picks.isEmpty()) return null
+        val quotes = quoteDao.getQuotesByIds(picks.map { it.quoteId }.distinct()).associateBy { it.id }
+        val pick = picks.firstOrNull { quotes[it.quoteId]?.let(filter::accepts) == true } ?: return null
+        val key = filter.key(date)
+        if (pick.date != key) quoteDao.storeDailySelection(key, pick.quoteId)
+        return quotes.getValue(pick.quoteId)
+    }
+
+    // The index depends only on the install and the date, and the pick is stored under the lock, so
+    // whoever asks first (app, widget or reminder) stores the quote that all of them show.
+    private suspend fun pickNew(date: String, filter: DailyFilter): QuoteEntity? {
+        val candidates = candidateIds(filter)
+        if (candidates.isEmpty()) return null
+        val pool = notRecentlyShown(candidates)
+        val quote = quoteDao.getQuoteById(pool[dailyQuoteIndex(installationSeed, date, pool.size)]) ?: return null
+        quoteDao.storeDailySelection(filter.key(date), quote.id)
+        return quote
+    }
+
+    private suspend fun notRecentlyShown(candidates: List<Int>): List<Int> {
+        val shown = currentNoRepeatCycle(quoteDao.getDailySelectionIdsOldestFirst(), candidates.toHashSet())
+        return candidates.filter { it !in shown }
     }
 
     companion object {
         /** How long rejected/removed/unlinked approved submissions keep being polled. */
         const val SUBMISSION_REFRESH_WINDOW_MS = 30L * 24 * 60 * 60 * 1000
+
+        // Shared by every instance in the process (app, widget, reminder, workers), so the daily
+        // pick, the re-seed and favorite changes never interleave.
+        private val writeLock = Mutex()
+
+        /**
+         * Runs [block] under [writeLock] on a background dispatcher. The holder never needs the
+         * main thread, so a caller that blocks the main thread while waiting for the lock cannot
+         * deadlock with a main-thread coroutine (e.g. the ViewModel) that holds it.
+         */
+        private suspend fun <T> locked(block: suspend () -> T): T =
+            withContext(Dispatchers.IO) { writeLock.withLock { block() } }
     }
 }
 
 internal fun dailyQuoteIndex(installationSeed: Long, date: String, poolSize: Int): Int {
     require(poolSize > 0)
     return kotlin.random.Random(installationSeed xor date.hashCode().toLong()).nextInt(poolSize)
+}
+
+/**
+ * The ids of the current no-repeat cycle in [historyOldestFirst]: every candidate is shown once
+ * before any comes back. When all have been shown a new cycle starts, which never opens with the
+ * quote that closed the last one. It never holds every candidate, so a pick is always possible.
+ */
+internal fun currentNoRepeatCycle(historyOldestFirst: List<Int>, candidates: Set<Int>): Set<Int> {
+    val cycle = HashSet<Int>()
+    var last: Int? = null
+    for (id in historyOldestFirst) {
+        if (id !in candidates) continue
+        cycle += id
+        last = id
+        if (cycle.size == candidates.size) cycle.clear()
+    }
+    if (cycle.isEmpty() && last != null && candidates.size > 1) cycle += last
+    return cycle
+}
+
+/**
+ * The rows a re-seed writes. Each [fresh] row takes over the id, favorite state, saved date and
+ * timestamp of the old bundled row it matches: by (text, author) first, then by text alone when
+ * that text is unique among the old rows, for author names the new seed corrected. Old favorites
+ * that left the seed are kept as they were, but with only their curated tags (older seeds carried
+ * noisy source tags). Other old rows are dropped.
+ */
+internal fun mergeReseed(old: List<QuoteEntity>, fresh: List<QuoteEntity>): List<QuoteEntity> {
+    val oldKeys = old.map { quoteMatchKey(it.text) to quoteMatchKey(it.author) }
+    val byTextAndAuthor = old.indices.groupBy({ oldKeys[it] }, { old[it] })
+    val byText = old.indices.groupBy({ oldKeys[it].first }, { old[it] }).filterValues { it.size == 1 }
+    val matched = HashSet<Int>()
+    fun claim(rows: List<QuoteEntity>?): QuoteEntity? =
+        rows?.firstOrNull { it.id !in matched }?.also { matched += it.id }
+
+    val freshKeys = fresh.map { quoteMatchKey(it.text) to quoteMatchKey(it.author) }
+    val exact = freshKeys.map { claim(byTextAndAuthor[it]) }
+    val now = System.currentTimeMillis().toString()
+    val merged = fresh.mapIndexed { index, quote ->
+        val match = exact[index] ?: claim(byText[freshKeys[index].first]) ?: return@mapIndexed quote
+        quote.copy(
+            id = match.id,
+            isFavorite = match.isFavorite,
+            savedDate = if (match.isFavorite) match.savedDate ?: now else null,
+            timestamp = match.timestamp
+        )
+    }
+    val keptFavorites = old.filter { it.isFavorite && it.id !in matched }.map { favorite ->
+        favorite.copy(tags = favorite.tags.split(',').map { it.trim() }.filter { isVocabularyTag(it) }.joinToString(", "))
+    }
+    return merged + keptFavorites
 }

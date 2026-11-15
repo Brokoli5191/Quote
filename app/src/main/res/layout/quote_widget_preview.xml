@@ -10,7 +10,7 @@
         android:layout_gravity="start|top"
         android:layout_marginStart="16dp"
         android:layout_marginTop="12dp"
-        android:text="QUOTE"
+        android:text="@string/widget_preview_label"
         android:textColor="#D0BCFF"
         android:textSize="11sp"
         android:textStyle="bold" />
@@ -22,7 +22,7 @@
         android:layout_marginHorizontal="16dp"
         android:ellipsize="end"
         android:maxLines="2"
-        android:text="The happiness of your life depends upon the quality of your thoughts."
+        android:text="@string/widget_preview_text"
         android:textColor="#E9DDFF"
         android:textSize="16sp"
         android:textStyle="italic" />
@@ -33,7 +33,7 @@
         android:layout_gravity="start|bottom"
         android:layout_marginStart="16dp"
         android:layout_marginBottom="10dp"
-        android:text="- Marcus Aurelius"
+        android:text="@string/widget_preview_author"
         android:textColor="#A0D2AD"
         android:textSize="10sp"
         android:textStyle="bold" />

@@ -7,6 +7,7 @@ import app.brokoli5191.quote.ui.strings.commonGermanUi
 import app.brokoli5191.quote.ui.strings.dailyGermanUi
 import app.brokoli5191.quote.ui.strings.libraryGermanUi
 import app.brokoli5191.quote.ui.strings.mainGermanUi
+import app.brokoli5191.quote.ui.strings.newQuoteGermanUi
 import app.brokoli5191.quote.ui.strings.onboardingGermanUi
 import app.brokoli5191.quote.ui.strings.savedGermanUi
 import app.brokoli5191.quote.ui.strings.settingsGermanUi
@@ -27,7 +28,6 @@ private val germanUi = mapOf(
     "Light" to "Hell",
     "Dark" to "Dunkel",
     "AMOLED" to "AMOLED",
-    "AMOLED Pure Black" to "AMOLED Tiefschwarz",
     "Light surfaces for bright environments." to "Helle Oberflächen für eine helle Umgebung.",
     "Comfortable dark gray surfaces with clear elevation." to "Angenehm dunkelgraue Oberflächen mit klaren Ebenen.",
     "True-black backgrounds for OLED displays." to "Echt schwarze Hintergründe für OLED-Displays.",
@@ -44,14 +44,9 @@ private val germanUi = mapOf(
     "German" to "Deutsch",
     "Anonymous reflections" to "Autorlose Gedanken",
     "Show original poetic quotes without an author" to "Eigene poetische Quotes ohne Autor anzeigen",
-    "Daily Reflection Reminders" to "Tägliche Erinnerungen",
     "Daily quote reminder" to "Tägliche Quote-Erinnerung",
     "Receive one quote at your chosen time." to "Erhalte ein Quote zu deiner gewählten Uhrzeit.",
     "Choose Notification Time" to "Uhrzeit auswählen",
-    "Increase hour" to "Stunde erhöhen",
-    "Decrease hour" to "Stunde verringern",
-    "Increase minute" to "Minute erhöhen",
-    "Decrease minute" to "Minute verringern",
     "Performance" to "Leistung",
     "Blur Navigation Surfaces" to "Navigation weichzeichnen",
     "Adds a translucent effect to navigation areas. Disable it if scrolling feels slow." to "Fügt Navigationsbereichen einen transparenten Effekt hinzu. Deaktiviere ihn, wenn das Scrollen langsam wirkt.",
@@ -73,9 +68,7 @@ private val germanUi = mapOf(
     "Clear All" to "Alle löschen",
     "Apply Filter" to "Filter anwenden",
     "Clear Filter" to "Filter löschen",
-    "Search quotes, authors, or tags" to "Quotes, Autoren oder Tags suchen",
     "Search results" to "Suchergebnisse",
-    "Search Off Icon" to "Keine Suchergebnisse",
     "No Community Quotes Yet" to "Noch keine Community-Quotes",
     "No Wisdom Matches" to "Keine passenden Quotes",
     "Checking for newly approved community quotes..." to "Neue freigegebene Community-Quotes werden gesucht …",
@@ -113,7 +106,6 @@ private val germanUi = mapOf(
     "Tap the heart on a quote to keep it here." to "Tippe bei einem Quote auf das Herz, um es hier zu speichern.",
     "Create a personal quote from the add button." to "Erstelle über die Hinzufügen-Schaltfläche ein eigenes Quote.",
     "Submit for review?" to "Zur Prüfung einreichen?",
-    "This quote, its author, category, and tags will be sent to Quote for review. If approved, it may be included in the public quote collection." to "Dieses Quote wird zusammen mit Autor, Kategorie und Tags zur Prüfung gesendet. Nach der Freigabe kann es in die öffentliche Sammlung aufgenommen werden.",
     "Cancel" to "Abbrechen",
     "Submit" to "Einreichen",
     "Submitting..." to "Wird eingereicht …",
@@ -157,7 +149,6 @@ private val germanUi = mapOf(
     "Slate" to "Schiefer",
     "Paper" to "Papier",
     "Pure Black" to "Tiefschwarz",
-    "QUOTE" to "ZITAT",
     "App Info" to "App-Info",
     "Data Health" to "Datenzustand",
     "Actions" to "Aktionen",
@@ -192,7 +183,6 @@ private val germanUi = mapOf(
     "Checking for updates…" to "Updates werden gesucht …",
     "You're on the latest version." to "Du verwendest die neueste Version.",
     "Version" to "Version",
-    "Could not reach update server" to "Der Update-Server ist nicht erreichbar",
     "Download failed" to "Download fehlgeschlagen",
     "Copy" to "Kopieren",
     "Share" to "Teilen",
@@ -208,9 +198,6 @@ private val germanUi = mapOf(
     "Filter Categories" to "Kategorien filtern",
     "Search" to "Suchen",
     "Clear Search" to "Suche löschen",
-    "Export Backup" to "Sicherung exportieren",
-    "Import Backup" to "Sicherung importieren",
-    "Daily Reminders" to "Tägliche Erinnerungen",
     "Daily Reminder scheduled! ✦" to "Tägliche Erinnerung geplant! ✦",
     "Notifications permission is required to receive daily quotes." to "Für tägliche Quotes ist die Benachrichtigungsberechtigung erforderlich.",
     "Daily Reminder disabled" to "Tägliche Erinnerung deaktiviert",
@@ -258,6 +245,7 @@ private val areaGermanUi: List<Map<String, String>> by lazy {
         dailyGermanUi,
         libraryGermanUi,
         savedGermanUi,
+        newQuoteGermanUi,
         settingsGermanUi,
         commonGermanUi
     )
@@ -280,3 +268,12 @@ fun categoryText(category: String): String = localizedCategory(category, LocalAp
 
 fun formattedQuote(text: String, author: String): String =
     if (author.isBlank()) "\"$text\"" else "\"$text\" — $author"
+
+/**
+ * Share/copy/notification text with the quotation marks of [language] (German „…“, English "…").
+ * A blank author is left out; callers pass "" for unknown authors instead of "Unknown".
+ */
+fun formattedQuote(text: String, author: String, language: String): String {
+    val quoted = if (language == QuoteLanguage.GERMAN) "„$text“" else "\"$text\""
+    return if (author.isBlank()) quoted else "$quoted — $author"
+}

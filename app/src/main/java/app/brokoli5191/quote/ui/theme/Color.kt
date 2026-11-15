@@ -13,10 +13,11 @@ val OnPrimaryViolet = Color(0xFF37265E)
 val PrimaryContainerViolet = Color(0xFFD0BCFF)
 val OnPrimaryContainerViolet = Color(0xFF594983)
 
-val SecondaryAmber = Color(0xFFFFDB9C)
-val OnSecondaryAmber = Color(0xFF412D00)
-val SecondaryContainerAmber = Color(0xFFFDB700)
-val OnSecondaryContainerAmber = Color(0xFF6A4B00)
+// Calm companion of the violet accent for tonal buttons and chips (Material 3's baseline dark secondary).
+val SecondaryViolet = Color(0xFFCCC2DC)
+val OnSecondaryViolet = Color(0xFF332D41)
+val SecondaryContainerViolet = Color(0xFF4A4458)
+val OnSecondaryContainerViolet = Color(0xFFE8DEF8)
 
 val TertiaryGreen = Color(0xFFBCEEC8)
 val OnTertiaryGreen = Color(0xFF06381F)

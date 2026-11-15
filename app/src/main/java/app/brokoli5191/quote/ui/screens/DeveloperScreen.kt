@@ -1,6 +1,5 @@
 package app.brokoli5191.quote.ui.screens
 
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -31,10 +30,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.brokoli5191.quote.BuildConfig
 import app.brokoli5191.quote.data.QuoteOrigin
 import app.brokoli5191.quote.data.QuoteSubmissionStatus
-import app.brokoli5191.quote.ui.LocalAppLanguage
 import app.brokoli5191.quote.ui.QuoteViewModel
 import app.brokoli5191.quote.ui.categoryText
-import app.brokoli5191.quote.ui.localizeUi
 import app.brokoli5191.quote.ui.uiText
 import app.brokoli5191.quote.ui.components.ExpressiveButton
 import app.brokoli5191.quote.ui.components.ExpressiveOutlinedButton
@@ -46,7 +43,6 @@ import dev.chrisbanes.haze.rememberHazeState
 fun DeveloperScreen(viewModel: QuoteViewModel, modifier: Modifier = Modifier) {
     val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
-    val uiLanguage = LocalAppLanguage.current
 
     val dailyQuote by viewModel.dailyQuote.collectAsStateWithLifecycle()
     val allQuotes by viewModel.allQuotes.collectAsStateWithLifecycle()
@@ -246,12 +242,8 @@ fun DeveloperScreen(viewModel: QuoteViewModel, modifier: Modifier = Modifier) {
                 ExpressiveOutlinedButton(
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        // Closes this screen and shows the onboarding at once, so no confirmation is needed.
                         viewModel.resetOnboarding()
-                        Toast.makeText(
-                            context,
-                            localizeUi("Onboarding will be shown again", uiLanguage),
-                            Toast.LENGTH_SHORT
-                        ).show()
                     },
                     modifier = Modifier.fillMaxWidth(),
                     restingCorner = 12.dp

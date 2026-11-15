@@ -1,6 +1,8 @@
 package app.brokoli5191.quote
 
+import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.PredictiveBackHandler
@@ -38,6 +40,7 @@ import androidx.compose.material.icons.outlined.Spa
 import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -59,12 +62,14 @@ import androidx.lifecycle.repeatOnLifecycle
 import app.brokoli5191.quote.data.AppDatabase
 import app.brokoli5191.quote.data.QuoteRepository
 import app.brokoli5191.quote.data.InstallationSeed
+import app.brokoli5191.quote.ui.QuoteDraft
 import app.brokoli5191.quote.ui.QuoteViewModel
 import app.brokoli5191.quote.ui.QuoteViewModelFactory
 import app.brokoli5191.quote.ui.LocalAppLanguage
 import app.brokoli5191.quote.ui.uiText
 import app.brokoli5191.quote.ui.components.BottomNavigationBarFade
 import app.brokoli5191.quote.ui.components.BottomNavigationBarHeight
+import app.brokoli5191.quote.ui.components.QuoteEventsHost
 import app.brokoli5191.quote.ui.screens.DailyScreen
 import app.brokoli5191.quote.ui.screens.DeveloperScreen
 import app.brokoli5191.quote.ui.screens.LibraryScreen
@@ -73,6 +78,8 @@ import app.brokoli5191.quote.ui.screens.OnboardingScreen
 import app.brokoli5191.quote.ui.screens.SavedScreen
 import app.brokoli5191.quote.ui.screens.WidgetSettingsScreen
 import app.brokoli5191.quote.ui.theme.MyApplicationTheme
+import app.brokoli5191.quote.utils.AppLinks
+import app.brokoli5191.quote.utils.QuoteSharing
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
@@ -81,6 +88,12 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+
+    private lateinit var viewModel: QuoteViewModel
+
+    // What the widget, a notification, a shortcut or another app asked to open. It waits while
+    // onboarding is shown and is kept across recreation until it has been opened.
+    private var pendingAppLink by mutableStateOf<AppLinkRequest?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -92,7 +105,12 @@ class MainActivity : ComponentActivity() {
         val factory = QuoteViewModelFactory(application, repository)
 
         // Create ViewModel before setContent so theme loads synchronously — prevents flash
-        val viewModel = ViewModelProvider(this, factory)[QuoteViewModel::class.java]
+        viewModel = ViewModelProvider(this, factory)[QuoteViewModel::class.java]
+
+        // A recreated activity gets its launch intent again; that request was handled already.
+        pendingAppLink = if (savedInstanceState == null) appLinkRequest(intent) else savedInstanceState.readAppLinkRequest()
+        // singleTop: taps on the widget or a notification reach the running activity here.
+        addOnNewIntentListener { newIntent -> appLinkRequest(newIntent)?.let { pendingAppLink = it } }
 
         setContent {
             LaunchedEffect(Unit) {
@@ -116,6 +134,14 @@ class MainActivity : ComponentActivity() {
             val blurNavigationSurfaces by viewModel.blurNavigationSurfaces.collectAsStateWithLifecycle()
             val appLanguage by viewModel.appLanguage.collectAsStateWithLifecycle()
             val showOnboarding by viewModel.showOnboarding.collectAsStateWithLifecycle()
+
+            val appLink = pendingAppLink
+            LaunchedEffect(appLink, showOnboarding) {
+                if (appLink != null && !showOnboarding) {
+                    pendingAppLink = null
+                    openAppLink(appLink)
+                }
+            }
 
             MyApplicationTheme(themeMode = themeMode, themeAccent = themeAccent, amoledBlack = amoledBlack) {
               // System bar icons follow the app theme, not the system one (e.g. Light theme on a
@@ -150,6 +176,75 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        pendingAppLink?.let(outState::putAppLinkRequest)
+    }
+
+    // openDestination keeps a New Quote form that holds a draft open, so no entry point drops it.
+    // setPendingDraft opens New Quote itself.
+    private fun openAppLink(link: AppLinkRequest) {
+        val draft = link.draft
+        if (draft != null) {
+            viewModel.setPendingDraft(draft.text, draft.author)
+        } else {
+            viewModel.openDestination(link.destination)
+        }
+    }
+}
+
+/** A destination from [AppLinks], plus the draft for text that another app shared or selected. */
+internal data class AppLinkRequest(val destination: String, val draft: QuoteDraft? = null)
+
+private val AppLinkDestinations = setOf(
+    AppLinks.DEST_DAILY,
+    AppLinks.DEST_FAVORITES,
+    AppLinks.DEST_MY_QUOTES,
+    AppLinks.DEST_NEW_QUOTE
+)
+
+/**
+ * What [intent] asks MainActivity to open, or null for a plain launch. Shared text (ACTION_SEND,
+ * ACTION_PROCESS_TEXT) opens New Quote with a draft; otherwise AppLinks.EXTRA_DEST names the screen.
+ * A task reopened from Recents gets its old intent again, which is not a new request.
+ */
+internal fun appLinkRequest(intent: Intent?): AppLinkRequest? {
+    if (intent == null || (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0) return null
+    // The activity is exported: extras from other apps may be malformed and must not crash the start.
+    return try {
+        val sharedText = when (intent.action) {
+            Intent.ACTION_SEND -> intent.getCharSequenceExtra(Intent.EXTRA_TEXT)
+            Intent.ACTION_PROCESS_TEXT -> intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)
+            else -> null
+        }
+        if (sharedText != null) {
+            QuoteSharing.draftFromSharedText(sharedText.toString())?.let { AppLinkRequest(AppLinks.DEST_NEW_QUOTE, it) }
+        } else {
+            intent.getStringExtra(AppLinks.EXTRA_DEST)?.takeIf { it in AppLinkDestinations }?.let { AppLinkRequest(it) }
+        }
+    } catch (e: RuntimeException) {
+        Log.w("MainActivity", "Ignoring an intent with unreadable extras", e)
+        null
+    }
+}
+
+private const val STATE_LINK_DESTINATION = "pending_app_link_destination"
+private const val STATE_LINK_TEXT = "pending_app_link_text"
+private const val STATE_LINK_AUTHOR = "pending_app_link_author"
+
+private fun Bundle.putAppLinkRequest(link: AppLinkRequest) {
+    putString(STATE_LINK_DESTINATION, link.destination)
+    link.draft?.let {
+        putString(STATE_LINK_TEXT, it.text)
+        putString(STATE_LINK_AUTHOR, it.author)
+    }
+}
+
+private fun Bundle.readAppLinkRequest(): AppLinkRequest? {
+    val destination = getString(STATE_LINK_DESTINATION) ?: return null
+    val draft = getString(STATE_LINK_TEXT)?.let { QuoteDraft(it, getString(STATE_LINK_AUTHOR).orEmpty()) }
+    return AppLinkRequest(destination, draft)
 }
 
 // Same scrims enableEdgeToEdge() uses by default (only visible on API < 29 with button navigation).
@@ -189,8 +284,16 @@ internal fun MainContent(
     // Whether the running back gesture only clears the Library search/filter.
     var backGestureIsFilterClear by remember { mutableStateOf(false) }
 
+    // Tab the user tapped while New Quote held a draft; set while the discard dialog asks.
+    var discardDraftForTab by rememberSaveable { mutableStateOf<String?>(null) }
+
     LaunchedEffect(showNewQuoteScreen) {
-        if (showNewQuoteScreen && !newQuoteBackInProgress) {
+        if (!showNewQuoteScreen) {
+            discardDraftForTab = null
+            // Closed without its exit animation (an entry point opened another screen), so the
+            // next open slides in again.
+            if (!newQuoteBackInProgress) newQuoteProgressAnim.snapTo(1f)
+        } else if (!newQuoteBackInProgress) {
             newQuoteProgressAnim.animateTo(
                 0f,
                 animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing)
@@ -230,30 +333,32 @@ internal fun MainContent(
     PredictiveBackHandler(
         enabled = hasBackStack && !showNewQuoteScreen && !newQuoteBackInProgress
     ) { progress ->
-        var capturedIsFilterClear = false
-        var capturedIsDevBack = false
-        var capturedPreviewTab: String? = null
+        // Read when the back starts instead of collecting search/filter state in composition. A
+        // plain back (three-button navigation, a key press, Android 13 and older) starts this with
+        // a flow that ends without any event, so none of it may wait for one.
+        val devScreen = viewModel.showDevScreen.value
+        val newQuoteScreen = viewModel.showNewQuoteScreen.value
+        val tab = viewModel.selectedTab.value
+        val isFilterClear = !devScreen && !newQuoteScreen && tab == "Library"
+            && (viewModel.selectedCategories.value.isNotEmpty() || viewModel.searchQuery.value.isNotBlank())
+        val previewTab = if (!isFilterClear && !devScreen && !newQuoteScreen && tab != "Daily") "Daily" else null
+        backGestureIsFilterClear = isFilterClear
+        var gestureSeen = false
         try {
             progress.collect { event ->
-                // Read at gesture time instead of collecting search/filter state in composition.
-                val devScreen = viewModel.showDevScreen.value
-                val newQuoteScreen = viewModel.showNewQuoteScreen.value
-                val tab = viewModel.selectedTab.value
-                capturedIsDevBack = devScreen
-                capturedIsFilterClear = !devScreen && !newQuoteScreen && tab == "Library"
-                    && (viewModel.selectedCategories.value.isNotEmpty() || viewModel.searchQuery.value.isNotBlank())
-                capturedPreviewTab = if (!capturedIsFilterClear && !devScreen && !newQuoteScreen && tab != "Daily") "Daily" else null
-                backGestureIsFilterClear = capturedIsFilterClear
+                gestureSeen = true
                 backProgressAnim.snapTo(event.progress)
             }
-            if (capturedIsFilterClear) {
+            if (isFilterClear || (!gestureSeen && !devScreen)) {
+                // No peek to finish: pop at once, so a tab change runs its normal transition.
                 backProgressAnim.snapTo(0f)
                 viewModel.popBackStack()
                 return@PredictiveBackHandler
             }
-            completionPreviewTab = capturedPreviewTab
+            // The Developer screen has no exit transition of its own; a plain back slides it out here.
+            completionPreviewTab = previewTab
             isCompletingPredictiveBack = true
-            if (capturedIsDevBack) isCompletingDevBack = true
+            if (devScreen) isCompletingDevBack = true
             backProgressAnim.animateTo(1f, animationSpec = spring(dampingRatio = 0.9f, stiffness = 500f))
             viewModel.popBackStack()
             kotlinx.coroutines.delay(50L)
@@ -341,10 +446,11 @@ internal fun MainContent(
                         blurEnabled = blurActive,
                         hazeState = navigationHazeState,
                         onTabSelected = { tab ->
-                            if (showNewQuoteScreen) {
-                                closeNewQuoteScreen { viewModel.selectTab(tab) }
-                            } else {
-                                viewModel.selectTab(tab)
+                            when {
+                                !showNewQuoteScreen -> viewModel.selectTab(tab)
+                                // Same question as Back: leaving New Quote must not drop a draft silently.
+                                viewModel.newQuoteHasDraft.value -> discardDraftForTab = tab
+                                else -> closeNewQuoteScreen { viewModel.selectTab(tab) }
                             }
                         }
                     )
@@ -456,7 +562,20 @@ internal fun MainContent(
                             }
                     )
                 }
+
+                QuoteEventsHost(viewModel)
             }
+        }
+
+        val tabAfterDiscard = discardDraftForTab
+        if (tabAfterDiscard != null && showNewQuoteScreen) {
+            DiscardDraftDialog(
+                onKeepEditing = { discardDraftForTab = null },
+                onDiscard = {
+                    discardDraftForTab = null
+                    closeNewQuoteScreen { viewModel.selectTab(tabAfterDiscard) }
+                }
+            )
         }
 
         // Developer screen — exit is instant so predictive back graphicsLayer is authoritative
@@ -480,6 +599,28 @@ internal fun MainContent(
         }
 
     }
+}
+
+// Same dialog as New Quote's own Back handling.
+@Composable
+private fun DiscardDraftDialog(onKeepEditing: () -> Unit, onDiscard: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onKeepEditing,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = 0.dp,
+        title = { Text(uiText("Discard draft?")) },
+        text = { Text(uiText("Your unsaved quote will be lost.")) },
+        dismissButton = {
+            TextButton(onClick = onKeepEditing) {
+                Text(uiText("Keep editing"))
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDiscard) {
+                Text(uiText("Discard"), color = MaterialTheme.colorScheme.error)
+            }
+        }
+    )
 }
 
 private fun tabIndex(tab: String) = when (tab) {

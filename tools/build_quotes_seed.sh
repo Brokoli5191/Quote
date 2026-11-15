@@ -24,12 +24,16 @@ QUOTE_TAGS="$SCRIPT_DIR/quote_tags.json"
 BUILDER="$SCRIPT_DIR/rebuild_quotes_seed.mjs"
 VALIDATOR="$SCRIPT_DIR/validate_quotes_seed.mjs"
 TMP_JSONL="$(mktemp)"
-trap 'rm -f "$TMP_JSONL"' EXIT
+TMP_OUT="$(mktemp "$OUT.XXXXXX")"
+trap 'rm -f "$TMP_JSONL" "$TMP_OUT"' EXIT
 
 echo "Downloading $SRC_URL ..."
-curl -sSL -m 120 -o "$TMP_JSONL" "$SRC_URL"
+curl -fsSL -m 120 -o "$TMP_JSONL" "$SRC_URL"
 echo "Downloaded $(wc -l < "$TMP_JSONL") lines."
 
-node "$BUILDER" "$TMP_JSONL" "$OUT" "$CURATED" "$QUOTE_TAGS"
-node "$VALIDATOR" "$OUT"
+# Build and validate a temp file first so a failed run never leaves a broken seed behind.
+node "$BUILDER" "$TMP_JSONL" "$TMP_OUT" "$CURATED" "$QUOTE_TAGS"
+node "$VALIDATOR" "$TMP_OUT"
+chmod 644 "$TMP_OUT"
+mv "$TMP_OUT" "$OUT"
 echo "Done."

@@ -1,6 +1,9 @@
 package app.brokoli5191.quote.ui.screens
 
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.os.Build
 import android.text.format.DateFormat
 import android.widget.Toast
@@ -27,7 +30,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -40,11 +43,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.brokoli5191.quote.BuildConfig
 import app.brokoli5191.quote.data.QuoteSourceMode
 import app.brokoli5191.quote.data.QuoteLanguage
 import app.brokoli5191.quote.ui.QuoteViewModel
+import app.brokoli5191.quote.ui.SyncUiState
 import app.brokoli5191.quote.ui.LocalAppLanguage
 import app.brokoli5191.quote.ui.localizeUi
 import app.brokoli5191.quote.ui.uiText
@@ -56,8 +61,14 @@ import app.brokoli5191.quote.ui.components.FloatingChromeBackdrop
 import app.brokoli5191.quote.ui.components.bottomBarContentPadding
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
+import app.brokoli5191.quote.ui.theme.accentSwatchColor
+import app.brokoli5191.quote.utils.CommunitySyncWorker
 import app.brokoli5191.quote.utils.UpdateStatus
+import app.brokoli5191.quote.widget.QuoteWidgetProvider
+import app.brokoli5191.quote.widget.WidgetConfigureActivity
 import java.util.Calendar
+import java.util.Locale
+import java.util.TimeZone
 
 @Composable
 fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
@@ -82,6 +93,40 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                 Toast.makeText(
                     context,
                     localizeUi("Notifications permission is required to receive daily quotes.", uiLanguage),
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    )
+
+    // Not part of the ViewModel: the background worker reads the same pref (default on).
+    val prefs = remember { context.getSharedPreferences("aura_prefs", Context.MODE_PRIVATE) }
+    var submissionNotifications by remember {
+        mutableStateOf(prefs.getBoolean(CommunitySyncWorker.KEY_SUBMISSION_NOTIFICATIONS, true))
+    }
+    fun notificationsGranted() =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+    var notificationsAllowed by remember { mutableStateOf(notificationsGranted()) }
+    LifecycleResumeEffect(Unit) {
+        notificationsAllowed = notificationsGranted()
+        onPauseOrDispose { }
+    }
+    val setSubmissionNotifications = { enabled: Boolean ->
+        prefs.edit().putBoolean(CommunitySyncWorker.KEY_SUBMISSION_NOTIFICATIONS, enabled).apply()
+        submissionNotifications = enabled
+        notificationsAllowed = notificationsGranted()
+    }
+    val submissionPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+        onResult = { isGranted ->
+            if (isGranted) {
+                setSubmissionNotifications(true)
+            } else {
+                Toast.makeText(
+                    context,
+                    localizeUi("Notifications permission is required to be notified about review decisions.", viewModel.appLanguage.value),
                     Toast.LENGTH_LONG
                 ).show()
             }
@@ -202,6 +247,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
 
                 val activeThemeMode by viewModel.themeMode.collectAsStateWithLifecycle()
                 val isDynamic = activeThemeMode == "DYNAMIC" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                val lightSurface = MaterialTheme.colorScheme.background.luminance() > 0.5f
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -213,13 +259,7 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                     colors.forEach { color ->
                         val isSelected = !isDynamic && activeThemeAccent == color
                         val colorLabel = uiText(color)
-                        val displayColor = when (color) {
-                            "Violet" -> Color(0xFFD0BCFF)
-                            "Amber" -> Color(0xFFFFDB9C)
-                            "Green" -> Color(0xFFA0D2AD)
-                            "Blue" -> Color(0xFFADC6FF)
-                            else -> Color(0xFFFFB2C5) // Rose
-                        }
+                        val displayColor = accentSwatchColor(color, lightSurface)
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -600,6 +640,146 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                         }
                     }
                 }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                        Text(uiText("Notify me about review decisions"), fontWeight = FontWeight.SemiBold)
+                        Text(
+                            uiText("A notification when a quote you submitted is approved or not approved."),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = submissionNotifications && notificationsAllowed,
+                        onCheckedChange = { isChecked ->
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            if (!isChecked) {
+                                setSubmissionNotifications(false)
+                            } else if (
+                                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+                                PackageManager.PERMISSION_GRANTED
+                            ) {
+                                submissionPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            } else {
+                                setSubmissionNotifications(true)
+                            }
+                        }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            // Widgets placed on the home screen; the launcher only offers "reconfigure" on newer Android versions.
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = uiText("Widgets"),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.align(Alignment.Start)
+                )
+
+                var widgetIds by remember { mutableStateOf(placedWidgetIds(context)) }
+                // The list changes while the app is in the background (placing or removing a widget).
+                LifecycleResumeEffect(Unit) {
+                    widgetIds = placedWidgetIds(context)
+                    onPauseOrDispose {}
+                }
+                val canPin = remember { canPinWidget(context) }
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f), RoundedCornerShape(20.dp)),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
+                    ),
+                    shape = RoundedCornerShape(20.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        if (widgetIds.isEmpty()) {
+                            Text(
+                                text = uiText(
+                                    if (canPin) "No widget is placed yet. Add one here or long-press an empty spot on your home screen."
+                                    else "No widget is placed yet. Long-press an empty spot on your home screen, tap Widgets and pick Quote."
+                                ),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        widgetIds.forEachIndexed { index, widgetId ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = uiText("Widget {number}").replace("{number}", (index + 1).toString()),
+                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f).padding(end = 8.dp)
+                                )
+                                ExpressiveOutlinedButton(
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        context.startActivity(
+                                            Intent(context, WidgetConfigureActivity::class.java)
+                                                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+                                        )
+                                    },
+                                    modifier = Modifier.heightIn(min = 48.dp),
+                                    restingCorner = 12.dp,
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.primary
+                                    ),
+                                    contentPadding = PaddingValues(horizontal = 16.dp)
+                                ) {
+                                    SettingsButtonText(uiText("Edit style"))
+                                }
+                            }
+                        }
+                        if (canPin) {
+                            ExpressiveButton(
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    requestPinWidget(context)
+                                },
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                                restingCorner = 12.dp,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                ),
+                                contentPadding = PaddingValues(horizontal = 12.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                SettingsButtonText(uiText("Add widget"))
+                            }
+                        }
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(28.dp))
@@ -854,6 +1034,16 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                 else -> Spacer(modifier = Modifier.weight(1f))
                             }
                         }
+
+                        val syncState by viewModel.syncState.collectAsStateWithLifecycle()
+                        syncStatusLine(syncState, uiLanguage)?.let { line ->
+                            Text(
+                                text = line,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (syncState is SyncUiState.Failed) MaterialTheme.colorScheme.error
+                                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            )
+                        }
                     }
                 }
             }
@@ -902,20 +1092,14 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                             viewModel.importBackup(
                                 uri = uri,
                                 onSuccess = { customCount, favCount, settingsRestored ->
+                                    // The restore may have switched the app language, so the toast follows the new one.
                                     Toast.makeText(
                                         context,
-                                        localizeUi(
-                                            if (settingsRestored) {
-                                                "Restore complete! Imported {custom} custom quotes, updated {favorites} favorites, and restored settings."
-                                            } else {
-                                                "Restore complete! Imported {custom} custom quotes and updated {favorites} favorites."
-                                            },
-                                            uiLanguage
-                                        )
-                                            .replace("{custom}", customCount.toString())
-                                            .replace("{favorites}", favCount.toString()),
+                                        restoreMessage(viewModel.appLanguage.value, customCount, favCount, settingsRestored),
                                         Toast.LENGTH_LONG
                                     ).show()
+                                    submissionNotifications =
+                                        prefs.getBoolean(CommunitySyncWorker.KEY_SUBMISSION_NOTIFICATIONS, true)
                                     if (
                                         settingsRestored &&
                                         viewModel.dailyReminderEnabled.value &&
@@ -929,7 +1113,6 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                         viewModel.setDailyReminderEnabled(false)
                                         permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                                     }
-                                    if (!settingsRestored) viewModel.loadDailyQuote()
                                     viewModel.runVerification()
                                 },
                                 onError = { error ->
@@ -1121,4 +1304,81 @@ internal fun formatReminderTime(context: Context, hour: Int, minute: Int): Strin
         set(Calendar.MILLISECOND, 0)
     }
     return DateFormat.getTimeFormat(context).format(calendar.time)
+}
+
+private fun quoteWidgetComponent(context: Context) = ComponentName(context, QuoteWidgetProvider::class.java)
+
+private fun placedWidgetIds(context: Context): List<Int> = runCatching {
+    AppWidgetManager.getInstance(context).getAppWidgetIds(quoteWidgetComponent(context)).sorted()
+}.getOrDefault(emptyList())
+
+private fun canPinWidget(context: Context): Boolean =
+    Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+        runCatching { AppWidgetManager.getInstance(context).isRequestPinAppWidgetSupported }.getOrDefault(false)
+
+/** Asks the launcher to place a new widget; it opens the configure screen itself once the user confirms. */
+private fun requestPinWidget(context: Context) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+    runCatching {
+        AppWidgetManager.getInstance(context).requestPinAppWidget(quoteWidgetComponent(context), null, null)
+    }
+}
+
+/** Singular or plural noun phrase for [count], e.g. "1 custom quote" / "2 custom quotes" (German likewise). */
+private fun countPhrase(count: Int, singular: String, plural: String, language: String): String =
+    localizeUi(if (count == 1) singular else plural, language).replace("{count}", count.toString())
+
+/** Toast after a restore. [language] is the app language after the restore, which may have changed. */
+internal fun restoreMessage(language: String, insertedCustom: Int, updatedFavorites: Int, settingsRestored: Boolean): String {
+    val custom = countPhrase(insertedCustom, "{count} custom quote", "{count} custom quotes", language)
+    val favorites = countPhrase(updatedFavorites, "{count} favorite", "{count} favorites", language)
+    val template = if (settingsRestored) {
+        "Restore complete! Imported {custom}, updated {favorites}, and restored settings."
+    } else {
+        "Restore complete! Imported {custom} and updated {favorites}."
+    }
+    return localizeUi(template, language).replace("{custom}", custom).replace("{favorites}", favorites)
+}
+
+/**
+ * The "Community quotes: updated 14:32" line under the update check, or null before any sync ran.
+ * Times are shown as clock time today and with the date otherwise, in the app language.
+ */
+internal fun syncStatusLine(
+    state: SyncUiState,
+    language: String,
+    now: Long = System.currentTimeMillis(),
+    zone: TimeZone = TimeZone.getDefault()
+): String? = when (state) {
+    SyncUiState.Idle -> null
+    SyncUiState.Running -> localizeUi("Community quotes: syncing…", language)
+    is SyncUiState.Success ->
+        localizeUi("Community quotes: updated {time}", language)
+            .replace("{time}", formatSyncTime(state.at, now, language, zone))
+    is SyncUiState.Failed -> {
+        val lastSuccess = state.lastSuccessAt
+        if (lastSuccess == null) {
+            localizeUi("Community quotes: last sync failed", language)
+        } else {
+            localizeUi("Community quotes: last sync failed, last updated {time}", language)
+                .replace("{time}", formatSyncTime(lastSuccess, now, language, zone))
+        }
+    }
+}
+
+internal fun formatSyncTime(at: Long, now: Long, language: String, zone: TimeZone): String {
+    val locale = Locale.forLanguageTag(language)
+    val sameDay = Calendar.getInstance(zone).run {
+        timeInMillis = at
+        val day = get(Calendar.YEAR) * 1000 + get(Calendar.DAY_OF_YEAR)
+        timeInMillis = now
+        day == get(Calendar.YEAR) * 1000 + get(Calendar.DAY_OF_YEAR)
+    }
+    val format = if (sameDay) {
+        java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT, locale)
+    } else {
+        java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT, locale)
+    }
+    format.timeZone = zone
+    return format.format(java.util.Date(at))
 }

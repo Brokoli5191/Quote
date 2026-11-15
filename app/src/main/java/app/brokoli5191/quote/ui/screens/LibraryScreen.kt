@@ -1,9 +1,5 @@
 package app.brokoli5191.quote.ui.screens
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
-import android.content.Intent
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
@@ -11,7 +7,11 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,14 +26,29 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -42,15 +57,17 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import app.brokoli5191.quote.data.QuoteEntity
 import app.brokoli5191.quote.data.QuoteLanguage
+import app.brokoli5191.quote.data.QuoteOrigin
 import app.brokoli5191.quote.data.QuoteSourceMode
 import app.brokoli5191.quote.data.alternateLanguage
 import app.brokoli5191.quote.data.alternateText
 import app.brokoli5191.quote.data.hasUnknownAuthor
 import app.brokoli5191.quote.ui.QuoteViewModel
+import app.brokoli5191.quote.ui.SyncUiState
 import app.brokoli5191.quote.ui.LocalAppLanguage
 import app.brokoli5191.quote.ui.categoryText
-import app.brokoli5191.quote.ui.formattedQuote
 import app.brokoli5191.quote.ui.uiText
+import app.brokoli5191.quote.ui.components.AuthorSheet
 import app.brokoli5191.quote.ui.components.ExpressiveButton
 import app.brokoli5191.quote.ui.components.ExpressiveIconButton
 import app.brokoli5191.quote.ui.components.ExpressiveTextButton
@@ -59,25 +76,62 @@ import app.brokoli5191.quote.ui.components.TranslationToggle
 import app.brokoli5191.quote.ui.components.bottomBarContentPadding
 import app.brokoli5191.quote.ui.components.rememberExpressiveShape
 import app.brokoli5191.quote.ui.theme.SerifFontFamily
+import app.brokoli5191.quote.utils.QuoteSharing
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel as composeViewModel
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+
+/**
+ * Scroll positions of the Library. The tabs leave composition when another tab is selected, so the
+ * states live in the activity's ViewModel store, which outlives them (and configuration changes).
+ */
+internal class LibraryListState : ViewModel() {
+    val browseListState = LazyListState()
+    val bentoScrollState = ScrollState(0)
+
+    /** The search and categories the browse list was last scrolled to the top for. */
+    var lastFilterKey: Any? = null
+}
+
+enum class LibraryEmptyReason { NoMatches, NoCommunityQuotes }
+
+/**
+ * Why the Library list is empty. "No community quotes yet" is only true in Community source mode
+ * when there is not a single community quote; any other empty list means the search or filter
+ * matched nothing. Own quotes (the Local category) are listed in every source mode.
+ */
+internal fun libraryEmptyReason(
+    sourceMode: String,
+    hasCommunityQuotes: Boolean,
+    categories: Set<String>
+): LibraryEmptyReason =
+    if (sourceMode == QuoteSourceMode.COMMUNITY && !hasCommunityQuotes && "Local" !in categories) {
+        LibraryEmptyReason.NoCommunityQuotes
+    } else {
+        LibraryEmptyReason.NoMatches
+    }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryScreen(viewModel: QuoteViewModel) {
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val filteredQuotes by viewModel.filteredQuotes.collectAsStateWithLifecycle()
+    val allQuotes by viewModel.allQuotes.collectAsStateWithLifecycle()
     val sourceMode by viewModel.quoteSourceMode.collectAsStateWithLifecycle()
-    val communitySyncFinished by viewModel.communitySyncFinished.collectAsStateWithLifecycle()
+    val syncState by viewModel.syncState.collectAsStateWithLifecycle()
+    val authorImagesEnabled by viewModel.authorImagesEnabled.collectAsStateWithLifecycle()
     val showAnonymousQuotes by viewModel.showAnonymousQuotes.collectAsStateWithLifecycle()
     val language = LocalAppLanguage.current
     val visibleCategoryCatalog = remember(showAnonymousQuotes) {
@@ -97,7 +151,11 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
         else -> null
     }
     
-    val scrollState = rememberScrollState()
+    val listState = composeViewModel<LibraryListState>()
+    val scrollState = listState.bentoScrollState
+    val hasCommunityQuotes by remember { derivedStateOf { allQuotes.any { it.origin == QuoteOrigin.COMMUNITY } } }
+    val emptyReason = libraryEmptyReason(sourceMode, hasCommunityQuotes, selectedCategories)
+    var sheetAuthor by rememberSaveable { mutableStateOf<String?>(null) }
     val libraryBlurEnabled = blurNavigationSurfaces && !lowPerformanceMode
     val libraryHazeState = rememberHazeState(blurEnabled = libraryBlurEnabled)
     // The header (title + search field) and the filter row are measured, so the content below
@@ -113,7 +171,37 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
     val libraryChromeHeight = (if (isBrowsing) filterRowTop + filterRowHeight else headerHeight) + LibraryContentGap
     var showCategoryFilterDialog by remember { mutableStateOf(false) }
 
-    val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val dismissKeyboard = {
+        focusManager.clearFocus()
+        keyboardController?.hide()
+    }
+    // Scrolling by hand hides the keyboard; scrolling to the top by code (below) must not.
+    val hideKeyboardOnScroll = remember(focusManager, keyboardController) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (source == NestedScrollSource.UserInput && available.y != 0f) {
+                    focusManager.clearFocus()
+                    keyboardController?.hide()
+                }
+                return Offset.Zero
+            }
+        }
+    }
+
+    // A new search or filter shows its best matches first. The results arrive a moment after the
+    // query, so the list is scrolled to the top again once they have replaced the old ones.
+    val filterKey = remember(searchQuery, selectedCategories) { searchQuery to selectedCategories }
+    val currentQuotes by rememberUpdatedState(filteredQuotes)
+    LaunchedEffect(filterKey) {
+        if (listState.lastFilterKey == filterKey) return@LaunchedEffect
+        listState.lastFilterKey = filterKey
+        val before = currentQuotes
+        listState.browseListState.scrollToItem(0)
+        withTimeoutOrNull(RESULTS_SETTLE_MILLIS) { snapshotFlow { currentQuotes }.first { it !== before } }
+            ?.let { listState.browseListState.scrollToItem(0) }
+    }
 
     val haptic = LocalHapticFeedback.current
     val selectCategoryWithHaptic: (String?) -> Unit = { category ->
@@ -171,6 +259,7 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                 modifier = Modifier
                     .fillMaxSize()
                     .zIndex(0f)
+                    .nestedScroll(hideKeyboardOnScroll)
                     .hazeSource(libraryHazeState, zIndex = 0f)
             ) { isBrowsing ->
                 if (isBrowsing) {
@@ -178,15 +267,19 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                         searchQuery = searchQuery,
                         quotes = filteredQuotes,
                         onBack = {
+                            dismissKeyboard()
                             selectCategoryWithHaptic(null)
                             viewModel.setSearchQuery("")
                         },
                         onToggleFavorite = { viewModel.toggleFavorite(it) },
-                        communityOnly = sourceMode == QuoteSourceMode.COMMUNITY,
-                        communitySyncFinished = communitySyncFinished,
+                        emptyReason = emptyReason,
+                        syncState = syncState,
                         onRetrySync = { viewModel.syncCommunityQuotes() },
                         lowPerformanceMode = lowPerformanceMode,
-                        topContentPadding = browseContentTop
+                        topContentPadding = browseContentTop,
+                        listState = listState.browseListState,
+                        filterKey = filterKey,
+                        onAuthorClick = { sheetAuthor = it }
                     )
                 } else {
                     Column(
@@ -317,6 +410,7 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                             modifier = Modifier
                                 .weight(1f)
                                 .padding(end = 12.dp)
+                                .semantics { heading() }
                         )
                         ExpressiveIconButton(
                             onClick = {
@@ -369,7 +463,9 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                         }
                     },
                     shape = RoundedCornerShape(32.dp),
-                    singleLine = true
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { dismissKeyboard() })
                 )
             }
 
@@ -377,6 +473,7 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                 LibraryFilterRow(
                     category = categoryLabel,
                     onBack = {
+                        dismissKeyboard()
                         selectCategoryWithHaptic(null)
                         viewModel.setSearchQuery("")
                     },
@@ -389,6 +486,19 @@ fun LibraryScreen(viewModel: QuoteViewModel) {
                 )
             }
         }
+    }
+
+    sheetAuthor?.let { author ->
+        val authorInfo by remember(author) { viewModel.authorInfo(author) }.collectAsStateWithLifecycle()
+        AuthorSheet(
+            name = author,
+            info = authorInfo,
+            imageUrl = authorInfo?.imageUrl?.takeIf { authorImagesEnabled },
+            language = language,
+            onDismiss = { sheetAuthor = null },
+            quoteCount = viewModel.authorQuoteCount(author),
+            onShowMoreQuotes = { viewModel.openLibrarySearch(author) }
+        )
     }
 
     // Category Filter Picker Sheet (allows selecting multiple categories at once)
@@ -585,31 +695,27 @@ fun CategoryBrowseViewInPlace(
     quotes: List<QuoteEntity>,
     onBack: () -> Unit,
     onToggleFavorite: (QuoteEntity) -> Unit,
-    communityOnly: Boolean = false,
-    communitySyncFinished: Boolean = true,
+    emptyReason: LibraryEmptyReason = LibraryEmptyReason.NoMatches,
+    syncState: SyncUiState = SyncUiState.Idle,
     onRetrySync: () -> Unit = {},
     lowPerformanceMode: Boolean = false,
-    topContentPadding: Dp = 0.dp
+    topContentPadding: Dp = 0.dp,
+    listState: LazyListState = rememberLazyListState(),
+    filterKey: Any = searchQuery,
+    onAuthorClick: ((String) -> Unit)? = null
 ) {
-    val context = LocalContext.current
-    val shareTitle = uiText("Share Wisdom")
     val haptic = LocalHapticFeedback.current
+    val language = LocalAppLanguage.current
     val onBackWithHaptic = {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
         onBack()
     }
-    // Ids whose entry animation already ran: a card slides in only the first time it appears,
-    // not again when it is scrolled back into view.
-    val animatedQuoteIds = remember { HashSet<Int>() }
-    val onShare = remember(context, shareTitle) {
-        { text: String ->
-            val intent = Intent(Intent.ACTION_SEND).apply {
-                type = "text/plain"
-                putExtra(Intent.EXTRA_TEXT, text)
-            }
-            context.startActivity(Intent.createChooser(intent, shareTitle))
-        }
-    }
+    // Ids whose entry animation already ran: a card slides in when it enters the list, not again
+    // when it is scrolled back into view. A new search or filter starts the bookkeeping over, so
+    // every card that appears for it animates, whether or not it was listed before.
+    val animatedQuoteIds = remember(filterKey) { HashSet<Int>() }
+    val communityEmpty = emptyReason == LibraryEmptyReason.NoCommunityQuotes
+    val syncRunning = syncState is SyncUiState.Running
 
     // The side margin is content padding, not layout padding, so cards sliding in are not cut off
     // at a hard edge inside the screen.
@@ -721,7 +827,8 @@ fun CategoryBrowseViewInPlace(
                     // Main illustration icon
                     Icon(
                         imageVector = Icons.Default.SearchOff,
-                        contentDescription = uiText("Search Off Icon"),
+                        // Decorative: the heading below says what the screen is about.
+                        contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(56.dp)
                     )
@@ -744,35 +851,40 @@ fun CategoryBrowseViewInPlace(
                 Spacer(modifier = Modifier.height(24.dp))
                 
                 Text(
-                    text = if (communityOnly) uiText("No Community Quotes Yet") else uiText("No Wisdom Matches"),
+                    text = if (communityEmpty) uiText("No Community Quotes Yet") else uiText("No Wisdom Matches"),
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontWeight = FontWeight.Bold,
                         fontFamily = SerifFontFamily
                     ),
                     color = MaterialTheme.colorScheme.onBackground,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.semantics { heading() }
                 )
-                
-                if (communityOnly) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text =
-                        if (communitySyncFinished) uiText("Approved community quotes will appear here after the next sync.")
-                        else uiText("Checking for newly approved community quotes..."),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .fillMaxWidth(0.85f)
-                            .padding(bottom = 24.dp)
-                    )
-                } else {
-                    Spacer(modifier = Modifier.height(24.dp))
-                }
 
-                // Beautiful interactive button to clear filters
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = when {
+                        !communityEmpty -> uiText("Try a different search or clear the filters.")
+                        syncRunning -> uiText("Checking for newly approved community quotes...")
+                        syncState is SyncUiState.Failed ->
+                            uiText("The community quotes could not be loaded. Check your connection and try again.")
+                        // Community quotes without a German version are not listed in German.
+                        language == QuoteLanguage.GERMAN ->
+                            uiText("Approved community quotes appear here once they have a German version, after the next sync.")
+                        else -> uiText("Approved community quotes will appear here after the next sync.")
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth(0.85f)
+                        .padding(bottom = 24.dp)
+                )
+
+                // Community: look for quotes again. Otherwise: clear the filters that matched nothing.
                 ExpressiveButton(
-                    onClick = if (communityOnly) onRetrySync else onBackWithHaptic,
+                    onClick = if (communityEmpty) onRetrySync else onBackWithHaptic,
+                    enabled = !(communityEmpty && syncRunning),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary
                     ),
@@ -780,21 +892,36 @@ fun CategoryBrowseViewInPlace(
                     contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
                     restingCorner = 24.dp
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
+                    if (communityEmpty && syncRunning) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (communityOnly) uiText("Sync again") else uiText("Reset All Filters"),
+                        text = when {
+                            !communityEmpty -> uiText("Reset All Filters")
+                            syncState is SyncUiState.Failed -> uiText("Try again")
+                            else -> uiText("Sync again")
+                        },
                         style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
                     )
                 }
             }
         } else {
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
+                state = listState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .imePadding(),
                 contentPadding = PaddingValues(
                     start = 20.dp,
                     top = topContentPadding,
@@ -804,7 +931,7 @@ fun CategoryBrowseViewInPlace(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(quotes, key = { it.id }, contentType = { BrowseQuoteContentType }) { quote ->
-                    val animateEntry = remember(quote.id) {
+                    val animateEntry = remember(quote.id, filterKey) {
                         !lowPerformanceMode && animatedQuoteIds.add(quote.id)
                     }
                     QuoteBrowseItemCard(
@@ -812,7 +939,7 @@ fun CategoryBrowseViewInPlace(
                         lowPerformanceMode = lowPerformanceMode,
                         animateEntry = animateEntry,
                         onToggleFavorite = onToggleFavorite,
-                        onShare = onShare
+                        onAuthorClick = onAuthorClick
                     )
                 }
             }
@@ -879,14 +1006,17 @@ private fun LibraryFilterRow(
 fun QuoteBrowseItemCard(
     quote: QuoteEntity,
     onToggleFavorite: (QuoteEntity) -> Unit,
-    onShare: (String) -> Unit,
     lowPerformanceMode: Boolean = false,
-    animateEntry: Boolean = !lowPerformanceMode
+    animateEntry: Boolean = !lowPerformanceMode,
+    onAuthorClick: ((String) -> Unit)? = null
 ) {
     val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
     val cardScope = rememberCoroutineScope()
+    val appLanguage = LocalAppLanguage.current
     var copyConfirmed by remember { mutableStateOf(false) }
+    var shareMenuOpen by remember { mutableStateOf(false) }
+    var imageShareRunning by remember { mutableStateOf(false) }
     // Animatables only exist for cards that actually slide in.
     val offsetX = if (animateEntry) remember { Animatable(80f) } else null
     val alphaAnim = if (animateEntry) remember { Animatable(0f) } else null
@@ -910,17 +1040,69 @@ fun QuoteBrowseItemCard(
     val alternateLanguage = quote.alternateLanguage()
     var showTranslation by rememberSaveable(quote.id) { mutableStateOf(false) }
     val displayedText = if (showTranslation && alternateText != null) alternateText else quote.text
-    val appLanguage = LocalAppLanguage.current
-    // Quotation marks follow the language of the text on screen, not the app language. An own quote
-    // without a translation has no known text language, so it keeps neutral English marks.
-    fun languageOf(translated: Boolean) = when {
-        alternateLanguage == null && quote.isUserAdded -> QuoteLanguage.ENGLISH
-        alternateLanguage == null -> appLanguage
-        translated -> alternateLanguage
+    // Copied and shared text carries the quotation marks of the language on screen, and no author
+    // when the author is unknown (QuoteSharing decides, from the raw author).
+    val displayedLanguage = QuoteSharing.textLanguage(quote, showTranslation)
+    val displayedAuthor = if (quote.hasUnknownAuthor) uiText("Unknown") else quote.author
+    val authorTappable = onAuthorClick != null && !quote.hasUnknownAuthor
+
+    val toggleTranslation = {
+        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        showTranslation = !showTranslation
+    }
+    val copyQuote: () -> Unit = {
+        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        QuoteSharing.copyText(context, displayedText, quote.author, displayedLanguage)
+        copyConfirmed = true
+        cardScope.launch {
+            delay(1200)
+            copyConfirmed = false
+        }
+    }
+    val shareAsText = {
+        QuoteSharing.shareText(context, displayedText, quote.author, appLanguage, displayedLanguage)
+    }
+    val shareAsImage: () -> Unit = {
+        if (!imageShareRunning) {
+            imageShareRunning = true
+            cardScope.launch {
+                try {
+                    QuoteSharing.shareImage(context, displayedText, quote.author, appLanguage, displayedLanguage)
+                } finally {
+                    imageShareRunning = false
+                }
+            }
+        }
+    }
+    val toggleFavorite = {
+        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        onToggleFavorite(quote)
+    }
+
+    // One TalkBack focus stop per card; its buttons are offered as custom actions.
+    // The language a tap on the translation chip switches to.
+    val targetLanguage = when {
+        alternateText == null || alternateLanguage == null -> null
+        !showTranslation -> alternateLanguage
         alternateLanguage == QuoteLanguage.GERMAN -> QuoteLanguage.ENGLISH
         else -> QuoteLanguage.GERMAN
     }
-    val displayedAuthor = if (quote.hasUnknownAuthor) uiText("Unknown") else quote.author
+    val translateLabel = targetLanguage?.let { uiText(if (it == QuoteLanguage.GERMAN) "Show in German" else "Show in English") }
+    val favoriteActionLabel = uiText(if (quote.isFavorite) "Remove from favorites" else "Add to favorites")
+    val copyActionLabel = uiText("Copy")
+    val shareActionLabel = uiText("Share")
+    val authorActionLabel = uiText("Explore this author")
+    val actions = buildList {
+        add(CustomAccessibilityAction(favoriteActionLabel) { toggleFavorite(); true })
+        add(CustomAccessibilityAction(copyActionLabel) { copyQuote(); true })
+        add(CustomAccessibilityAction(shareActionLabel) { shareAsText(); true })
+        if (translateLabel != null) {
+            add(CustomAccessibilityAction(translateLabel) { toggleTranslation(); true })
+        }
+        if (authorTappable) {
+            add(CustomAccessibilityAction(authorActionLabel) { onAuthorClick?.invoke(quote.author); true })
+        }
+    }
 
     Card(
         modifier = Modifier
@@ -935,7 +1117,8 @@ fun QuoteBrowseItemCard(
                     Modifier
                 }
             )
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), BrowseCardShape),
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), BrowseCardShape)
+            .semantics(mergeDescendants = true) { customActions = actions },
         shape = BrowseCardShape,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
@@ -948,7 +1131,7 @@ fun QuoteBrowseItemCard(
             AnimatedTranslation(showTranslation, lowPerformanceMode) { showing ->
                 val text = if (showing && alternateText != null) alternateText else quote.text
                 Text(
-                    text = if (languageOf(showing) == QuoteLanguage.GERMAN) "„$text“" else "“$text”",
+                    text = if (QuoteSharing.textLanguage(quote, showing) == QuoteLanguage.GERMAN) "„$text“" else "“$text”",
                     style = MaterialTheme.typography.bodyLarge.copy(
                         fontFamily = SerifFontFamily,
                         fontStyle = FontStyle.Italic,
@@ -958,20 +1141,12 @@ fun QuoteBrowseItemCard(
                 )
             }
 
-            if (alternateText != null && alternateLanguage != null) {
+            if (targetLanguage != null) {
                 // The chip names the language the quote switches to.
-                val targetLanguage = when {
-                    !showTranslation -> alternateLanguage
-                    alternateLanguage == QuoteLanguage.GERMAN -> QuoteLanguage.ENGLISH
-                    else -> QuoteLanguage.GERMAN
-                }
                 TranslationToggle(
                     showingTranslation = showTranslation,
                     targetLanguage = targetLanguage,
-                    onToggle = {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        showTranslation = !showTranslation
-                    }
+                    onToggle = toggleTranslation
                 )
             }
 
@@ -980,50 +1155,85 @@ fun QuoteBrowseItemCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (displayedAuthor.isNotBlank()) Text(
-                    text = "— $displayedAuthor",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold,
+                if (displayedAuthor.isNotBlank()) Box(
                     modifier = Modifier
                         .weight(1f)
-                        .padding(end = 4.dp),
-                    // Two lines so names like "Marcus Aurelius" stay readable next to the actions.
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
+                        .padding(end = 4.dp)
+                        .heightIn(min = 48.dp)
+                        .then(
+                            if (authorTappable) {
+                                Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable(onClickLabel = authorActionLabel, role = Role.Button) {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        onAuthorClick?.invoke(quote.author)
+                                    }
+                            } else {
+                                Modifier
+                            }
+                        ),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    Text(
+                        text = "— $displayedAuthor",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        // Two lines so names like "Marcus Aurelius" stay readable next to the actions.
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
 
                 Row(
                     modifier = Modifier.wrapContentWidth(),
                     horizontalArrangement = Arrangement.spacedBy(0.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    ExpressiveIconButton(onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        clipboard.setPrimaryClip(ClipData.newPlainText("quote", formattedQuote(displayedText, displayedAuthor)))
-                        copyConfirmed = true
-                        cardScope.launch {
-                            delay(1200)
-                            copyConfirmed = false
-                        }
-                    }) {
+                    ExpressiveIconButton(onClick = copyQuote) {
                         Icon(
                             imageVector = if (copyConfirmed) Icons.Default.Check else Icons.Default.ContentCopy,
                             contentDescription = uiText(if (copyConfirmed) "Copied" else "Copy"),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
                         )
                     }
 
-                    ExpressiveIconButton(onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onShare(formattedQuote(displayedText, displayedAuthor))
-                    }) {
-                        Icon(
-                            imageVector = Icons.Default.Share,
-                            contentDescription = uiText("Share"),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    Box {
+                        ExpressiveIconButton(onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            shareMenuOpen = true
+                        }) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = uiText("Share"),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = shareMenuOpen,
+                            onDismissRequest = { shareMenuOpen = false },
+                            shape = RoundedCornerShape(18.dp),
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(uiText("Share as text")) },
+                                leadingIcon = { Icon(Icons.Default.TextFields, contentDescription = null) },
+                                onClick = {
+                                    shareMenuOpen = false
+                                    shareAsText()
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(uiText("Share as image")) },
+                                leadingIcon = { Icon(Icons.Default.Image, contentDescription = null) },
+                                enabled = !imageShareRunning,
+                                onClick = {
+                                    shareMenuOpen = false
+                                    shareAsImage()
+                                }
+                            )
+                        }
                     }
 
                     var isLikedAnim by remember { mutableStateOf(false) }
@@ -1032,12 +1242,15 @@ fun QuoteBrowseItemCard(
                         animationSpec = spring(stiffness = 500f, dampingRatio = 0.5f),
                         finishedListener = { isLikedAnim = false }
                     )
+                    val favoriteState = uiText(if (quote.isFavorite) "Saved" else "Not saved")
 
-                    ExpressiveIconButton(onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        isLikedAnim = true
-                        onToggleFavorite(quote)
-                    }) {
+                    ExpressiveIconButton(
+                        onClick = {
+                            isLikedAnim = true
+                            toggleFavorite()
+                        },
+                        stateDescription = favoriteState
+                    ) {
                         Icon(
                             imageVector = if (quote.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                             contentDescription = uiText("Favorite"),
@@ -1054,6 +1267,7 @@ fun QuoteBrowseItemCard(
     }
 }
 
+private const val RESULTS_SETTLE_MILLIS = 500L
 private val BrowseCardShape = RoundedCornerShape(20.dp)
 private const val BrowseQuoteContentType = "browse_quote"
 

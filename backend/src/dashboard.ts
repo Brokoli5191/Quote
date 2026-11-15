@@ -94,6 +94,7 @@ export function dashboardPage(): Response {
     .author strong { display: block; margin-top: 8px; font: 19px Georgia, serif; }
     .details { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 0 0 18px; }
     .detail span { display: block; margin-top: 6px; color: var(--muted); font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; }
+    .detail.wide { grid-column: 1 / -1; }
     .tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
     .tag { padding: 5px 8px; background: var(--soft); color: var(--accent); font-size: 12px; }
     .origin { margin: auto 0 0; padding-top: 24px; color: var(--muted); }
@@ -118,6 +119,8 @@ export function dashboardPage(): Response {
     .dialog-actions { display: flex; justify-content: end; gap: 7px; padding-top: 5px; }
     .dialog-actions button { min-height: 44px; padding: 0 17px; border: 1px solid var(--line); background: transparent; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: .08em; }
     .dialog-actions .primary { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+    .dialog-actions button:disabled { opacity: .6; cursor: progress; }
+    .editor-error { margin: 0; color: var(--danger); font-size: 13px; line-height: 1.4; }
     #notice { position: fixed; z-index: 60; left: 50%; bottom: 24px; width: max-content; max-width: calc(100% - 28px); margin: 0; padding: 11px 15px; transform: translateX(-50%); border: 1px solid var(--line); background: var(--panel-strong); color: var(--muted); box-shadow: 0 10px 35px var(--shadow); font-size: 12px; }
     #notice.error { color: var(--danger); border-color: var(--danger); }
     @media (min-width: 721px) and (max-width: 1050px) {
@@ -204,8 +207,9 @@ export function dashboardPage(): Response {
       <label>Language<select id="language"><option value="en">English</option><option value="de">German</option></select></label>
       <label><span id="translationLabel">German translation, optional</span><textarea id="translation" rows="3" maxlength="500"></textarea></label>
       <label>Note to submitter, shown in the app<textarea id="reviewNote" rows="2" maxlength="500"></textarea></label>
-      <label>Private reviewer note<textarea id="note" rows="2" maxlength="500"></textarea></label>
-      <div class="dialog-actions"><button type="button" id="cancel">Cancel</button><button class="primary" type="submit">Approve quote</button></div>
+      <label><span id="noteLabel">Private reviewer note</span><textarea id="note" rows="2" maxlength="500"></textarea></label>
+      <p class="editor-error" id="editorError" role="alert" hidden></p>
+      <div class="dialog-actions"><button type="button" id="cancel">Cancel</button><button class="primary" type="submit" id="save">Approve quote</button></div>
     </form>
   </dialog>
   <script>
@@ -216,17 +220,23 @@ export function dashboardPage(): Response {
     let selectedId = null;
     let query = '';
     let nextCursor = null;
+    let loadToken = 0;
+    let saving = false;
     const list = document.querySelector('#list');
     const notice = document.querySelector('#notice');
     const tabs = document.querySelector('#tabs');
     const review = document.querySelector('#review');
     const editor = document.querySelector('#editor');
+    const editorError = document.querySelector('#editorError');
+    const saveButton = document.querySelector('#save');
     const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
     const parseTags = value => { try { const tags = JSON.parse(value || '[]'); return Array.isArray(tags) ? tags : []; } catch (error) { return []; } };
     const titleCase = value => value[0].toUpperCase() + value.slice(1);
     const languageNames = { en: 'English', de: 'German' };
     const otherLanguage = language => language === 'de' ? 'en' : 'de';
     const selected = () => current.find(item => item.id === selectedId);
+    const detail = (label, value, wide = false) => value ? '<div class="detail' + (wide ? ' wide' : '') + '"><span class="field-label">' + escapeHtml(label) + '</span><span>' + escapeHtml(value) + '</span></div>' : '';
+    const byline = (timestamp, moderator) => timestamp ? formatDate(timestamp) + (moderator ? ' · ' + moderator : '') : '';
 
     function showNotice(message, isError = false) {
       notice.textContent = message;
@@ -234,15 +244,28 @@ export function dashboardPage(): Response {
       notice.hidden = !message;
     }
 
+    async function readJson(response) {
+      try { return await response.json(); } catch (error) { return {}; }
+    }
+
+    // Only the latest request may update the list: a slower answer for a tab the moderator
+    // already left must not replace the rows or the paging cursor of the current tab.
     async function load(status = active, append = false) {
+      const token = ++loadToken;
+      const cursor = append && nextCursor ? '&cursor=' + encodeURIComponent(nextCursor) : '';
       active = status;
       showNotice('Loading submissions...');
-      if (!append) list.innerHTML = '';
+      if (!append) {
+        list.innerHTML = '';
+        nextCursor = null;
+        document.querySelector('#more').hidden = true;
+        renderTabs();
+      }
       try {
-        const cursor = append && nextCursor ? '&cursor=' + encodeURIComponent(nextCursor) : '';
         const response = await fetch('/admin/api/submissions?status=' + encodeURIComponent(status) + cursor);
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Could not load submissions.');
+        const data = await readJson(response);
+        if (token !== loadToken) return;
+        if (!response.ok || !Array.isArray(data.submissions)) throw new Error(data.error || 'Could not load submissions.');
         current = append ? current.concat(data.submissions) : data.submissions;
         counts = data.counts;
         nextCursor = data.nextCursor || null;
@@ -252,6 +275,7 @@ export function dashboardPage(): Response {
         render();
         showNotice('');
       } catch (error) {
+        if (token !== loadToken) return;
         showNotice(error.message, true);
         list.innerHTML = '<div class="empty">The queue could not be loaded.</div>';
         document.querySelector('#results').textContent = 'Unavailable';
@@ -295,7 +319,7 @@ export function dashboardPage(): Response {
       if (item.status === 'pending') actions = '<button class="danger" data-reject>Reject</button><button class="primary" data-approve>Review & approve ↗</button>';
       if (item.status === 'rejected') actions = '<button class="danger" data-delete>Delete permanently</button><button class="primary" data-approve>Review & approve</button>';
       if (item.status === 'approved' && item.communityQuoteId) actions = (item.communityActive ? '<button data-toggle>Unpublish</button>' : '<button class="danger" data-delete-community>Delete permanently</button><button data-toggle>Republish</button>') + '<button class="primary" data-edit>Edit quote</button>';
-      review.innerHTML = '<button class="close" type="button" aria-label="Close review">×</button><div class="review-top"><span>Selected quote</span><span>' + escapeHtml(formatDate(item.submittedAt)) + '</span></div><span class="mark">“</span><blockquote>' + escapeHtml(item.quoteText) + '</blockquote>' + (item.translation ? '<div class="author"><span class="field-label">' + escapeHtml(languageNames[otherLanguage(item.language)]) + ' translation</span><p class="translation">' + escapeHtml(item.translation) + '</p></div>' : '') + '<div class="author"><span class="field-label">Author</span><strong>' + escapeHtml(item.author || 'Unknown') + '</strong></div><div class="details"><div class="detail"><span class="field-label">Category</span><span>' + escapeHtml(item.category) + '</span></div><div class="detail"><span class="field-label">Status</span><span>' + escapeHtml(publication) + '</span></div><div class="detail"><span class="field-label">Language</span><span>' + escapeHtml(languageNames[item.language] || 'English') + '</span></div>' + (item.reviewNote ? '<div class="detail"><span class="field-label">Note to submitter</span><span>' + escapeHtml(item.reviewNote) + '</span></div>' : '') + '</div>' + (tags.length ? '<div><span class="field-label">Tags</span><div class="tags">' + tags.map(tag => '<span class="tag">#' + escapeHtml(tag) + '</span>').join('') + '</div></div>' : '') + '<p class="origin">Received through the app' + (item.appVersion ? ' · Version ' + escapeHtml(item.appVersion) : '') + '</p><div class="actions">' + actions + '</div>';
+      review.innerHTML = '<button class="close" type="button" aria-label="Close review">×</button><div class="review-top"><span>Selected quote</span><span>' + escapeHtml(formatDate(item.submittedAt)) + '</span></div><span class="mark">“</span><blockquote>' + escapeHtml(item.quoteText) + '</blockquote>' + (item.translation ? '<div class="author"><span class="field-label">' + escapeHtml(languageNames[otherLanguage(item.language)]) + ' translation</span><p class="translation">' + escapeHtml(item.translation) + '</p></div>' : '') + '<div class="author"><span class="field-label">Author</span><strong>' + escapeHtml(item.author || 'Unknown') + '</strong></div><div class="details">' + detail('Category', item.category) + detail('Status', publication) + detail('Language', languageNames[item.language] || 'English') + detail('Reviewed', byline(item.reviewedAt, item.reviewedBy)) + (item.communityUpdatedBy ? detail('Last changed', byline(item.communityUpdatedAt, item.communityUpdatedBy)) : '') + detail('Note to submitter', item.reviewNote, true) + detail('Private reviewer note', item.reviewerNote, true) + '</div>' + (tags.length ? '<div><span class="field-label">Tags</span><div class="tags">' + tags.map(tag => '<span class="tag">#' + escapeHtml(tag) + '</span>').join('') + '</div></div>' : '') + '<p class="origin">Received through the app' + (item.appVersion ? ' · Version ' + escapeHtml(item.appVersion) : '') + '</p><div class="actions">' + actions + '</div>';
       review.querySelector('.close').onclick = closeReview;
       const approveButton = review.querySelector('[data-approve]');
       const rejectButton = review.querySelector('[data-reject]');
@@ -332,6 +356,9 @@ export function dashboardPage(): Response {
       document.querySelector('#id').value = item.id;
       document.querySelector('#communityId').value = communityId;
       document.querySelector('#editorTitle').textContent = communityId ? 'Edit community quote' : 'Edit and approve';
+      document.querySelector('#noteLabel').textContent = communityId ? 'New private reviewer note, replaces the current one' : 'Private reviewer note';
+      saveButton.textContent = communityId ? 'Save changes' : 'Approve quote';
+      showEditorError('');
       document.querySelector('#quoteText').value = item.quoteText;
       document.querySelector('#author').value = item.author || '';
       document.querySelector('#category').value = item.category;
@@ -359,13 +386,22 @@ export function dashboardPage(): Response {
       if (item) fillEditor(item, id);
     }
 
+    function showEditorError(message) {
+      editorError.textContent = message;
+      editorError.hidden = !message;
+    }
+
     async function moderate(id, action, values) {
       const response = await fetch('/admin/api/submissions/' + id, { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({...values, action}) });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Review failed.');
+      const data = await readJson(response);
+      // A repeated approval, for example after a lost response, finds the quote approved:
+      // the outcome the moderator asked for, not an error.
+      const alreadyApproved = action === 'approve' && response.status === 409 && data.status === 'approved';
+      if (!response.ok && !alreadyApproved) throw new Error(data.error || 'Review failed.');
       selectedId = null;
       closeReview();
       await load(active);
+      if (alreadyApproved) showNotice('This quote had already been approved.');
     }
 
     async function reject(id) {
@@ -381,7 +417,7 @@ export function dashboardPage(): Response {
       if (!confirm('Permanently delete this rejected submission? This cannot be undone.')) return;
       try {
         const response = await fetch('/admin/api/submissions/' + id, {method: 'DELETE'});
-        if (!response.ok) { const data = await response.json(); throw new Error(data.error || 'Delete failed.'); }
+        if (!response.ok) { const data = await readJson(response); throw new Error(data.error || 'Delete failed.'); }
         selectedId = null;
         closeReview();
         await load(active);
@@ -390,7 +426,7 @@ export function dashboardPage(): Response {
 
     async function updateCommunity(id, action, values = {}) {
       const response = await fetch('/admin/api/community/' + id, { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({...values, action}) });
-      const data = await response.json();
+      const data = await readJson(response);
       if (!response.ok) throw new Error(data.error || 'Community update failed.');
       await load(active);
     }
@@ -406,7 +442,7 @@ export function dashboardPage(): Response {
       if (!confirm('Permanently delete this unpublished quote? This cannot be undone.')) return;
       try {
         const response = await fetch('/admin/api/community/' + id, {method: 'DELETE'});
-        if (!response.ok) { const data = await response.json(); throw new Error(data.error || 'Delete failed.'); }
+        if (!response.ok) { const data = await readJson(response); throw new Error(data.error || 'Delete failed.'); }
         selectedId = null;
         closeReview();
         await load(active);
@@ -424,8 +460,11 @@ export function dashboardPage(): Response {
       document.documentElement.dataset.theme = theme;
       try { localStorage.setItem('quote-theme', theme); } catch (error) {}
     };
+    // The save button stays disabled while a request is in flight, so a double click or a
+    // second Enter cannot send the approval twice.
     document.querySelector('#form').onsubmit = async event => {
       event.preventDefault();
+      if (saving) return;
       const values = {
         quoteText: document.querySelector('#quoteText').value,
         author: document.querySelector('#author').value,
@@ -436,12 +475,22 @@ export function dashboardPage(): Response {
         reviewNote: document.querySelector('#reviewNote').value,
         note: document.querySelector('#note').value
       };
+      saving = true;
+      saveButton.disabled = true;
+      showEditorError('');
       try {
         const communityId = document.querySelector('#communityId').value;
         if (communityId) await updateCommunity(communityId, 'update', values);
         else await moderate(document.querySelector('#id').value, 'approve', values);
         editor.close();
-      } catch (error) { alert(error.message); }
+      } catch (error) {
+        // The dialog sits above the notice bar, so its errors are shown inside it.
+        if (editor.open) showEditorError(error.message);
+        else showNotice(error.message, true);
+      } finally {
+        saving = false;
+        saveButton.disabled = false;
+      }
     };
     load();
   </script>

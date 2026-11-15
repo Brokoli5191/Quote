@@ -10,6 +10,7 @@ import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.drawable.BitmapDrawable
+import android.os.Looper
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -69,6 +70,7 @@ import java.net.SocketAddress
 import java.net.URI
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
+import org.robolectric.Shadows.shadowOf
 
 /** Device used for every screenshot (in addition to the per-run locale, night mode and font scale). */
 const val SCREENSHOT_DEVICE = "w360dp-h780dp-xxhdpi"
@@ -327,14 +329,20 @@ fun ComposeContentTestRule.settle(rounds: Int = 8) {
     waitForIdle()
 }
 
+/**
+ * Waits for [condition]. ViewModel work resumes on the paused Robolectric main looper, which
+ * waitUntil alone does not run, so the looper is drained on every check.
+ */
 fun ComposeContentTestRule.awaitCondition(timeoutMillis: Long = 10_000, condition: () -> Boolean) {
-    waitUntil(timeoutMillis) { condition() }
+    waitUntil(timeoutMillis) { idleMainLooper(); condition() }
     settle()
 }
 
+private fun idleMainLooper() = shadowOf(Looper.getMainLooper()).idle()
+
 /** Like [awaitCondition] but returns false instead of failing on timeout. */
 fun ComposeContentTestRule.tryAwait(timeoutMillis: Long, condition: () -> Boolean): Boolean = try {
-    waitUntil(timeoutMillis) { condition() }
+    waitUntil(timeoutMillis) { idleMainLooper(); condition() }
     true
 } catch (_: androidx.compose.ui.test.ComposeTimeoutException) {
     false

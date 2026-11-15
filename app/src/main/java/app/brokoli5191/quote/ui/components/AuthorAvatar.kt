@@ -10,6 +10,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -24,13 +25,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.brokoli5191.quote.BuildConfig
-import app.brokoli5191.quote.ui.uiText
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import kotlinx.coroutines.delay
 
 // Wikimedia asks clients to identify themselves; image requests use the same agent as the API lookups.
 private val AuthorImageUserAgent =
     "QuoteApp/${BuildConfig.VERSION_NAME} (https://github.com/Brokoli5191/Quote)"
+
+private const val CROSSFADE_MILLIS = 150
 
 /**
  * Circular author portrait. Shows the author's initial until [imageUrl] has loaded (or when it is
@@ -56,7 +59,8 @@ fun AuthorAvatar(
         if (unknown || initial == null) {
             Icon(
                 imageVector = Icons.Default.QuestionMark,
-                contentDescription = uiText("Unknown author"),
+                // Every caller prints the author's name next to the avatar.
+                contentDescription = null,
                 tint = colors.onPrimaryContainer,
                 modifier = Modifier.size(size * 0.5f)
             )
@@ -64,8 +68,19 @@ fun AuthorAvatar(
             val context = LocalContext.current
             val url = imageUrl?.takeIf { it.isNotBlank() }
             var imageLoaded by remember(url) { mutableStateOf(false) }
+            // The initial stays until the image's crossfade has finished, so the circle never shows
+            // a bare background in between.
+            var showInitial by remember(url) { mutableStateOf(true) }
+            LaunchedEffect(imageLoaded) {
+                if (imageLoaded) {
+                    delay(CROSSFADE_MILLIS + 50L)
+                    showInitial = false
+                } else {
+                    showInitial = true
+                }
+            }
 
-            if (!imageLoaded) {
+            if (showInitial) {
                 // Sized from the avatar, not the font scale, so the letter always fits the circle.
                 val letterSize = with(LocalDensity.current) { (size * 0.42f).toSp() }
                 Text(
@@ -81,7 +96,7 @@ fun AuthorAvatar(
                     ImageRequest.Builder(context)
                         .data(url)
                         .addHeader("User-Agent", AuthorImageUserAgent)
-                        .crossfade(true)
+                        .crossfade(CROSSFADE_MILLIS)
                         .build()
                 }
                 AsyncImage(

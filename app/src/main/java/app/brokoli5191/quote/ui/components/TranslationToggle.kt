@@ -56,7 +56,7 @@ fun TranslationToggle(
             )
         },
         // Selected state follows the accent like the app's other selected chips/tabs
-        // (the default secondaryContainer is amber in the dark themes).
+        // (the default secondaryContainer is a muted tone, too quiet for an on/off toggle).
         colors = FilterChipDefaults.filterChipColors(
             selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
             selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,

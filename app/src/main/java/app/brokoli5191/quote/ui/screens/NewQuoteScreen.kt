@@ -43,6 +43,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,6 +53,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.foundation.relocation.BringIntoViewRequester
@@ -61,6 +64,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.brokoli5191.quote.data.SubmissionLimits
+import app.brokoli5191.quote.data.QuoteLanguage
+import app.brokoli5191.quote.data.storedQuoteTextLength
+import app.brokoli5191.quote.data.submissionLength
+import app.brokoli5191.quote.ui.QuoteDraft
 import app.brokoli5191.quote.ui.QuoteViewModel
 import app.brokoli5191.quote.ui.categoryText
 import app.brokoli5191.quote.ui.uiText
@@ -89,6 +97,25 @@ private val FormHorizontalPadding = 20.dp
 private val HeaderContentGap = 8.dp
 private val HeaderFallbackHeight = 68.dp
 
+/**
+ * The longest prefix of [value] (cut between code points) whose [length] stays within [max], or [value]
+ * itself when it already fits. Pasted text is shortened to the limit instead of being dropped.
+ *
+ * [length] need not be strictly monotonic (quote normalization can strip or close wrapping quotes), so the
+ * result always fits but is not guaranteed to be the longest fitting prefix.
+ */
+internal fun truncateToLimit(value: String, max: Int, length: (String) -> Int): String {
+    if (length(value) <= max) return value
+    fun prefix(codePoints: Int) = value.substring(0, value.offsetByCodePoints(0, codePoints))
+    var low = 0
+    var high = value.codePointCount(0, value.length)
+    while (low < high) {
+        val middle = (low + high + 1) / 2
+        if (length(prefix(middle)) <= max) low = middle else high = middle - 1
+    }
+    return prefix(low)
+}
+
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 fun NewQuoteScreen(
@@ -104,6 +131,11 @@ fun NewQuoteScreen(
     var author by rememberSaveable { mutableStateOf("") }
     var category by rememberSaveable { mutableStateOf("Inspirational") }
     var tags by rememberSaveable { mutableStateOf("") }
+    var language by rememberSaveable { mutableStateOf(viewModel.appLanguage.value) }
+    var textShortened by rememberSaveable { mutableStateOf(false) }
+    var authorShortened by rememberSaveable { mutableStateOf(false) }
+    var saving by remember { mutableStateOf(false) }
+    var handledDraft by remember { mutableStateOf<QuoteDraft?>(null) }
     var showDiscardDialog by rememberSaveable { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
     val tagsBringIntoViewRequester = remember { BringIntoViewRequester() }
@@ -118,11 +150,35 @@ fun NewQuoteScreen(
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     var headerHeightPx by remember { mutableIntStateOf(0) }
     val headerHeight = if (headerHeightPx > 0) with(density) { headerHeightPx.toDp() } else statusBarTop + HeaderFallbackHeight
-    val trimmedTextLength = text.trim().length
-    val quoteInvalid = text.isNotEmpty() && trimmedTextLength < 3
-    val parsedTags = tags.split(',').map(String::trim).filter(String::isNotEmpty)
-    val tagsInvalid = parsedTags.size > 8 || parsedTags.any { it.length > 30 }
-    val hasDraft = text.isNotBlank() || author.isNotBlank() || tags.isNotBlank() || category != "Inspirational"
+    // The limits count what the backend counts: code points of the text as it will be stored.
+    val textLength = storedQuoteTextLength(text)
+    val authorLength = submissionLength(author)
+    val textAtLimit = textLength >= SubmissionLimits.MAX_TEXT_LENGTH
+    val authorAtLimit = authorLength >= SubmissionLimits.MAX_AUTHOR_LENGTH
+    val textBlank = text.isNotEmpty() && text.isBlank()
+    val quoteInvalid = text.isNotEmpty() && textLength < SubmissionLimits.MIN_TEXT_LENGTH
+    val parsedTags = tags.split(',').map(String::trim).filter(String::isNotEmpty).distinctBy { it.lowercase() }
+    val tagsInvalid = parsedTags.size > SubmissionLimits.MAX_TAGS ||
+        parsedTags.any { submissionLength(it) > SubmissionLimits.MAX_TAG_LENGTH }
+    val hasDraft = text.isNotBlank() || author.isNotBlank() || tags.isNotBlank()
+    val pendingDraft by viewModel.pendingDraft.collectAsStateWithLifecycle()
+    fun fillFrom(draft: QuoteDraft) {
+        val fittedText = truncateToLimit(draft.text, SubmissionLimits.MAX_TEXT_LENGTH, ::storedQuoteTextLength)
+        val fittedAuthor = truncateToLimit(draft.author, SubmissionLimits.MAX_AUTHOR_LENGTH, ::submissionLength)
+        text = fittedText
+        author = fittedAuthor
+        textShortened = fittedText.length < draft.text.length
+        authorShortened = fittedAuthor.length < draft.author.length
+        handledDraft = draft
+        viewModel.consumePendingDraft()
+    }
+    LaunchedEffect(pendingDraft, hasDraft) {
+        val draft = pendingDraft
+        if (draft == null) handledDraft = null
+        else if (!hasDraft && draft != handledDraft) fillFrom(draft)
+    }
+    LaunchedEffect(hasDraft) { viewModel.setNewQuoteHasDraft(hasDraft) }
+    DisposableEffect(Unit) { onDispose { viewModel.setNewQuoteHasDraft(false) } }
     val requestBack = {
         if (hasDraft) showDiscardDialog = true else onBack()
     }
@@ -155,7 +211,11 @@ fun NewQuoteScreen(
                 Box {
                     OutlinedTextField(
                         value = text,
-                        onValueChange = { if (it.length <= 500) text = it },
+                        onValueChange = {
+                            val fitted = truncateToLimit(it, SubmissionLimits.MAX_TEXT_LENGTH, ::storedQuoteTextLength)
+                            textShortened = fitted.length < it.length
+                            text = fitted
+                        },
                         label = { Text(uiText("Quote or affirmation")) },
                         placeholder = { Text(uiText("Write a quote…")) },
                         textStyle = MaterialTheme.typography.bodyLarge.copy(
@@ -164,14 +224,23 @@ fun NewQuoteScreen(
                         ),
                         minLines = 1,
                         maxLines = 6,
-                        isError = quoteInvalid,
+                        isError = quoteInvalid || textShortened,
                         supportingText = {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text(
-                                    text = if (quoteInvalid) uiText("Enter at least 3 characters.") else "",
+                                    text = when {
+                                        textShortened -> uiText("The text was shortened to 500 characters.")
+                                        textBlank -> uiText("Add some text besides spaces.")
+                                        quoteInvalid -> uiText("Enter at least 3 characters.")
+                                        textAtLimit -> uiText("At most 500 characters")
+                                        else -> ""
+                                    },
                                     modifier = Modifier.weight(1f).padding(end = 8.dp)
                                 )
-                                Text("${text.length}/500")
+                                Text(
+                                    text = "$textLength/${SubmissionLimits.MAX_TEXT_LENGTH}",
+                                    color = if (textAtLimit) MaterialTheme.colorScheme.error else Color.Unspecified
+                                )
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
@@ -186,10 +255,30 @@ fun NewQuoteScreen(
                 ) {
                     OutlinedTextField(
                         value = author,
-                        onValueChange = { if (it.length <= 100) author = it },
+                        onValueChange = {
+                            val fitted = truncateToLimit(it, SubmissionLimits.MAX_AUTHOR_LENGTH, ::submissionLength)
+                            authorShortened = fitted.length < it.length
+                            author = fitted
+                        },
                         label = { Text(uiText("Author")) },
                         placeholder = { Text(uiText("Unknown")) },
-                        supportingText = { Text("${author.length}/100") },
+                        isError = authorShortened,
+                        supportingText = {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(
+                                    text = when {
+                                        authorShortened -> uiText("The author was shortened to 100 characters.")
+                                        authorAtLimit -> uiText("At most 100 characters")
+                                        else -> ""
+                                    },
+                                    modifier = Modifier.weight(1f).padding(end = 8.dp)
+                                )
+                                Text(
+                                    text = "$authorLength/${SubmissionLimits.MAX_AUTHOR_LENGTH}",
+                                    color = if (authorAtLimit) MaterialTheme.colorScheme.error else Color.Unspecified
+                                )
+                            }
+                        },
                         singleLine = true,
                         modifier = Modifier
                             .weight(1f)
@@ -243,6 +332,36 @@ fun NewQuoteScreen(
                     }
                 }
 
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = uiText("Language of the quote"),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(QuoteLanguage.ENGLISH to "English", QuoteLanguage.GERMAN to "German").forEach { (code, name) ->
+                            FilterChip(
+                                selected = language == code,
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    language = code
+                                },
+                                label = { Text(uiText(name)) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                                )
+                            )
+                        }
+                    }
+                    Text(
+                        text = uiText("Decides who sees the quote if you submit it to the community."),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
                 OutlinedTextField(
                     value = tags,
                     onValueChange = { tags = it },
@@ -274,11 +393,12 @@ fun NewQuoteScreen(
                 ExpressiveButton(
                     onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        viewModel.addUserQuote(text.trim(), author.trim(), category, tags.trim())
+                        saving = true
+                        viewModel.addUserQuote(text.trim(), author.trim(), category, tags.trim(), language)
                         viewModel.selectSavedSubTab("My Quotes")
                         onBack()
                     },
-                    enabled = trimmedTextLength in 3..500 && !tagsInvalid,
+                    enabled = !saving && textLength in SubmissionLimits.MIN_TEXT_LENGTH..SubmissionLimits.MAX_TEXT_LENGTH && !tagsInvalid,
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 54.dp),
@@ -341,6 +461,33 @@ fun NewQuoteScreen(
                 }
             }
         }
+    }
+
+    val sharedDraft = pendingDraft
+    if (sharedDraft != null && sharedDraft != handledDraft && hasDraft) {
+        AlertDialog(
+            onDismissRequest = {
+                handledDraft = sharedDraft
+                viewModel.consumePendingDraft()
+            },
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 0.dp,
+            title = { Text(uiText("Replace your draft?")) },
+            text = { Text(uiText("You shared text to Quote while a draft was open.")) },
+            dismissButton = {
+                TextButton(onClick = {
+                    handledDraft = sharedDraft
+                    viewModel.consumePendingDraft()
+                }) {
+                    Text(uiText("Keep my draft"))
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { fillFrom(sharedDraft) }) {
+                    Text(uiText("Use shared text"))
+                }
+            }
+        )
     }
 
     if (showDiscardDialog) {

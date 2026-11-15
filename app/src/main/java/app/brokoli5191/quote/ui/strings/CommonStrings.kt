@@ -18,8 +18,15 @@ internal val commonGermanUi: Map<String, String> = mapOf(
     "Show in English" to "Auf Englisch anzeigen",
     "Show in German" to "Auf Deutsch anzeigen",
 
-    // Author avatar
-    "Unknown author" to "Unbekannter Autor",
+    // Author sheet
+    "Read on Wikipedia" to "Auf Wikipedia lesen",
+    "Read on Wikipedia (English)" to "Auf Wikipedia lesen (Englisch)",
+    "More quotes by %1\$s (%2\$d)" to "Mehr Quotes von %1\$s (%2\$d)",
+
+    // Sharing (utils/QuoteSharing)
+    "Share as text" to "Als Text teilen",
+    "Share as image" to "Als Bild teilen",
+    "The image could not be created." to "Das Bild konnte nicht erstellt werden.",
 
     // Submission errors (see submissionErrorText)
     "No connection. Please check your internet and try again." to "Keine Verbindung. Bitte prüfe deine Internetverbindung und versuche es erneut.",

@@ -1,10 +1,14 @@
 import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { CATEGORIES } from './category_mapper.mjs';
 import { authorKey, canonicalAuthor, isProbablyEnglish, MAX_QUOTE_LENGTH, MAX_TAGS, quoteKey } from './quote_seed_rules.mjs';
 
-const seedPath = process.argv[2] || 'app/src/main/res/raw/quotes_seed.json';
-const translationsPath = process.argv[3] || 'app/src/main/res/raw/quotes_de.json';
-const anonymousPath = process.argv[4] || 'app/src/main/res/raw/anonymous_quotes.json';
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const rawDir = path.join(repoRoot, 'app/src/main/res/raw');
+const seedPath = process.argv[2] || path.join(rawDir, 'quotes_seed.json');
+const translationsPath = process.argv[3] || path.join(rawDir, 'quotes_de.json');
+const anonymousPath = process.argv[4] || path.join(rawDir, 'anonymous_quotes.json');
 const vocabulary = new Set(JSON.parse(fs.readFileSync(new URL('./tag_vocabulary.json', import.meta.url), 'utf8')).map((entry) => entry.en));
 const MIN_TAGS = 3;
 const quotes = JSON.parse(fs.readFileSync(seedPath, 'utf8'));

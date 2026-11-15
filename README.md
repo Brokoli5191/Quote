@@ -12,6 +12,7 @@
   <a href="https://github.com/Brokoli5191/Quote/releases/latest"><strong>Download the latest APK</strong></a>
   &nbsp;&middot;&nbsp;
   <a href="https://quote.cowsay.win/privacy">Privacy policy</a>
+  (<a href="https://quote.cowsay.win/privacy?lang=de">Deutsch</a>)
 </div>
 
 ## About
@@ -26,15 +27,19 @@ Quote brings daily inspiration, a searchable quote library, and personal collect
 
 ## Features
 
-- Daily quotes with manual cycling and no-repeat history
+- A daily quote that changes with the calendar day, "Another quote" with undo, and a history of earlier days
 - App and quotes in English and German, with a translation toggle on each card
-- Author portraits and short bios from Wikipedia (optional)
-- Search by quote, author, or tag and browse by topic
+- Tap an author's name for their portrait and short bio from Wikipedia (optional), the full article, and more of their quotes
+- Search by quote text in either language, author, or tag, browse by topic, and tap a tag to search for it
 - Curated and community quote sources
-- Favorites, sharing, and personal quotes
-- Optional community submissions with human review
-- Home-screen widgets and scheduled reminders
+- Favorites and personal quotes with search, sorting, status filters, and multi-select (copy, share, remove, with undo)
+- Share quotes as text or as an image card
+- Save text from other apps through the share sheet or the "Save to Quote" text selection action
+- Optional community submissions with human review, status checks, and notifications when a review is decided
+- Customizable home-screen widget that follows the new day at midnight
+- Daily reminders with Save and Share actions, and app shortcuts for Favorites and New quote
 - JSON backup and restore
+- In-app update check for GitHub releases; downloads are verified against the published SHA-256 checksum
 - Guided onboarding for language, appearance, sources, and reminders
 - Light, dark, Material You, and AMOLED themes
 - Custom accent colors and reduced-effects mode
@@ -55,7 +60,7 @@ Quote supports Android 7.0 and newer.
 Requirements:
 
 - JDK 17 or newer
-- Android SDK with API 36
+- Android SDK Platform 36.1 (API 36, minor level 1)
 
 Add your Android SDK path to `local.properties`, then build with the Gradle wrapper:
 
@@ -80,7 +85,7 @@ The optional community service is a Cloudflare Worker backed by D1. See [`backen
 
 ## Privacy
 
-The curated library, favorites, and personal quotes are stored locally. Community sync and optional submissions use the Quote backend. See the [Privacy & Submission Policy](https://quote.cowsay.win/privacy) for details.
+The curated library, favorites, and personal quotes are stored locally. Community sync, review status checks, and optional submissions use the Quote backend. Author portraits and bios are fetched from Wikipedia only when that option is on, and update checks talk to GitHub. See the [Privacy & Submission Policy](https://quote.cowsay.win/privacy) ([Deutsch](https://quote.cowsay.win/privacy?lang=de)) for details.
 
 ## Contributing
 

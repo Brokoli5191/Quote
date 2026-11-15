@@ -76,11 +76,14 @@ sealed interface WithdrawResult {
     data class Error(val code: String) : WithdrawResult
 }
 
-class QuoteSubmissionClient {
-    suspend fun submit(
+// Open so tests can stand in for the network.
+open class QuoteSubmissionClient {
+    /** [language] is the quote's language as the submitter confirmed it ("en"/"de"); by default the stored one. */
+    open suspend fun submit(
         quote: QuoteEntity,
         installationId: String,
-        appVersion: String
+        appVersion: String,
+        language: String = quote.language
     ): QuoteSubmissionResult = withContext(Dispatchers.IO) {
         val connection = (URL(SUBMISSION_URL).openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
@@ -93,7 +96,7 @@ class QuoteSubmissionClient {
 
         try {
             connection.outputStream.bufferedWriter(Charsets.UTF_8).use {
-                it.write(createSubmissionBody(quote, installationId, appVersion).toString())
+                it.write(createSubmissionBody(quote, installationId, appVersion, language).toString())
             }
 
             val responseCode = connection.responseCode
@@ -109,8 +112,11 @@ class QuoteSubmissionClient {
         }
     }
 
-    /** Current server state of a submission. A 404 (withdrawn or deleted) reads as [QuoteSubmissionStatus.REMOVED]. */
-    suspend fun status(submissionId: String, installationId: String): Result<SubmissionStatusInfo> =
+    /**
+     * Current server state of a submission. A 404 (withdrawn, deleted, or another installation id) reads as
+     * [QuoteSubmissionStatus.REMOVED] with [SubmissionStatusInfo.notFound] set.
+     */
+    open suspend fun status(submissionId: String, installationId: String): Result<SubmissionStatusInfo> =
         withContext(Dispatchers.IO) {
             runCatching {
                 val connection = (URL("$SUBMISSION_URL/$submissionId/status").openConnection() as HttpURLConnection).apply {
@@ -139,7 +145,7 @@ class QuoteSubmissionClient {
      * [WithdrawResult.NotFound] only with the backend's "not_found" code: an old backend without the
      * route answers a bare 404, and the submission is then still in review.
      */
-    suspend fun withdraw(submissionId: String, installationId: String): WithdrawResult =
+    open suspend fun withdraw(submissionId: String, installationId: String): WithdrawResult =
         withContext(Dispatchers.IO) {
             try {
                 val connection = (URL("$SUBMISSION_URL/$submissionId").openConnection() as HttpURLConnection).apply {
@@ -223,24 +229,60 @@ internal fun parseSubmissionStatusInfo(json: String): SubmissionStatusInfo {
 internal fun JSONObject.optNullableString(key: String): String? =
     if (!has(key) || isNull(key)) null else optString(key)
 
-private fun QuoteEntity.submissionTags(): List<String> = tags.split(",")
-    .map { it.trim() }
-    .filter { it.isNotEmpty() && it.length <= 30 }
-    .distinctBy { it.lowercase() }
-    .take(8)
+/** The backend's length limits for a submission, in characters as [submissionLength] counts them. */
+object SubmissionLimits {
+    const val MIN_TEXT_LENGTH = 3
+    const val MAX_TEXT_LENGTH = 500
+    const val MAX_AUTHOR_LENGTH = 100
+    const val MAX_CATEGORY_LENGTH = 50
+    const val MAX_TAGS = 8
+    const val MAX_TAG_LENGTH = 30
+}
+
+// The backend's cleanText: invisible format characters and control characters are dropped, and runs of
+// whitespace (JavaScript's \s) become one space.
+private val SERVER_INVISIBLE_CHARACTERS =
+    Regex("[\\u00AD\\u061C\\u180E\\u200B-\\u200F\\u202A-\\u202E\\u2060-\\u2064\\u2066-\\u2069\\uFEFF]")
+private val SERVER_CONTROL_CHARACTERS = Regex("[\\u0000-\\u0008\\u000E-\\u001F\\u007F-\\u009F]")
+private val SERVER_WHITESPACE =
+    Regex("[\\t\\n\\u000B\\f\\r \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]+")
 
 /**
- * Checks a personal quote against the backend's validation rules before sending it.
+ * Length of [value] as the backend validates it: in Unicode code points (an emoji counts once, like
+ * SQLite's length()), after the server's cleanup of invisible characters and whitespace.
+ */
+fun submissionLength(value: String): Int {
+    val cleaned = value
+        .replace(SERVER_INVISIBLE_CHARACTERS, "")
+        .replace(SERVER_CONTROL_CHARACTERS, "")
+        .replace(SERVER_WHITESPACE, " ")
+        .trim()
+    return cleaned.codePointCount(0, cleaned.length)
+}
+
+/**
+ * [submissionLength] of quote text typed into a form, measured on the text the app will store: saving
+ * normalizes it (a wrapping pair of quotation marks is removed, an unclosed one is closed), which can move
+ * it across a limit. Check form input with this, so a quote that saves can also be submitted.
+ */
+fun storedQuoteTextLength(text: String): Int = submissionLength(normalizeQuoteText(text))
+
+private fun QuoteEntity.submissionTags(): List<String> = tags.split(",")
+    .map { it.trim() }
+    .filter { submissionLength(it) in 1..SubmissionLimits.MAX_TAG_LENGTH }
+    .distinctBy { it.lowercase() }
+    .take(SubmissionLimits.MAX_TAGS)
+
+/**
+ * Checks a stored personal quote against the backend's validation rules before sending it.
  * Returns [SubmissionError.VALIDATION] when the server would reject it, null when it can be sent.
  */
-fun QuoteEntity.submissionValidationError(): String? {
-    val cleanText = text.trim()
-    return when {
-        cleanText.length !in 3..500 -> SubmissionError.VALIDATION
-        author.trim().length > 100 -> SubmissionError.VALIDATION
-        category.trim().length !in 1..50 -> SubmissionError.VALIDATION
-        else -> null
-    }
+fun QuoteEntity.submissionValidationError(): String? = when {
+    submissionLength(text) !in SubmissionLimits.MIN_TEXT_LENGTH..SubmissionLimits.MAX_TEXT_LENGTH ->
+        SubmissionError.VALIDATION
+    submissionLength(author) > SubmissionLimits.MAX_AUTHOR_LENGTH -> SubmissionError.VALIDATION
+    submissionLength(category) !in 1..SubmissionLimits.MAX_CATEGORY_LENGTH -> SubmissionError.VALIDATION
+    else -> null
 }
 
 /** Whether the UI should offer "Submit for review" (or "Resubmit") for this quote. */
@@ -256,7 +298,8 @@ fun QuoteEntity.canSubmitForReview(): Boolean =
 internal fun createSubmissionBody(
     quote: QuoteEntity,
     installationId: String,
-    appVersion: String
+    appVersion: String,
+    language: String = quote.language
 ): JSONObject = JSONObject().apply {
     put("quoteText", quote.text)
     put("author", quote.author)
@@ -264,5 +307,5 @@ internal fun createSubmissionBody(
     put("tags", JSONArray(quote.submissionTags()))
     put("installationId", installationId)
     put("appVersion", appVersion)
-    put("language", if (quote.language == QuoteLanguage.GERMAN) QuoteLanguage.GERMAN else QuoteLanguage.ENGLISH)
+    put("language", if (language == QuoteLanguage.GERMAN) QuoteLanguage.GERMAN else QuoteLanguage.ENGLISH)
 }
