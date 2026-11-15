@@ -139,4 +139,69 @@ class QuoteSubmissionClientTest {
         assertTrue(quote.copy(submissionStatus = QuoteSubmissionStatus.REJECTED).canSubmitForReview())
         assertFalse(quote.copy(isUserAdded = false).canSubmitForReview())
     }
+
+    @Test
+    fun createSubmissionBody_sendsTheLanguageTheSubmitterChose() {
+        // Written in English while the app was in German: the stored language is the UI language.
+        val quote = QuoteEntity(
+            text = "Stay hungry, stay foolish.",
+            author = "Steve Jobs",
+            category = "Life",
+            isUserAdded = true,
+            language = QuoteLanguage.GERMAN
+        )
+        val installationId = "123e4567-e89b-42d3-a456-426614174000"
+
+        assertEquals("de", createSubmissionBody(quote, installationId, "2.1.0").getString("language"))
+        assertEquals("en", createSubmissionBody(quote, installationId, "2.1.0", QuoteLanguage.ENGLISH).getString("language"))
+        // Anything else falls back to English, the backend's default.
+        assertEquals("en", createSubmissionBody(quote, installationId, "2.1.0", "fr").getString("language"))
+    }
+
+    @Test
+    fun createSubmissionBody_countsTagLengthInCodePoints() {
+        val body = createSubmissionBody(
+            QuoteEntity(
+                text = "Valid quote",
+                author = "Me",
+                category = "Life",
+                isUserAdded = true,
+                tags = "${"😀".repeat(30)}, ${"😀".repeat(31)}, \u200B"
+            ),
+            installationId = "123e4567-e89b-42d3-a456-426614174000",
+            appVersion = "2.1.0"
+        )
+        val tags = body.getJSONArray("tags")
+        assertEquals(1, tags.length())
+        assertEquals("😀".repeat(30), tags.getString(0))
+    }
+
+    @Test
+    fun submissionLength_countsCodePointsAfterTheServersCleanup() {
+        assertEquals(2, submissionLength("a😀"))
+        assertEquals(1, submissionLength("👍"))
+        // Zero-width and control characters are dropped, whitespace runs collapse, ends are trimmed.
+        assertEquals(3, submissionLength("  a\u200B \u0007\n\u00A0 b\uFEFF  "))
+        assertEquals(0, submissionLength("\u200B\u2060"))
+    }
+
+    @Test
+    fun submissionValidationError_matchesTheServersCodePointLimits() {
+        val quote = QuoteEntity(text = "Valid quote", author = "Me", category = "Life", isUserAdded = true)
+        // "a😀" is three UTF-16 units but two characters: the server (and SQLite) refuse it.
+        assertEquals(SubmissionError.VALIDATION, quote.copy(text = "a😀").submissionValidationError())
+        assertNull(quote.copy(text = "😀😀😀").submissionValidationError())
+        assertNull(quote.copy(text = "😀".repeat(500)).submissionValidationError())
+        assertEquals(SubmissionError.VALIDATION, quote.copy(text = "ab\u200B\u200B").submissionValidationError())
+        assertNull(quote.copy(author = "😀".repeat(100)).submissionValidationError())
+        assertEquals(SubmissionError.VALIDATION, quote.copy(author = "😀".repeat(101)).submissionValidationError())
+        assertEquals(SubmissionError.VALIDATION, quote.copy(category = " ").submissionValidationError())
+    }
+
+    @Test
+    fun storedQuoteTextLength_measuresTheTextAsItWillBeStored() {
+        // Saving strips a pair of quotation marks around the whole text: "Hi" in marks is stored as Hi.
+        assertEquals(2, storedQuoteTextLength("\"Hi\""))
+        assertEquals(6, storedQuoteTextLength("  Hi  you "))
+    }
 }

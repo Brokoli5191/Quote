@@ -16,8 +16,9 @@ data class CommunityQuotePage(
     val deletedIds: List<String>
 )
 
-class CommunityQuoteClient {
-    suspend fun updates(after: Long): Result<CommunityQuotePage> = withContext(Dispatchers.IO) {
+// Open so tests can stand in for the network.
+open class CommunityQuoteClient {
+    open suspend fun updates(after: Long): Result<CommunityQuotePage> = withContext(Dispatchers.IO) {
         runCatching {
             val connection = (URL("$COMMUNITY_QUOTES_URL?after=$after").openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
