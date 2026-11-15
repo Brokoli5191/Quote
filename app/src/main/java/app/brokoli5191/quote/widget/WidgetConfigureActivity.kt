@@ -3,10 +3,15 @@ package app.brokoli5191.quote.widget
 import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,6 +21,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.calculateEndPadding
@@ -23,7 +29,6 @@ import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -63,10 +68,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -78,6 +86,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.lifecycle.lifecycleScope
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.brokoli5191.quote.data.AppDatabase
@@ -86,23 +95,33 @@ import app.brokoli5191.quote.data.QuoteEntity
 import app.brokoli5191.quote.data.QuoteRepository
 import app.brokoli5191.quote.data.QuoteSourceMode
 import app.brokoli5191.quote.data.QuoteLanguage
+import app.brokoli5191.quote.data.FallbackQuote
 import app.brokoli5191.quote.data.dailyDateKey
 import app.brokoli5191.quote.ui.LocalAppLanguage
 import app.brokoli5191.quote.ui.uiText
-import app.brokoli5191.quote.ui.localizeUi
 import app.brokoli5191.quote.ui.theme.MyApplicationTheme
 import app.brokoli5191.quote.ui.components.ExpressiveButton
 import app.brokoli5191.quote.ui.components.FloatingChromeBackdrop
 import app.brokoli5191.quote.ui.components.bleedHorizontally
 import app.brokoli5191.quote.ui.components.rememberExpressiveShape
-import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.ceil
+import kotlin.math.min
 import kotlin.math.roundToInt
+
+private val DEFAULT_CONFIG = WidgetConfig()
+
+// Same scrims enableEdgeToEdge() uses by default (only visible on API < 29 with button navigation).
+private val LightNavigationScrim = android.graphics.Color.argb(0xe6, 0xFF, 0xFF, 0xFF)
+private val DarkNavigationScrim = android.graphics.Color.argb(0x80, 0x1b, 0x1b, 0x1b)
 
 class WidgetConfigureActivity : ComponentActivity() {
     private var appWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID
+    private var reconfiguring = false
+    private var saving by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -114,6 +133,7 @@ class WidgetConfigureActivity : ComponentActivity() {
             finish()
             return
         }
+        reconfiguring = WidgetConfig.exists(this, appWidgetId)
         setResult(
             RESULT_CANCELED,
             Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
@@ -124,6 +144,21 @@ class WidgetConfigureActivity : ComponentActivity() {
         val accent = prefs.getString("theme_accent", "Violet") ?: "Violet"
         val amoled = prefs.getBoolean("amoled_black", false)
         val language = prefs.getString("app_language", QuoteLanguage.ENGLISH) ?: QuoteLanguage.ENGLISH
+        // System bar icons follow the app theme, not the system one, like in MainActivity.
+        val effectiveMode = if (amoled && mode == "DARK") "AMOLED" else mode
+        val appDark = when (effectiveMode) {
+            "LIGHT" -> false
+            "DYNAMIC" -> (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                android.content.res.Configuration.UI_MODE_NIGHT_YES
+            else -> true
+        }
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.auto(
+                android.graphics.Color.TRANSPARENT,
+                android.graphics.Color.TRANSPARENT
+            ) { appDark },
+            navigationBarStyle = SystemBarStyle.auto(LightNavigationScrim, DarkNavigationScrim) { appDark }
+        )
         setContent {
             MyApplicationTheme(themeMode = mode, themeAccent = accent, amoledBlack = amoled) {
                 CompositionLocalProvider(LocalAppLanguage provides language) { ConfigureScreen() }
@@ -187,6 +222,15 @@ class WidgetConfigureActivity : ComponentActivity() {
             authorY = authorY
         )
 
+        val colorsValid = listOf(bgStart, bgEnd, labelColor, quoteColor, authorColor)
+            .all { normalizeWidgetColor(it) != null } &&
+            (!borderEnabled || normalizeWidgetColor(borderColor) != null)
+        val portrait = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT
+        val widgetSizeDp = remember {
+            widgetSizeDpFromOptions(AppWidgetManager.getInstance(this).getAppWidgetOptions(appWidgetId), portrait)
+        }
+        BackHandler(enabled = saving) {}
+
         Scaffold(
             topBar = {
                 CenterAlignedTopAppBar(
@@ -235,11 +279,21 @@ class WidgetConfigureActivity : ComponentActivity() {
                         }
                         WidgetPreview(
                             config = config,
+                            widgetWidthDp = widgetSizeDp.first,
+                            widgetHeightDp = widgetSizeDp.second,
                             onLabelPosition = { labelX = it.first; labelY = it.second },
                             onIconPosition = { iconX = it.first; iconY = it.second },
                             onQuotePosition = { quoteX = it.first; quoteY = it.second },
                             onAuthorPosition = { authorX = it.first; authorY = it.second }
                         )
+                        val hidden = hiddenElements(config, widgetSizeDp)
+                        if (hidden.isNotEmpty()) {
+                            Text(
+                                widgetText("Hidden at this widget size: ", "Bei dieser Widget-Größe ausgeblendet: ") + hidden.joinToString(", "),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
 
                     Box(Modifier.weight(1f)) {
@@ -279,7 +333,7 @@ class WidgetConfigureActivity : ComponentActivity() {
                                         .clip(RoundedCornerShape(14.dp))
                                         .background(
                                             Brush.linearGradient(
-                                                listOf(parseColor(preset.start), parseColor(preset.end))
+                                                listOf(widgetColor(preset.start, preset.start), widgetColor(preset.end, preset.end))
                                             )
                                         )
                                         .border(
@@ -290,6 +344,10 @@ class WidgetConfigureActivity : ComponentActivity() {
                                         .clickable {
                                             bgStart = preset.start
                                             bgEnd = preset.end
+                                            labelColor = preset.labelColor
+                                            quoteColor = preset.quoteColor
+                                            authorColor = preset.authorColor
+                                            borderColor = preset.borderColor
                                         },
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -365,6 +423,7 @@ class WidgetConfigureActivity : ComponentActivity() {
                     )
                     ExpressiveButton(
                         onClick = { saveAndFinish(config) },
+                        enabled = colorsValid && !saving,
                         modifier = Modifier
                             .fillMaxWidth()
                             .navigationBarsPadding()
@@ -372,10 +431,28 @@ class WidgetConfigureActivity : ComponentActivity() {
                             .heightIn(min = 54.dp),
                         restingCorner = 18.dp
                     ) {
-                        Text(uiText("Create Widget"), fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                        Text(
+                            if (reconfiguring) widgetText("Save", "Speichern") else uiText("Create Widget"),
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
                     }
                 }
             }
+        }
+    }
+
+    @Composable
+    private fun widgetText(english: String, german: String): String =
+        if (LocalAppLanguage.current == QuoteLanguage.GERMAN) german else english
+
+    @Composable
+    private fun hiddenElements(config: WidgetConfig, widgetSizeDp: Pair<Int, Int>): List<String> {
+        val visible = widgetElementVisibility(config, widgetSizeDp.first.toFloat(), widgetSizeDp.second.toFloat())
+        return buildList {
+            if (config.showLabel && !visible.label) add(uiText("Quote Label"))
+            if (config.showIcon && !visible.icon) add(uiText("Decorative Icon"))
+            if (config.showAuthor && !visible.author) add(uiText("Author"))
         }
     }
 
@@ -450,7 +527,7 @@ class WidgetConfigureActivity : ComponentActivity() {
                         Modifier
                             .size(38.dp)
                             .clip(CircleShape)
-                            .background(parseColor(color))
+                            .background(widgetColor(color, color))
                             .border(
                                 if (selected) 3.dp else 1.dp,
                                 if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
@@ -469,32 +546,48 @@ class WidgetConfigureActivity : ComponentActivity() {
 
     @Composable
     private fun ColorTextField(label: String, value: String, onValue: (String) -> Unit, modifier: Modifier) {
+        val invalid = normalizeWidgetColor(value) == null
         OutlinedTextField(
             value = value,
             onValueChange = { if (it.length <= 9) onValue(it) },
             modifier = modifier,
             label = { Text(uiText(label)) },
             singleLine = true,
+            isError = invalid,
+            supportingText = if (invalid) {
+                { Text(widgetText("Use #RRGGBB or #AARRGGBB", "Nutze #RRGGBB oder #AARRGGBB")) }
+            } else null,
             shape = RoundedCornerShape(14.dp),
-            trailingIcon = { Icon(Icons.Default.Colorize, null, tint = parseColor(value)) }
+            trailingIcon = {
+                Icon(Icons.Default.Colorize, null, tint = if (invalid) MaterialTheme.colorScheme.error else widgetColor(value, "#FFFFFF"))
+            }
         )
     }
 
+    /**
+     * Mirrors the renderer: same widget proportions (from the launcher's size options), same
+     * size rules for label/icon/author, same text sizes, position limits and anchors. Everything
+     * is the real size in dp times [fit], the factor that fits the widget area into the preview.
+     */
     @Composable
     private fun WidgetPreview(
         config: WidgetConfig,
+        widgetWidthDp: Int,
+        widgetHeightDp: Int,
         onLabelPosition: (Pair<Float, Float>) -> Unit,
         onIconPosition: (Pair<Float, Float>) -> Unit,
         onQuotePosition: (Pair<Float, Float>) -> Unit,
         onAuthorPosition: (Pair<Float, Float>) -> Unit
     ) {
-        val shape = RoundedCornerShape(config.cornerRadius.dp)
+        val language = LocalAppLanguage.current
+        val density = LocalDensity.current
+        val visibility = widgetElementVisibility(config, widgetWidthDp.toFloat(), widgetHeightDp.toFloat())
         val quoteFont = when (config.font) {
             "Sans" -> FontFamily.SansSerif
             "Monospace" -> FontFamily.Monospace
             else -> FontFamily.Serif
         }
-        Box(
+        BoxWithConstraints(
             Modifier
                 .fillMaxWidth()
                 .height(180.dp)
@@ -502,66 +595,89 @@ class WidgetConfigureActivity : ComponentActivity() {
                 .background(MaterialTheme.colorScheme.surfaceContainer),
             contentAlignment = Alignment.Center
         ) {
+            val fit = min(maxWidth.value / widgetWidthDp, maxHeight.value / widgetHeightDp)
+            val (cardWidthDp, cardHeightDp) = widgetCardSizeDp(widgetWidthDp.toFloat(), widgetHeightDp.toFloat(), config.visualScale)
+            fun sp(valueDp: Float) = with(density) { (valueDp * fit).dp.toSp() }
+            val shape = RoundedCornerShape((config.cornerRadius.coerceIn(0f, 48f) * config.visualScale.coerceIn(0.65f, 1f) * fit).dp)
+            val bgStart = widgetColor(config.backgroundStart, DEFAULT_CONFIG.backgroundStart)
+            val bgEnd = widgetColor(config.backgroundEnd, DEFAULT_CONFIG.backgroundEnd)
+
+            val labelSize = (cardHeightDp * 0.07f).coerceIn(11f, 18f)
+            val authorSize = (cardHeightDp * 0.08f * config.authorSizeScale).coerceIn(9f, 28f)
+            val padX = if (cardWidthDp < 160f) 12f else 20f
+            val padY = if (cardHeightDp < 100f) 8f else 16f
+            val quoteX = WidgetElement.QUOTE.clampX(config.quoteX)
+            val quoteY = WidgetElement.QUOTE.clampY(config.quoteY)
+            val quoteWidthDp = (cardWidthDp * (1f - quoteX) - padX).coerceAtLeast(80f)
+            val quoteMaxHeightDp = cardHeightDp * (1f - quoteY) - padY
+            val quoteText = FallbackQuote.text(language)
+            val quoteSizeDp = fitQuoteSize(
+                quoteText.length,
+                quoteWidthDp,
+                quoteMaxHeightDp,
+                ((if (cardWidthDp < cardHeightDp) cardWidthDp * 0.14f else cardHeightDp * 0.20f) * config.quoteSizeScale).coerceIn(12f, 42f)
+            )
+            val authorWidthDp = (cardWidthDp * (1f - WidgetElement.AUTHOR.clampX(config.authorX)) - padX).coerceAtLeast(80f)
+
             Box(
                 Modifier
-                    .fillMaxWidth(config.visualScale)
-                    .fillMaxHeight(config.visualScale)
+                    .size((cardWidthDp * fit).dp, (cardHeightDp * fit).dp)
                     .clip(shape)
-                    .background(Brush.linearGradient(listOf(parseColor(config.backgroundStart), parseColor(config.backgroundEnd))))
+                    .background(Brush.linearGradient(listOf(bgStart, bgEnd)))
                     .then(
-                        if (config.borderEnabled) Modifier.border(1.dp, parseColor(config.borderColor), shape)
-                        else Modifier
+                        if (config.borderEnabled) {
+                            Modifier.border((1.5f * fit).dp, widgetColor(config.borderColor, DEFAULT_CONFIG.borderColor), shape)
+                        } else Modifier
                     )
             ) {
-                if (config.blurBackground) {
-                    Box(
-                        Modifier
-                            .size(150.dp)
-                            .offset(x = (-35).dp, y = (-45).dp)
-                            .blur(28.dp)
-                            .background(parseColor(config.labelColor).copy(alpha = 0.45f), CircleShape)
-                    )
-                    Box(
-                        Modifier
-                            .size(170.dp)
-                            .align(Alignment.BottomEnd)
-                            .offset(x = 55.dp, y = 70.dp)
-                            .blur(32.dp)
-                            .background(parseColor(config.authorColor).copy(alpha = 0.35f), CircleShape)
-                    )
-                }
-                if (config.showLabel) {
-                    DraggablePreviewElement(config.labelX, config.labelY, onLabelPosition) {
-                        Text(uiText("QUOTE"), color = parseColor(config.labelColor), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                if (config.blurBackground) BlurGlows(bgStart, bgEnd, fit, config.visualScale.coerceIn(0.65f, 1f))
+                if (visibility.label) {
+                    DraggablePreviewElement(WidgetElement.LABEL, config.labelX, config.labelY, onLabelPosition) {
+                        Text(
+                            if (language == QuoteLanguage.GERMAN) "ZITAT" else "QUOTE",
+                            color = widgetColor(config.labelColor, DEFAULT_CONFIG.labelColor),
+                            fontSize = sp(labelSize),
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.SansSerif
+                        )
                     }
                 }
-                if (config.showIcon) {
-                    DraggablePreviewElement(config.iconX, config.iconY, onIconPosition) {
-                        Text("✦", color = parseColor(config.labelColor), fontSize = 20.sp)
+                if (visibility.icon) {
+                    DraggablePreviewElement(WidgetElement.ICON, config.iconX, config.iconY, onIconPosition, anchorEnd = true) {
+                        Text(
+                            "✦",
+                            color = widgetColor(config.labelColor, DEFAULT_CONFIG.labelColor),
+                            fontSize = sp(labelSize * 1.35f),
+                            fontFamily = FontFamily.Serif,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
-                DraggablePreviewElement(config.quoteX, config.quoteY, onQuotePosition) {
+                DraggablePreviewElement(WidgetElement.QUOTE, config.quoteX, config.quoteY, onQuotePosition) {
                     Text(
-                        uiText("The happiness of your life depends upon the quality of your thoughts."),
-                        color = parseColor(config.quoteColor),
+                        quoteText,
+                        color = widgetColor(config.quoteColor, DEFAULT_CONFIG.quoteColor),
                         fontFamily = quoteFont,
                         fontStyle = if (config.font == "Serif") FontStyle.Italic else FontStyle.Normal,
                         fontWeight = if (config.font == "Serif Bold") FontWeight.Bold else FontWeight.Normal,
-                        fontSize = (18 * config.quoteSizeScale).sp,
-                        lineHeight = (23 * config.quoteSizeScale).sp,
-                        maxLines = 4,
+                        fontSize = sp(quoteSizeDp),
+                        lineHeight = sp(quoteSizeDp * 1.2f),
+                        maxLines = (quoteMaxHeightDp / (quoteSizeDp * 1.2f)).toInt().coerceAtLeast(1),
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.fillMaxWidth(0.82f)
+                        modifier = Modifier.width((quoteWidthDp * fit).dp)
                     )
                 }
-                if (config.showAuthor) {
-                    DraggablePreviewElement(config.authorX, config.authorY, onAuthorPosition) {
+                if (visibility.author) {
+                    DraggablePreviewElement(WidgetElement.AUTHOR, config.authorX, config.authorY, onAuthorPosition, anchorBottom = true) {
                         Text(
-                            "— Marcus Aurelius",
-                            color = parseColor(config.authorColor),
+                            "— ${FallbackQuote.AUTHOR}",
+                            color = widgetColor(config.authorColor, DEFAULT_CONFIG.authorColor),
                             fontFamily = quoteFont,
                             fontWeight = FontWeight.Bold,
-                            fontSize = (12 * config.authorSizeScale).sp
+                            fontSize = sp(authorSize),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.width((authorWidthDp * fit).dp)
                         )
                     }
                 }
@@ -569,14 +685,68 @@ class WidgetConfigureActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Rough line-count estimate (about half an em per character) standing in for the renderer's
+     * measured shrink-to-fit loop.
+     */
+    private fun fitQuoteSize(textLength: Int, widthDp: Float, maxHeightDp: Float, startDp: Float): Float {
+        var size = startDp
+        val lowest = minOf(8f, startDp)
+        while (size > lowest) {
+            val lines = ceil(textLength * size * 0.5f / widthDp).coerceAtLeast(1f)
+            if (lines * size * 1.2f <= maxHeightDp) break
+            size -= 0.5f
+        }
+        return size
+    }
+
+    /** The widget's glows. Compose only blurs from API 31, so older versions get soft radial fades instead. */
+    @Composable
+    private fun BlurGlows(bgStart: Color, bgEnd: Color, fit: Float, visualScale: Float) {
+        val nativeBlur = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+        val glows = widgetBlurGlows(bgStart.toArgb(), bgEnd.toArgb())
+        Canvas(
+            Modifier
+                .fillMaxSize()
+                .then(
+                    if (nativeBlur) Modifier.blur((WIDGET_BLUR_RADIUS_DP * fit).dp, BlurredEdgeTreatment.Unbounded)
+                    else Modifier
+                )
+        ) {
+            glows.forEach { glow ->
+                // Glow geometry is relative to the whole widget area, the card is inset by the visual scale.
+                val areaWidth = size.width / visualScale
+                val areaHeight = size.height / visualScale
+                val inset = (1f - visualScale) / 2f
+                val center = Offset((glow.centerX - inset) * areaWidth, (glow.centerY - inset) * areaHeight)
+                val radius = glow.radiusOfWidth * areaWidth
+                val color = Color(glow.color)
+                if (nativeBlur) {
+                    drawCircle(color, radius, center)
+                } else {
+                    val reach = radius + WIDGET_BLUR_RADIUS_DP * fit * density
+                    drawCircle(
+                        Brush.radialGradient(listOf(color, color.copy(alpha = 0f)), center, reach),
+                        reach,
+                        center
+                    )
+                }
+            }
+        }
+    }
+
     @Composable
     private fun DraggablePreviewElement(
+        element: WidgetElement,
         x: Float,
         y: Float,
         onPosition: (Pair<Float, Float>) -> Unit,
+        anchorEnd: Boolean = false,
+        anchorBottom: Boolean = false,
         content: @Composable () -> Unit
     ) {
         var containerSize by remember { mutableStateOf(IntSize.Zero) }
+        var elementSize by remember { mutableStateOf(IntSize.Zero) }
         val latestX by rememberUpdatedState(x)
         val latestY by rememberUpdatedState(y)
         Box(
@@ -587,24 +757,26 @@ class WidgetConfigureActivity : ComponentActivity() {
             Box(
                 Modifier
                     .offset {
+                        // The renderer anchors the icon by its right edge and the author by its baseline.
                         IntOffset(
-                            (x * containerSize.width).roundToInt(),
-                            (y * containerSize.height).roundToInt()
+                            (element.clampX(x) * containerSize.width).roundToInt() - if (anchorEnd) elementSize.width else 0,
+                            (element.clampY(y) * containerSize.height).roundToInt() - if (anchorBottom) elementSize.height else 0
                         )
                     }
+                    .onSizeChanged { elementSize = it }
                     .pointerInput(containerSize) {
                         var currentX = latestX
                         var currentY = latestY
                         detectDragGestures(
                             onDragStart = {
-                                currentX = latestX
-                                currentY = latestY
+                                currentX = element.clampX(latestX)
+                                currentY = element.clampY(latestY)
                             }
                         ) { change, dragAmount ->
                             change.consume()
                             if (containerSize.width == 0 || containerSize.height == 0) return@detectDragGestures
-                            currentX = (currentX + dragAmount.x / containerSize.width).coerceIn(0f, 0.95f)
-                            currentY = (currentY + dragAmount.y / containerSize.height).coerceIn(0f, 0.95f)
+                            currentX = element.clampX(currentX + dragAmount.x / containerSize.width)
+                            currentY = element.clampY(currentY + dragAmount.y / containerSize.height)
                             onPosition(currentX to currentY)
                         }
                     }
@@ -614,39 +786,59 @@ class WidgetConfigureActivity : ComponentActivity() {
         }
     }
 
-    private fun parseColor(value: String): Color = runCatching {
-        Color(android.graphics.Color.parseColor(if (value.startsWith("#")) value else "#$value"))
-    }.getOrElse { Color.White }
-
     private fun saveAndFinish(config: WidgetConfig) {
-        WidgetConfig.write(this, appWidgetId, config)
-        val manager = AppWidgetManager.getInstance(this)
-        CoroutineScope(Dispatchers.IO).launch {
-            val repository = QuoteRepository(
-                AppDatabase.getInstance(this@WidgetConfigureActivity).quoteDao(),
-                InstallationSeed.get(this@WidgetConfigureActivity)
-            )
-            val date = dailyDateKey()
-            val prefs = getSharedPreferences("aura_prefs", Context.MODE_PRIVATE)
-            val sourceMode = prefs.getString("quote_source_mode", QuoteSourceMode.ALL) ?: QuoteSourceMode.ALL
-            val language = prefs.getString("app_language", QuoteLanguage.ENGLISH) ?: QuoteLanguage.ENGLISH
-            val quote = runCatching {
-                repository.getDailyQuote(date, sourceMode, language, prefs.getBoolean("show_anonymous_quotes", false))
-            }.getOrNull()
-                ?: QuoteEntity(
-                    text = if (language == QuoteLanguage.GERMAN) "Bleib neugierig. Bleib mutig." else if (sourceMode == QuoteSourceMode.COMMUNITY) "No community quotes available yet." else "Stay hungry. Stay foolish.",
-                    author = if (language == QuoteLanguage.GERMAN) "" else if (sourceMode == QuoteSourceMode.COMMUNITY) "Open Quote to sync" else "Steve Jobs",
-                    category = "Life"
+        if (saving) return
+        saving = true
+        val normalized = config.copy(
+            backgroundStart = normalizeWidgetColor(config.backgroundStart) ?: DEFAULT_CONFIG.backgroundStart,
+            backgroundEnd = normalizeWidgetColor(config.backgroundEnd) ?: DEFAULT_CONFIG.backgroundEnd,
+            labelColor = normalizeWidgetColor(config.labelColor) ?: DEFAULT_CONFIG.labelColor,
+            quoteColor = normalizeWidgetColor(config.quoteColor) ?: DEFAULT_CONFIG.quoteColor,
+            authorColor = normalizeWidgetColor(config.authorColor) ?: DEFAULT_CONFIG.authorColor,
+            borderColor = normalizeWidgetColor(config.borderColor) ?: DEFAULT_CONFIG.borderColor
+        )
+        val prefs = getSharedPreferences("aura_prefs", Context.MODE_PRIVATE)
+        val language = prefs.getString("app_language", QuoteLanguage.ENGLISH) ?: QuoteLanguage.ENGLISH
+        lifecycleScope.launch {
+            try {
+                val quote = withContext(Dispatchers.IO) {
+                    val repository = QuoteRepository(
+                        AppDatabase.getInstance(this@WidgetConfigureActivity).quoteDao(),
+                        InstallationSeed.get(this@WidgetConfigureActivity)
+                    )
+                    val sourceMode = prefs.getString("quote_source_mode", QuoteSourceMode.ALL) ?: QuoteSourceMode.ALL
+                    runCatching {
+                        repository.getDailyQuote(dailyDateKey(), sourceMode, language, prefs.getBoolean("show_anonymous_quotes", false))
+                    }.getOrNull()
+                        ?: QuoteEntity(text = FallbackQuote.text(language), author = FallbackQuote.AUTHOR, category = "Life")
+                }
+                // Written right before the first render so a cancelled save leaves no config behind.
+                withContext(Dispatchers.IO) { WidgetConfig.write(this@WidgetConfigureActivity, appWidgetId, normalized) }
+                QuoteWidgetProvider.updateAppWidget(
+                    this@WidgetConfigureActivity,
+                    AppWidgetManager.getInstance(this@WidgetConfigureActivity),
+                    appWidgetId,
+                    quote
                 )
-            withContext(Dispatchers.Main) {
-                QuoteWidgetProvider.updateAppWidget(this@WidgetConfigureActivity, manager, appWidgetId, quote)
                 setResult(
                     RESULT_OK,
                     Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
                 )
-                Toast.makeText(this@WidgetConfigureActivity, localizeUi("Widget created", language), Toast.LENGTH_SHORT).show()
+                val message = if (reconfiguring) "Widget updated" else "Widget created"
+                val messageDe = if (reconfiguring) "Widget aktualisiert" else "Widget erstellt"
+                Toast.makeText(
+                    this@WidgetConfigureActivity,
+                    if (language == QuoteLanguage.GERMAN) messageDe else message,
+                    Toast.LENGTH_SHORT
+                ).show()
                 finish()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                saving = false
             }
         }
     }
 }
+
+private fun widgetColor(value: String, fallbackHex: String): Color = Color(parseWidgetColor(value, fallbackHex))
