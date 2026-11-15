@@ -69,6 +69,7 @@ import app.brokoli5191.quote.ui.LocalAppLanguage
 import app.brokoli5191.quote.ui.uiText
 import app.brokoli5191.quote.ui.components.BottomNavigationBarFade
 import app.brokoli5191.quote.ui.components.BottomNavigationBarHeight
+import app.brokoli5191.quote.ui.components.QuoteEventsHost
 import app.brokoli5191.quote.ui.screens.DailyScreen
 import app.brokoli5191.quote.ui.screens.DeveloperScreen
 import app.brokoli5191.quote.ui.screens.LibraryScreen
@@ -561,6 +562,8 @@ internal fun MainContent(
                             }
                     )
                 }
+
+                QuoteEventsHost(viewModel)
             }
         }
 
