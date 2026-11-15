@@ -74,6 +74,36 @@ private val LightColorScheme = lightColorScheme(
     onSurfaceVariant = androidx.compose.ui.graphics.Color(0xFF49454F)
 )
 
+// Light-theme primaries are saturated and dark; they double as the swatch colour in Light mode.
+private val LightPrimaryViolet = androidx.compose.ui.graphics.Color(0xFF6750A4)
+private val LightPrimaryAmber = androidx.compose.ui.graphics.Color(0xFF6E5000)
+private val LightPrimaryGreen = androidx.compose.ui.graphics.Color(0xFF006D3E)
+private val LightPrimaryBlue = androidx.compose.ui.graphics.Color(0xFF005FAF)
+private val LightPrimaryRose = androidx.compose.ui.graphics.Color(0xFF9D004B)
+
+/**
+ * Colour of an accent swatch that matches the theme it would produce, so a swatch stays visible on
+ * a light page: the dark-theme pastels on dark surfaces, the Light-theme primaries on light ones.
+ */
+fun accentSwatchColor(accent: String, lightSurface: Boolean): androidx.compose.ui.graphics.Color =
+    if (lightSurface) {
+        when (accent) {
+            "Amber" -> LightPrimaryAmber
+            "Green" -> LightPrimaryGreen
+            "Blue" -> LightPrimaryBlue
+            "Rose" -> LightPrimaryRose
+            else -> LightPrimaryViolet
+        }
+    } else {
+        when (accent) {
+            "Amber" -> PrimaryAmber
+            "Green" -> PrimaryContainerGreen
+            "Blue" -> PrimaryBlue
+            "Rose" -> PrimaryRose
+            else -> PrimaryContainerViolet
+        }
+    }
+
 private data class QuadrupleColors(
     val primary: androidx.compose.ui.graphics.Color,
     val onPrimary: androidx.compose.ui.graphics.Color,
@@ -215,11 +245,11 @@ fun MyApplicationTheme(
             val textVariantLight = androidx.compose.ui.graphics.Color(0xFF49454F)
 
             val colors = when (themeAccent) {
-                "Amber" -> QuadrupleColors(androidx.compose.ui.graphics.Color(0xFF6E5000), androidx.compose.ui.graphics.Color(0xFFFFFFFF), androidx.compose.ui.graphics.Color(0xFFFFFDBD), androidx.compose.ui.graphics.Color(0xFF3E2D00))
-                "Green" -> QuadrupleColors(androidx.compose.ui.graphics.Color(0xFF006D3E), androidx.compose.ui.graphics.Color(0xFFFFFFFF), androidx.compose.ui.graphics.Color(0xFF90F9B9), androidx.compose.ui.graphics.Color(0xFF003D20))
-                "Blue" -> QuadrupleColors(androidx.compose.ui.graphics.Color(0xFF005FAF), androidx.compose.ui.graphics.Color(0xFFFFFFFF), androidx.compose.ui.graphics.Color(0xFFD4E3FF), androidx.compose.ui.graphics.Color(0xFF001C3B))
-                "Rose" -> QuadrupleColors(androidx.compose.ui.graphics.Color(0xFF9D004B), androidx.compose.ui.graphics.Color(0xFFFFFFFF), androidx.compose.ui.graphics.Color(0xFFFFD9E2), androidx.compose.ui.graphics.Color(0xFF3E001A))
-                else -> QuadrupleColors(androidx.compose.ui.graphics.Color(0xFF6750A4), androidx.compose.ui.graphics.Color(0xFFFFFFFF), androidx.compose.ui.graphics.Color(0xFFEADDFF), androidx.compose.ui.graphics.Color(0xFF21005D)) // Violet
+                "Amber" -> QuadrupleColors(LightPrimaryAmber, androidx.compose.ui.graphics.Color(0xFFFFFFFF), androidx.compose.ui.graphics.Color(0xFFFFFDBD), androidx.compose.ui.graphics.Color(0xFF3E2D00))
+                "Green" -> QuadrupleColors(LightPrimaryGreen, androidx.compose.ui.graphics.Color(0xFFFFFFFF), androidx.compose.ui.graphics.Color(0xFF90F9B9), androidx.compose.ui.graphics.Color(0xFF003D20))
+                "Blue" -> QuadrupleColors(LightPrimaryBlue, androidx.compose.ui.graphics.Color(0xFFFFFFFF), androidx.compose.ui.graphics.Color(0xFFD4E3FF), androidx.compose.ui.graphics.Color(0xFF001C3B))
+                "Rose" -> QuadrupleColors(LightPrimaryRose, androidx.compose.ui.graphics.Color(0xFFFFFFFF), androidx.compose.ui.graphics.Color(0xFFFFD9E2), androidx.compose.ui.graphics.Color(0xFF3E001A))
+                else -> QuadrupleColors(LightPrimaryViolet, androidx.compose.ui.graphics.Color(0xFFFFFFFF), androidx.compose.ui.graphics.Color(0xFFEADDFF), androidx.compose.ui.graphics.Color(0xFF21005D)) // Violet
             }
             val surfaces = lightSurfaces(colors.primary)
 

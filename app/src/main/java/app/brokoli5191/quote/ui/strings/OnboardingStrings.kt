@@ -42,6 +42,7 @@ internal val onboardingGermanUi: Map<String, String> = mapOf(
     "Portraits and short bios from Wikipedia." to "Porträts und Kurzinfos aus Wikipedia.",
     "Show author images" to "Autorenbilder anzeigen",
     "Loaded from Wikimedia. Turn off to skip these requests." to "Kommen von Wikimedia. Ausschalten spart diese Anfragen.",
+    "Show portrait preview" to "Porträtvorschau anzeigen",
 
     // Widget
     "Home screen widget" to "Quote als Widget",
