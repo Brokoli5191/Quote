@@ -194,6 +194,9 @@ class QuoteViewModel(
     private val backupManager = BackupManager(app, repository, communitySyncManager)
 
     private val updateCheckRunning = AtomicBoolean(false)
+    // Set by a manual check, also one that arrives while the automatic check runs: the running check
+    // then reports its result as the manual one would, errors included.
+    @Volatile private var manualUpdateCheck = false
     // The release the last check found, for the expected size of its download.
     private var latestRelease: ReleaseInfo? = null
     private var downloadJob: Job? = null
@@ -500,8 +503,10 @@ class QuoteViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
-        _showOnboarding.value = resolveOnboarding()
-        loadThemeSettings()
+        // Read before resolveOnboarding and loadThemeSettings write their prefs.
+        val firstStart = isFirstStart()
+        _showOnboarding.value = resolveOnboarding(firstStart)
+        loadThemeSettings(firstStart)
         // Auto Backup, device transfers and force-stops keep the reminder setting but lose its alarm.
         NotificationScheduler.ensureScheduled(app)
         NotificationHelper.refreshChannels(app)
@@ -511,12 +516,17 @@ class QuoteViewModel(
         CommunitySyncWorker.schedule(app)
     }
 
-    // Must run before loadThemeSettings, which writes theme_mode on a fresh install.
-    private fun resolveOnboarding(): Boolean {
+    // True when the app has never run on this install: every earlier start left a seed flag of its
+    // version, and since 1.7.0 also theme_mode.
+    private fun isFirstStart(): Boolean =
+        !prefs.contains(KEY_ONBOARDING_COMPLETED) && !prefs.contains("theme_mode") &&
+            prefs.all.keys.none { it.startsWith(SEEDED_FLAG_PREFIX) }
+
+    private fun resolveOnboarding(firstStart: Boolean): Boolean {
         if (prefs.contains(KEY_ONBOARDING_COMPLETED)) return !prefs.getBoolean(KEY_ONBOARDING_COMPLETED, false)
-        val existingInstall = prefs.contains("database_json_seeded_v11") || prefs.contains("theme_mode")
-        prefs.edit().putBoolean(KEY_ONBOARDING_COMPLETED, existingInstall).apply()
-        return !existingInstall
+        // Installs from before the onboarding skip it.
+        prefs.edit().putBoolean(KEY_ONBOARDING_COMPLETED, !firstStart).apply()
+        return firstStart
     }
 
     fun completeOnboarding() {
@@ -622,7 +632,7 @@ class QuoteViewModel(
         return changed
     }
 
-    private fun loadThemeSettings() {
+    private fun loadThemeSettings(firstStart: Boolean = false) {
         val storedMode = prefs.getString("theme_mode", "DARK") ?: "DARK"
         val migratedMode = when {
             storedMode == "AMOLED" -> "AMOLED"
@@ -632,13 +642,14 @@ class QuoteViewModel(
         }
         _themeMode.value = migratedMode
         _amoledBlack.value = migratedMode == "AMOLED"
-        val storedLanguage = prefs.getString(KEY_APP_LANGUAGE, null)
         val editor = prefs.edit()
             .putString("theme_mode", migratedMode)
             .putBoolean("amoled_black", migratedMode == "AMOLED")
-        // First start: German devices start in German (onboarding, widget and reminder alike); a stored
-        // choice, or a restored backup's, always wins.
-        if (storedLanguage == null) editor.putString(KEY_APP_LANGUAGE, deviceLanguage())
+        // A fresh install on a German device starts in German (onboarding, widget and reminder alike).
+        // An earlier install without a stored choice kept the English default, so it stays English. The
+        // pref is written either way, because widget and reminder read it.
+        val language = prefs.getString(KEY_APP_LANGUAGE, null)
+            ?: (if (firstStart) deviceLanguage() else QuoteLanguage.ENGLISH).also { editor.putString(KEY_APP_LANGUAGE, it) }
         editor.apply()
         _themeAccent.value = prefs.getString("theme_accent", "Violet")
             ?.takeIf { it in setOf("Violet", "Amber", "Green", "Blue", "Rose") }
@@ -646,9 +657,7 @@ class QuoteViewModel(
         _quoteSourceMode.value = prefs.getString("quote_source_mode", QuoteSourceMode.ALL)
             ?.takeIf { it in SOURCE_MODES }
             ?: QuoteSourceMode.ALL
-        _appLanguage.value = (storedLanguage ?: deviceLanguage())
-            .takeIf { it == QuoteLanguage.ENGLISH || it == QuoteLanguage.GERMAN }
-            ?: QuoteLanguage.ENGLISH
+        _appLanguage.value = supportedLanguage(language) ?: QuoteLanguage.ENGLISH
         _showAnonymousQuotes.value = prefs.getBoolean("show_anonymous_quotes", false)
         _widgetStyle.value = prefs.getString("widget_style", "Quote") ?: "Quote"
         _dailyReminderEnabled.value = prefs.getBoolean("daily_reminder_enabled", false)
@@ -728,13 +737,16 @@ class QuoteViewModel(
 
     private fun checkForUpdates(manual: Boolean) {
         if (_updateStatus.value is UpdateStatus.Downloading) return
+        if (manual) manualUpdateCheck = true
         if (!updateCheckRunning.compareAndSet(false, true)) return
         val before = _updateStatus.value
         _updateStatus.value = UpdateStatus.Checking
         viewModelScope.launch {
             try {
-                _updateStatus.value = updateStatusAfter(UpdateChecker.fetchLatestRelease(), before, manual)
+                val result = UpdateChecker.fetchLatestRelease()
+                _updateStatus.value = updateStatusAfter(result, before, manual || manualUpdateCheck)
             } finally {
+                manualUpdateCheck = false
                 updateCheckRunning.set(false)
             }
         }
@@ -850,7 +862,8 @@ class QuoteViewModel(
 
     /**
      * Loads today's quote for the current settings. [refreshWidget] re-renders the widget once the pick
-     * is stored (settings changes, a new day, a new seed), so widget and app never disagree.
+     * is stored (settings changes, a new seed), so widget and app never disagree. A load that finds a
+     * new day does that by itself.
      */
     fun loadDailyQuote(refreshWidget: Boolean = false) {
         val today = dailyDateKey()
@@ -866,6 +879,10 @@ class QuoteViewModel(
     // that a cancelled load asked for is sent by the change that replaced it, after its pick is stored.
     private fun updateDailyQuote(today: String, userAction: Boolean, pick: suspend () -> QuoteEntity?) {
         if (today != _dailyDate.value) {
+            // The day changed while the app ran: whichever load notices it (resume, sync, Try again),
+            // the widget follows without waiting for its midnight alarm. The first load after start
+            // leaves the widget to that alarm.
+            if (_dailyDate.value.isNotEmpty()) widgetRefreshPending = true
             _dailyDate.value = today
             clearCycleUndo()
         }
@@ -874,8 +891,10 @@ class QuoteViewModel(
         val userActionBefore = dailyUserActionJob
         val job = viewModelScope.launch {
             userActionBefore?.join()
-            _dailyQuote.value = pick()
+            val quote = pick()
+            // Before the quote is published: whoever sees the new quote also sees its day.
             shownQuoteDate = today
+            _dailyQuote.value = quote
             if (widgetRefreshPending) {
                 widgetRefreshPending = false
                 WidgetRefreshScheduler.requestUpdate(app)
@@ -887,7 +906,7 @@ class QuoteViewModel(
 
     /** Picks up a new day; the widget follows, since the app now shows the new day's quote. */
     fun refreshDailyQuoteIfNeeded() {
-        if (_dailyDate.value != dailyDateKey()) loadDailyQuote(refreshWidget = true)
+        if (_dailyDate.value != dailyDateKey()) loadDailyQuote()
     }
 
     /**
@@ -1611,9 +1630,10 @@ class QuoteViewModel(
     private data class DailySettings(val sourceMode: String, val language: String, val showAnonymous: Boolean)
 
     private companion object {
+        const val SEEDED_FLAG_PREFIX = "database_json_seeded_"
         // Bumped to v14 so installs that seeded before the normalizer and category fixes re-seed;
         // the re-seed keeps bundled ids, favorites and the daily history.
-        const val SEEDED_FLAG = "database_json_seeded_v14"
+        const val SEEDED_FLAG = "${SEEDED_FLAG_PREFIX}v14"
         // v3: the normalizer now also drops the stray space before German closing marks („Real. “).
         const val KEY_TEXT_REPAIRED = "stored_quote_text_repaired_v3"
         const val MIN_SEEDED_QUOTES = 30
@@ -1664,10 +1684,13 @@ class QuoteViewModel(
  * death. A ViewModelProvider made from the activity passes its saved-state owner in the creation
  * extras; without one (a bare ViewModelStore in tests) the state starts fresh.
  */
-class QuoteViewModelFactory(
-    private val application: Application,
-    private val repository: QuoteRepository
+class QuoteViewModelFactory internal constructor(
+    // Tests pass fake network clients here.
+    private val newViewModel: (SavedStateHandle) -> QuoteViewModel
 ) : ViewModelProvider.Factory {
+    constructor(application: Application, repository: QuoteRepository) :
+        this({ savedState -> QuoteViewModel(application, repository, savedState) })
+
     override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
         require(modelClass.isAssignableFrom(QuoteViewModel::class.java)) { "Unknown ViewModel class" }
         val savedState = if (extras[SAVED_STATE_REGISTRY_OWNER_KEY] != null && extras[VIEW_MODEL_STORE_OWNER_KEY] != null) {
@@ -1676,6 +1699,6 @@ class QuoteViewModelFactory(
             SavedStateHandle()
         }
         @Suppress("UNCHECKED_CAST")
-        return QuoteViewModel(application, repository, savedState) as T
+        return newViewModel(savedState) as T
     }
 }

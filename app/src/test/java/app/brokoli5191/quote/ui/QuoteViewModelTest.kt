@@ -2,13 +2,25 @@ package app.brokoli5191.quote.ui
 
 import android.app.Application
 import android.content.Context
+import android.content.Intent
+import android.os.Bundle
 import android.os.Parcel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.SAVED_STATE_REGISTRY_OWNER_KEY
 import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.VIEW_MODEL_STORE_OWNER_KEY
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.enableSavedStateHandles
 import androidx.lifecycle.viewmodel.CreationExtras
+import androidx.lifecycle.viewmodel.MutableCreationExtras
 import androidx.room.Room
+import androidx.savedstate.SavedStateRegistry
+import androidx.savedstate.SavedStateRegistryController
+import androidx.savedstate.SavedStateRegistryOwner
 import androidx.test.core.app.ApplicationProvider
 import androidx.work.Configuration
 import androidx.work.WorkManager
@@ -17,6 +29,7 @@ import app.brokoli5191.quote.data.AppDatabase
 import app.brokoli5191.quote.data.CommunityQuoteClient
 import app.brokoli5191.quote.data.CommunityQuotePage
 import app.brokoli5191.quote.data.CommunitySyncManager
+import app.brokoli5191.quote.data.DailySelectionEntity
 import app.brokoli5191.quote.data.QuoteDao
 import app.brokoli5191.quote.data.QuoteEntity
 import app.brokoli5191.quote.data.QuoteLanguage
@@ -57,8 +70,11 @@ import java.io.IOException
 import java.time.Duration
 import java.util.Calendar
 import java.util.Locale
+import java.util.TimeZone
 import java.util.UUID
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -70,10 +86,12 @@ class QuoteViewModelTest {
     private lateinit var dao: QuoteDao
     private lateinit var repository: QuoteRepository
     private val store = ViewModelStore()
+    private val activityStores = ArrayList<ViewModelStore>()
     private var created = 0
     private val community = FakeCommunityClient()
     private val submissions = FakeSubmissionClient()
     private val defaultLocale = Locale.getDefault()
+    private val defaultTimeZone = TimeZone.getDefault()
 
     @Before
     fun setUp() {
@@ -93,6 +111,7 @@ class QuoteViewModelTest {
     @After
     fun tearDown() {
         store.clear()
+        activityStores.forEach { it.clear() }
         // Cancelled work that still holds one of the process-wide locks releases it when its database call
         // returns. Wait for that while Main is still the test dispatcher: after resetMain it would resume on
         // the paused main looper and keep the lock from every later test in this JVM.
@@ -106,6 +125,7 @@ class QuoteViewModelTest {
         installDatabase(null)
         Dispatchers.resetMain()
         Locale.setDefault(defaultLocale)
+        TimeZone.setDefault(defaultTimeZone)
     }
 
     @Test
@@ -209,11 +229,12 @@ class QuoteViewModelTest {
     }
 
     @Test
-    fun firstStartFollowsAGermanDevice() {
-        prefs.edit().remove("app_language").commit()
+    fun aFreshInstallFollowsAGermanDevice() {
+        prefs.edit().clear().commit()
         Locale.setDefault(Locale.GERMANY)
         val vm = newViewModel()
         assertEquals(QuoteLanguage.GERMAN, vm.appLanguage.value)
+        assertTrue(vm.showOnboarding.value)
         // Widget and reminder read the pref, so they start in German too.
         assertEquals(QuoteLanguage.GERMAN, prefs.getString("app_language", null))
     }
@@ -225,8 +246,23 @@ class QuoteViewModelTest {
     }
 
     @Test
+    fun anEarlierInstallWithoutAStoredLanguageStaysEnglish() {
+        Locale.setDefault(Locale.GERMANY)
+        // Onboarding stores no language when the English default is kept.
+        prefs.edit().remove("app_language").putString("theme_mode", "DARK").commit()
+        assertEquals(QuoteLanguage.ENGLISH, newViewModel().appLanguage.value)
+        assertEquals(QuoteLanguage.ENGLISH, prefs.getString("app_language", null))
+
+        // From before 1.7.0 and the onboarding: only an old seed flag.
+        prefs.edit().clear().putBoolean("database_json_seeded_v9", true).commit()
+        val old = newViewModel()
+        assertEquals(QuoteLanguage.ENGLISH, old.appLanguage.value)
+        assertFalse(old.showOnboarding.value)
+    }
+
+    @Test
     fun otherDeviceLanguagesStartInEnglish() {
-        prefs.edit().remove("app_language").commit()
+        prefs.edit().clear().commit()
         Locale.setDefault(Locale.FRANCE)
         assertEquals(QuoteLanguage.ENGLISH, newViewModel().appLanguage.value)
     }
@@ -511,6 +547,7 @@ class QuoteViewModelTest {
     @Test
     fun anotherQuoteCanBeUndone() {
         insert(*(1..5).map { bundled("Quote $it") }.toTypedArray())
+        holdSyncs()
         val vm = newViewModel()
         val first = vm.dailyQuote.await { it != null }!!
         assertFalse(vm.canUndoCycle.value)
@@ -526,6 +563,121 @@ class QuoteViewModelTest {
             repository.getDailyQuote(dailyDateKey(), QuoteSourceMode.ALL, QuoteLanguage.ENGLISH, false)
         }
         assertEquals(first.id, stored!!.id)
+    }
+
+    @Test
+    fun theWidgetFollowsSettingsAnotherQuoteAndItsUndo() {
+        insert(*(1..5).map { bundled("Quote $it") }.toTypedArray())
+        holdSyncs()
+        val app = WidgetRecordingApp()
+        val vm = newViewModel(app = app)
+        val first = vm.dailyQuote.await { it != null }!!
+        assertTrue("starting the app leaves the widget alone", app.refreshes.isEmpty())
+
+        vm.setAppLanguage(QuoteLanguage.GERMAN)
+        awaitTrue { app.refreshes.size == 1 }
+        // Today's quote stays across a language change.
+        assertEquals(first.id, app.refreshes[0])
+
+        vm.cycleDailyQuote()
+        val next = vm.dailyQuote.await { it != null && it.id != first.id }!!
+        awaitTrue { app.refreshes.size == 2 }
+        assertEquals("the widget is asked once the new pick is stored", next.id, app.refreshes[1])
+
+        vm.undoCycleDailyQuote()
+        vm.dailyQuote.await { it?.id == first.id }
+        awaitTrue { app.refreshes.size == 3 }
+        assertEquals(first.id, app.refreshes[2])
+    }
+
+    @Test
+    fun theWidgetFollowsANewDayWhicheverLoadNoticesIt() {
+        insert(*(1..5).map { bundled("Quote $it") }.toTypedArray())
+        TimeZone.setDefault(TimeZone.getTimeZone("Etc/GMT+12"))
+        holdSyncs()
+        val app = WidgetRecordingApp()
+        val vm = newViewModel(app = app)
+        val earlier = vm.dailyQuote.await { it != null }!!
+
+        // Fourteen hours east of UTC it is a later day, as after midnight. A plain load (after a sync,
+        // Try again) notices it.
+        TimeZone.setDefault(TimeZone.getTimeZone("Etc/GMT-14"))
+        vm.loadDailyQuote()
+        awaitTrue { app.refreshes.isNotEmpty() }
+        val later = vm.dailyQuote.await { it != null && it.id != earlier.id }!!
+        assertEquals(later.id, app.refreshes[0])
+
+        // The same day again needs no refresh; resuming on another day does.
+        vm.refreshDailyQuoteIfNeeded()
+        vm.loadDailyQuote()
+        TimeZone.setDefault(TimeZone.getTimeZone("Etc/GMT+12"))
+        vm.refreshDailyQuoteIfNeeded()
+        awaitTrue { app.refreshes.size >= 2 }
+        vm.dailyQuote.await { it?.id == earlier.id }
+        assertEquals(listOf(later.id, earlier.id), app.refreshes.toList())
+    }
+
+    @Test
+    fun aNewSeedReachesTheWidget() {
+        // No update check against the network.
+        prefs.edit().putBoolean("auto_update_enabled", false).commit()
+        val app = WidgetRecordingApp()
+        val vm = newViewModel(app = app)
+        // The text repair needs the sync lock, so the start-up sync finishes first instead of being held.
+        vm.syncState.await { it is SyncUiState.Success }
+        vm.checkAndSeedDatabase()
+        val quote = vm.dailyQuote.await(timeoutMs = 60_000) { it != null }!!
+        awaitTrue { app.refreshes.isNotEmpty() }
+        assertEquals(listOf(quote.id), app.refreshes.toList())
+    }
+
+    @Test
+    fun aNewerLoadCancelsAStaleOne() {
+        insert(*(1..5).map { bundled("Quote $it") }.toTypedArray())
+        val gated = GatedDao(dao)
+        holdSyncs()
+        val vm = newViewModel(repository = QuoteRepository(gated, 42L))
+        val first = vm.dailyQuote.await { it != null }!!
+
+        gated.holdKeysContaining = "_${QuoteLanguage.GERMAN}_"
+        try {
+            vm.setAppLanguage(QuoteLanguage.GERMAN)
+            // The German load now holds the repository lock and does not finish.
+            runBlocking { withTimeout(5_000) { gated.held.await() } }
+            val readsBefore = gated.dayReads.get()
+            vm.setAppLanguage(QuoteLanguage.ENGLISH)
+            // The English load gets the lock while the German one would still hold it: it was cancelled.
+            awaitTrue { gated.dayReads.get() > readsBefore }
+        } finally {
+            gated.release.complete(Unit)
+        }
+        assertEquals(first.text, vm.dailyQuote.await { it != null }!!.text)
+        val picks = runBlocking { dao.getDailySelectionsForDay("${dailyDateKey()}_") }
+        assertTrue("the stale German pick never lands", picks.none { "_${QuoteLanguage.GERMAN}_" in it.date })
+    }
+
+    @Test
+    fun theFactoryKeepsTheStateInTheActivitysSavedState() {
+        val factory = QuoteViewModelFactory { savedState ->
+            QuoteViewModel(context, repository, savedState, submissions, newManager(repository))
+        }
+        val before = FakeActivity(null)
+        val vm = before.viewModel(factory)
+        vm.selectTab("Library")
+        vm.setSearchQuery("rumi")
+        vm.openNewQuoteScreen()
+        val saved = parcelled(before.saveState())
+        before.viewModelStore.clear()
+
+        val after = FakeActivity(saved).viewModel(factory)
+        assertEquals("Library", after.selectedTab.value)
+        assertEquals("rumi", after.searchQuery.value)
+        assertTrue(after.showNewQuoteScreen.value)
+
+        // Without a saved-state owner in the extras (a bare ViewModelStore) the state starts fresh.
+        val fresh = ViewModelProvider(store, factory)["fresh", QuoteViewModel::class.java]
+        assertEquals("Daily", fresh.selectedTab.value)
+        assertEquals("", fresh.searchQuery.value)
     }
 
     @Test
@@ -575,23 +727,37 @@ class QuoteViewModelTest {
         vm.submissionRefreshRunning.await { !it }
     }
 
-    private fun newViewModel(savedState: SavedStateHandle = SavedStateHandle()): QuoteViewModel {
-        val manager = CommunitySyncManager(context, repository, community, submissions)
+    private fun newViewModel(
+        savedState: SavedStateHandle = SavedStateHandle(),
+        app: Application = context,
+        repository: QuoteRepository = this.repository
+    ): QuoteViewModel {
+        val manager = newManager(repository)
         val factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T =
-                QuoteViewModel(context, repository, savedState, submissions, manager) as T
+                QuoteViewModel(app, repository, savedState, submissions, manager) as T
         }
         return ViewModelProvider(store, factory)["vm${created++}", QuoteViewModel::class.java]
     }
 
+    // Syncs wait until the ViewModel is cleared, so no sync reloads the daily quote alongside the test.
+    private fun holdSyncs() {
+        community.hold = CompletableDeferred()
+    }
+
+    private fun newManager(repository: QuoteRepository) = CommunitySyncManager(context, repository, community, submissions)
+
+    private fun restoredAfterProcessDeath(handle: SavedStateHandle): SavedStateHandle =
+        SavedStateHandle.createHandle(parcelled(handle.savedStateProvider().saveState()), null)
+
     // What the activity's saved state goes through when the process dies: a Bundle written to a Parcel.
-    private fun restoredAfterProcessDeath(handle: SavedStateHandle): SavedStateHandle {
+    private fun parcelled(state: Bundle): Bundle {
         val parcel = Parcel.obtain()
         try {
-            parcel.writeBundle(handle.savedStateProvider().saveState())
+            parcel.writeBundle(state)
             parcel.setDataPosition(0)
-            return SavedStateHandle.createHandle(parcel.readBundle(javaClass.classLoader), null)
+            return parcel.readBundle(javaClass.classLoader)!!
         } finally {
             parcel.recycle()
         }
@@ -641,7 +807,8 @@ class QuoteViewModelTest {
         savedDate = if (favorite) "1000" else null
     )
 
-    private fun <T> Flow<T>.await(predicate: (T) -> Boolean): T = runBlocking { withTimeout(5_000) { first(predicate) } }
+    private fun <T> Flow<T>.await(timeoutMs: Long = 5_000, predicate: (T) -> Boolean): T =
+        runBlocking { withTimeout(timeoutMs) { first(predicate) } }
 
     private fun Flow<QuoteUiEvent>.awaitFirst(): QuoteUiEvent = runBlocking { withTimeout(5_000) { first() } }
 
@@ -673,12 +840,83 @@ class QuoteViewModelTest {
         )
     }
 
+    // The application as the ViewModel sees it. Records each widget refresh the ViewModel asks for, with
+    // the quote stored as today's latest pick at that moment.
+    private inner class WidgetRecordingApp : Application() {
+        val refreshes = CopyOnWriteArrayList<Int?>()
+
+        init {
+            attachBaseContext(context)
+        }
+
+        override fun sendBroadcast(intent: Intent) {
+            if (intent.action == AppLinks.ACTION_UPDATE_WIDGET) {
+                refreshes += runBlocking { dao.getDailySelectionsForDay("${dailyDateKey()}_") }.firstOrNull()?.quoteId
+            } else {
+                super.sendBroadcast(intent)
+            }
+        }
+    }
+
+    // What an activity gives the factory: a ViewModelStore and saved state with SavedStateHandle support.
+    private inner class FakeActivity(restored: Bundle?) : SavedStateRegistryOwner, ViewModelStoreOwner {
+        private val lifecycleRegistry = LifecycleRegistry.createUnsafe(this)
+        private val savedStateController = SavedStateRegistryController.create(this)
+        override val lifecycle: Lifecycle get() = lifecycleRegistry
+        override val savedStateRegistry: SavedStateRegistry get() = savedStateController.savedStateRegistry
+        override val viewModelStore = ViewModelStore()
+
+        init {
+            activityStores += viewModelStore
+            // The order ComponentActivity uses: attach and enable in the constructor, restore in onCreate.
+            savedStateController.performAttach()
+            enableSavedStateHandles()
+            savedStateController.performRestore(restored)
+            lifecycleRegistry.currentState = Lifecycle.State.CREATED
+        }
+
+        fun viewModel(factory: ViewModelProvider.Factory): QuoteViewModel {
+            val extras = MutableCreationExtras().apply {
+                this[SAVED_STATE_REGISTRY_OWNER_KEY] = this@FakeActivity
+                this[VIEW_MODEL_STORE_OWNER_KEY] = this@FakeActivity
+            }
+            return ViewModelProvider(viewModelStore, factory, extras)[QuoteViewModel::class.java]
+        }
+
+        fun saveState(): Bundle = Bundle().also(savedStateController::performSave)
+    }
+
+    // Holds back storing a daily pick under a key containing [holdKeysContaining], with the repository's
+    // lock held, until [release] completes. Counts reads of a day's picks, which happen under that lock.
+    private class GatedDao(private val dao: QuoteDao) : QuoteDao by dao {
+        @Volatile var holdKeysContaining: String? = null
+        val held = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val dayReads = AtomicInteger()
+
+        override suspend fun storeDailySelection(key: String, quoteId: Int) {
+            if (holdKeysContaining?.let { it in key } == true) {
+                held.complete(Unit)
+                release.await()
+            }
+            dao.storeDailySelection(key, quoteId)
+        }
+
+        override suspend fun getDailySelectionsForDay(keyPrefix: String): List<DailySelectionEntity> {
+            dayReads.incrementAndGet()
+            return dao.getDailySelectionsForDay(keyPrefix)
+        }
+    }
+
     private class FakeCommunityClient : CommunityQuoteClient() {
         @Volatile var online = true
         @Volatile var calls = 0
+        // While set, a sync waits here and holds the sync lock until the ViewModel is cleared.
+        @Volatile var hold: CompletableDeferred<Unit>? = null
 
         override suspend fun updates(after: Long): Result<CommunityQuotePage> {
             calls++
+            hold?.await()
             return if (online) {
                 Result.success(CommunityQuotePage(after, hasMore = false, quotes = emptyList(), deletedIds = emptyList()))
             } else {
