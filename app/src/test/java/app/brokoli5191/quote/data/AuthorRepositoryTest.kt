@@ -2,9 +2,11 @@ package app.brokoli5191.quote.data
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import app.brokoli5191.quote.R
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -86,6 +88,18 @@ class AuthorRepositoryTest {
         val german = author.toAuthorInfo("X", QuoteLanguage.GERMAN, allowImages = true)
         assertEquals("English writer", german.description)
         assertEquals("https://en.wikipedia.org/wiki/X", german.wikiUrl)
+    }
+
+    @Test
+    fun bundledAuthorsWithoutAGermanArticle_linkEnglishWikipediaInGerman() {
+        val json = context.resources.openRawResource(R.raw.author_wiki).bufferedReader().use { it.readText() }
+        val withoutGerman = parseBundledAuthors(json).filterValues { it.dewiki == null }
+        assertTrue(withoutGerman.isNotEmpty())
+        withoutGerman.forEach { (name, author) ->
+            val info = author.toAuthorInfo(name, QuoteLanguage.GERMAN, allowImages = false)
+            assertTrue(name, info.wikiUrl!!.startsWith("https://en.wikipedia.org/wiki/"))
+            assertNotNull(name, info.description)
+        }
     }
 
     @Test

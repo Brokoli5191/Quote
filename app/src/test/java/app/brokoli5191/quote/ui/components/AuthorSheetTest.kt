@@ -6,6 +6,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import app.brokoli5191.quote.data.AuthorInfo
 import app.brokoli5191.quote.data.QuoteLanguage
 import app.brokoli5191.quote.ui.LocalAppLanguage
 import app.brokoli5191.quote.ui.theme.MyApplicationTheme
@@ -28,13 +29,13 @@ class AuthorSheetTest {
     private var dismissed = 0
     private var showMoreCalls = 0
 
-    private fun showSheet(quoteCount: Int, language: String = QuoteLanguage.ENGLISH) {
+    private fun showSheet(quoteCount: Int, language: String = QuoteLanguage.ENGLISH, info: AuthorInfo? = null) {
         compose.setContent {
             MyApplicationTheme {
                 CompositionLocalProvider(LocalAppLanguage provides language) {
                     AuthorSheet(
                         name = "Seneca",
-                        info = null,
+                        info = info,
                         imageUrl = null,
                         language = language,
                         onDismiss = { dismissed++ },
@@ -70,5 +71,20 @@ class AuthorSheetTest {
 
         assertTrue(compose.onAllNodesWithText("More quotes", substring = true).fetchSemanticsNodes().isEmpty())
         compose.onNodeWithText("Read on Wikipedia").assertIsDisplayed()
+    }
+
+    @Test
+    fun germanUiSaysWhenTheArticleIsEnglish() {
+        // Authors without a German article link English Wikipedia (AuthorRepository).
+        val english = AuthorInfo(
+            name = "Seneca",
+            wikiTitle = "Seneca the Younger",
+            imageUrl = null,
+            description = "Roman Stoic philosopher",
+            wikiUrl = "https://en.wikipedia.org/wiki/Seneca_the_Younger"
+        )
+        showSheet(quoteCount = 1, language = QuoteLanguage.GERMAN, info = english)
+
+        compose.onNodeWithText("Auf Wikipedia lesen (Englisch)").assertIsDisplayed()
     }
 }

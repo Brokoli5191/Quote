@@ -56,6 +56,9 @@ fun AuthorSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     val description = info?.description?.takeIf { it.isNotBlank() }
+    val wikiUrl = info?.wikiUrl ?: wikipediaSearchUrl(name, language)
+    // Without a German article the German UI links English Wikipedia; the button says so.
+    val englishWiki = language == QuoteLanguage.GERMAN && wikiUrl.startsWith("https://en.wikipedia.org/")
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -115,9 +118,8 @@ fun AuthorSheet(
             ExpressiveButton(
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    val url = info?.wikiUrl ?: wikipediaSearchUrl(name, language)
                     runCatching {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(wikiUrl)))
                     }
                     scope.launch { sheetState.hide() }.invokeOnCompletion {
                         if (!sheetState.isVisible) onDismiss()
@@ -128,7 +130,11 @@ fun AuthorSheet(
             ) {
                 Icon(Icons.Default.Language, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text(uiText("Read on Wikipedia"), maxLines = 2, textAlign = TextAlign.Center)
+                Text(
+                    uiText(if (englishWiki) "Read on Wikipedia (English)" else "Read on Wikipedia"),
+                    maxLines = 2,
+                    textAlign = TextAlign.Center
+                )
             }
         }
     }
