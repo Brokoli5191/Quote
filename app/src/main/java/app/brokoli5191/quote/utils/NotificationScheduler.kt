@@ -11,6 +11,21 @@ import java.util.Calendar
 object NotificationScheduler {
     private const val ALARM_REQ_CODE = 4242
 
+    /**
+     * Re-arms the daily reminder from the stored prefs if it is enabled. Safe to call on every
+     * app start: Auto Backup restores, force-stops and device transfers keep the pref but lose
+     * the alarm.
+     */
+    fun ensureScheduled(context: Context) {
+        val prefs = context.getSharedPreferences("aura_prefs", Context.MODE_PRIVATE)
+        if (!prefs.getBoolean("daily_reminder_enabled", false)) return
+        scheduleDailyNotification(
+            context,
+            prefs.getInt("daily_reminder_hour", 8),
+            prefs.getInt("daily_reminder_minute", 0)
+        )
+    }
+
     fun scheduleDailyNotification(context: Context, hour: Int, minute: Int) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
         val intent = Intent(context, NotificationReceiver::class.java)

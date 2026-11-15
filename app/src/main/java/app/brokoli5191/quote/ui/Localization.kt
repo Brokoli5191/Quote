@@ -280,3 +280,12 @@ fun categoryText(category: String): String = localizedCategory(category, LocalAp
 
 fun formattedQuote(text: String, author: String): String =
     if (author.isBlank()) "\"$text\"" else "\"$text\" — $author"
+
+/**
+ * Share/copy/notification text with the quotation marks of [language] (German „…“, English "…").
+ * A blank author is left out; callers pass "" for unknown authors instead of "Unknown".
+ */
+fun formattedQuote(text: String, author: String, language: String): String {
+    val quoted = if (language == QuoteLanguage.GERMAN) "„$text“" else "\"$text\""
+    return if (author.isBlank()) quoted else "$quoted — $author"
+}

@@ -11,6 +11,15 @@ import app.brokoli5191.quote.MainActivity
 
 object NotificationHelper {
     const val CHANNEL_ID = "aura_daily_quotes"
+    const val SUBMISSION_CHANNEL_ID = "submission_updates"
+
+    /** OWNER: platform package. Re-creates both channels with names in the current app language. */
+    fun refreshChannels(context: Context) {
+    }
+
+    /** OWNER: platform package. Posts one notification summarizing review decisions. */
+    fun showSubmissionUpdates(context: Context, updates: List<app.brokoli5191.quote.data.SubmissionUpdate>) {
+    }
 
     fun showQuoteNotification(context: Context, text: String, author: String, notificationId: Int = 1001) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
