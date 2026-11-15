@@ -1,6 +1,6 @@
-# Hand-written baseline profile: app startup, main screens, widget, workers.
-# Compose and other AndroidX libraries ship their own profiles; the rules below
-# make sure the hot paths used by this app are precompiled as well.
+# Hand-written baseline profile with broad package wildcards: every method of the app,
+# Compose (runtime, ui, foundation, animation, material3), navigation, lifecycle, activity,
+# Room and kotlinx.coroutines is marked as hot and precompiled. It is not measured.
 
 # App code
 HSPLapp/brokoli5191/quote/**->**(**)**

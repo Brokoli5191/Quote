@@ -9,7 +9,6 @@ on:
         default: false
   push:
     tags:
-      - "v*"
       - "[0-9]+.[0-9]+.[0-9]+"
 
 permissions:
@@ -25,6 +24,36 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v7
 
+      - name: Validate version, tag and release notes
+        id: version
+        shell: bash
+        run: |
+          version="$(sed -n 's/^ *versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts)"
+          if [ -z "$version" ]; then
+            echo "versionName not found in app/build.gradle.kts"
+            exit 1
+          fi
+          if [ "$GITHUB_REF_TYPE" = "tag" ] && [ "$GITHUB_REF_NAME" != "$version" ]; then
+            echo "Tag $GITHUB_REF_NAME must equal versionName $version (bare X.Y.Z, no v prefix)"
+            exit 1
+          fi
+          if [ ! -f ".github/release-notes/$version.md" ]; then
+            echo "Missing .github/release-notes/$version.md"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Validate seed data and tag labels
+        run: |
+          node tools/validate_quotes_seed.mjs
+          node --test tools/*.test.mjs
+          node tools/generate_tag_labels.mjs --check
+
       - name: Set up Java 17
         uses: actions/setup-java@v6
         with:
@@ -38,6 +67,9 @@ jobs:
 
       - name: Make Gradle executable
         run: chmod +x gradlew
+
+      - name: Run unit tests
+        run: ./gradlew :app:testDebugUnitTest --no-daemon
 
       - name: Restore signing key
         shell: bash
@@ -63,12 +95,10 @@ jobs:
       - name: Prepare release files
         id: release_files
         shell: bash
+        env:
+          VERSION_IN: ${{ steps.version.outputs.version }}
         run: |
-          version="$(sed -n 's/^ *versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts)"
-          if [ -z "$version" ]; then
-            echo "versionName not found in app/build.gradle.kts"
-            exit 1
-          fi
+          version="$VERSION_IN"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
           mkdir -p release
@@ -93,24 +123,20 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.release_files.outputs.version }}
-          TAG: ${{ github.ref_type == 'tag' && github.ref_name || steps.release_files.outputs.version }}
         run: |
-          if [ "${TAG#v}" != "$VERSION" ]; then
-            echo "Tag $TAG does not match versionName $VERSION"
+          TAG="$VERSION"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists"
             exit 1
           fi
-
           notes="release-notes.md"
-          if [ -f ".github/release-notes/$VERSION.md" ]; then
-            cp ".github/release-notes/$VERSION.md" "$notes"
-          else
-            echo "## What's New in Quote $VERSION" > "$notes"
-          fi
+          cp ".github/release-notes/$VERSION.md" "$notes"
           printf '\n**SHA-256:** `%s`\n' "$(cut -d ' ' -f 1 "release/quote-$VERSION.apk.sha256")" >> "$notes"
 
           gh release create "$TAG" \
             "release/quote-$VERSION.apk" \
             "release/quote-$VERSION.apk.sha256" \
+            "release/quote-$VERSION-mapping.txt" \
             --title "$VERSION" \
             --notes-file "$notes" \
             --target "$GITHUB_SHA"
