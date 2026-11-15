@@ -117,6 +117,7 @@ import app.brokoli5191.quote.ui.localizeUi
 import app.brokoli5191.quote.ui.uiText
 import app.brokoli5191.quote.ui.components.AnimatedTranslation
 import app.brokoli5191.quote.ui.components.AuthorAvatar
+import app.brokoli5191.quote.ui.components.AuthorSheet
 import app.brokoli5191.quote.ui.components.ExpressiveButton
 import app.brokoli5191.quote.ui.components.ExpressiveIconButton
 import app.brokoli5191.quote.ui.components.FloatingChromeBackdrop
@@ -296,6 +297,8 @@ fun SavedScreen(viewModel: QuoteViewModel) {
     var withdrawTargets by rememberQuoteTargets(ownQuote)
     var editTargets by rememberQuoteTargets(ownQuote)
     var editResubmit by rememberSaveable { mutableStateOf(false) }
+    // Kept by name, like Library's: the sheet is about the author, not about one quote.
+    var sheetAuthor by rememberSaveable { mutableStateOf<String?>(null) }
 
     fun toast(english: String, long: Boolean = false) {
         Toast.makeText(context, localizeUi(english, uiLanguage), if (long) Toast.LENGTH_LONG else Toast.LENGTH_SHORT).show()
@@ -452,6 +455,7 @@ fun SavedScreen(viewModel: QuoteViewModel) {
                                 },
                                 onWithdraw = { withdrawTargets = listOf(quote) },
                                 onCheckNow = checkNow,
+                                onAuthorClick = { sheetAuthor = quote.author },
                                 modifier = if (lowPerformanceMode) Modifier else Modifier.animateItem()
                             )
                         }
@@ -692,6 +696,22 @@ fun SavedScreen(viewModel: QuoteViewModel) {
                         }
                     }
                 }
+            )
+        }
+
+        // Built as Library builds it; own quotes' authors open it too, as they do in Library.
+        sheetAuthor?.let { author ->
+            val authorInfo by remember(author) { viewModel.authorInfo(author) }.collectAsStateWithLifecycle()
+            // Re-read when the library finishes loading behind an already open sheet.
+            val authorQuoteCount = remember(author, allQuotes) { viewModel.authorQuoteCount(author) }
+            AuthorSheet(
+                name = author,
+                info = authorInfo,
+                imageUrl = authorInfo?.imageUrl?.takeIf { authorImagesEnabled },
+                language = uiLanguage,
+                onDismiss = { sheetAuthor = null },
+                quoteCount = authorQuoteCount,
+                onShowMoreQuotes = { viewModel.openLibrarySearch(author) }
             )
         }
     }
@@ -1477,6 +1497,7 @@ private fun PremiumCollectionQuoteCard(
     onEdit: (resubmit: Boolean) -> Unit,
     onWithdraw: () -> Unit,
     onCheckNow: () -> Unit,
+    onAuthorClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val language = LocalAppLanguage.current
@@ -1523,6 +1544,8 @@ private fun PremiumCollectionQuoteCard(
     val textLanguage = QuoteSharing.textLanguage(quote, showTranslation)
     val unknownAuthor = quote.hasUnknownAuthor
     val authorName = if (unknownAuthor) uiText("Unknown") else quote.author
+    // While selecting, a tap on the author selects like a tap anywhere else on the card.
+    val authorTappable = !unknownAuthor && !selecting
 
     val copy: () -> Unit = {
         QuoteSharing.copyText(context, displayedText, quote.author, textLanguage)
@@ -1553,6 +1576,7 @@ private fun PremiumCollectionQuoteCard(
     val shareImageLabel = uiText("Share as image")
     val removeLabel = uiText(if (inFavorites) "Remove from favorites" else "Delete")
     val selectLabel = uiText("Select")
+    val authorLabel = uiText("Explore this author")
     val currentToggleSelected by rememberUpdatedState(onToggleSelected)
     // While selecting, a tap anywhere on the card toggles it; otherwise a long press starts selecting.
     val selectionModifier = if (selecting) {
@@ -1596,8 +1620,9 @@ private fun PremiumCollectionQuoteCard(
             Column(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // TalkBack reads quote, author and date as one item and offers the card's actions in
-                // its actions menu. While selecting, the whole card is one checkbox instead.
+                // TalkBack reads quote and date as one item and offers the card's actions in its
+                // actions menu. A known author is a button of its own after it, as in Library; an
+                // unknown one is read with the quote. While selecting, the whole card is one checkbox.
                 Column(
                     modifier = if (selecting) {
                         Modifier
@@ -1607,6 +1632,7 @@ private fun PremiumCollectionQuoteCard(
                                 add(CustomAccessibilityAction(copyLabel) { copy(); true })
                                 add(CustomAccessibilityAction(shareTextLabel) { shareText(); true })
                                 if (!imageShareRunning) add(CustomAccessibilityAction(shareImageLabel) { shareImage(); true })
+                                if (authorTappable) add(CustomAccessibilityAction(authorLabel) { onAuthorClick(); true })
                                 if (inFavorites) {
                                     add(CustomAccessibilityAction(removeLabel) { onUnfavorite(); true })
                                 } else if (!isSubmitting) {
@@ -1701,7 +1727,27 @@ private fun PremiumCollectionQuoteCard(
                     // the three actions (long names, large font scales), the actions move below the name.
                     val authorBlock: @Composable (Modifier) -> Unit = { rowModifier ->
                         Row(
-                            modifier = rowModifier.padding(end = 8.dp),
+                            modifier = rowModifier
+                                .padding(end = 8.dp)
+                                // The touch target stays while selecting, so the card keeps its height.
+                                .then(if (unknownAuthor) Modifier else Modifier.heightIn(min = 48.dp).clip(RoundedCornerShape(12.dp)))
+                                .then(
+                                    if (authorTappable) {
+                                        // The long press still selects, as everywhere else on the card
+                                        // (combinedClickable gives it the long-press haptic).
+                                        Modifier.combinedClickable(
+                                            onClickLabel = authorLabel,
+                                            role = Role.Button,
+                                            onLongClickLabel = selectLabel,
+                                            onLongClick = onToggleSelected
+                                        ) {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            onAuthorClick()
+                                        }
+                                    } else {
+                                        Modifier
+                                    }
+                                ),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {

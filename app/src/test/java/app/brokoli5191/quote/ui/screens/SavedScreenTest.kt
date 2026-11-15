@@ -4,12 +4,15 @@ import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.activity.ComponentDialog
 import androidx.compose.runtime.remember
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsNodeInteractionCollection
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasAnySibling
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasSetTextAction
@@ -65,7 +68,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
 
-/** Saved's behaviour: favorites of own quotes, Undo, the review section, editing, search and selection. */
+/** Saved's behaviour: favorites of own quotes, Undo, the review section, editing, search, selection and the author sheet. */
 @OptIn(ExperimentalTestApi::class)
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -375,5 +378,62 @@ class SavedScreenTest {
         compose.settle()
         assertTrue(snackbars.messages.isEmpty())
         assertEquals(0, compose.onAllNodesWithText("withdrawn once Quote can reach", substring = true).count())
+    }
+
+    // The labels of the actions TalkBack offers for the card that shows [text].
+    private fun cardActions(text: String): List<String> =
+        compose.onNode(hasText(text, substring = true)).fetchSemanticsNode()
+            .config.getOrNull(SemanticsActions.CustomActions).orEmpty().map { it.label }
+
+    @Test
+    fun tappingAFavoritesAuthorOpensTheAuthorSheetAndItSurvivesARecreation() {
+        val restoration = StateRestorationTester(compose)
+        showSaved(restoration = restoration)
+        assertEquals(0, compose.onAllNodesWithText("Read on Wikipedia").count())
+
+        compose.onNode(hasText("Marcus Aurelius") and hasClickAction()).performClick()
+        compose.settle()
+        compose.onNodeWithText("Read on Wikipedia").assertIsDisplayed()
+        // The card's name and the sheet's title.
+        assertEquals(2, compose.onAllNodesWithText("Marcus Aurelius").count())
+
+        restoration.emulateSavedInstanceStateRestore()
+        compose.settle()
+        compose.onNodeWithText("Read on Wikipedia").assertIsDisplayed()
+        assertEquals(2, compose.onAllNodesWithText("Marcus Aurelius").count())
+    }
+
+    @Test
+    fun whileSelectingATapOnTheAuthorTogglesTheCard() {
+        showSaved()
+        // A long press on the author starts selecting, as on the rest of the card.
+        compose.onNode(hasText("Marcus Aurelius") and hasClickAction()).performTouchInput { longClick() }
+        compose.settle()
+        compose.onNodeWithText("1 selected").assertIsDisplayed()
+
+        compose.onNodeWithText("Maya Angelou", useUnmergedTree = true).performClick()
+        compose.settle()
+        compose.onNodeWithText("2 selected").assertIsDisplayed()
+        compose.onNodeWithText("Marcus Aurelius", useUnmergedTree = true).performClick()
+        compose.settle()
+        compose.onNodeWithText("1 selected").assertIsDisplayed()
+        assertEquals(0, compose.onAllNodesWithText("Read on Wikipedia").count())
+    }
+
+    @Test
+    fun ownQuotesOfferTheirKnownAuthorAsInLibrary() {
+        val sunrise = FakeQuotes.personal.first { it.text.startsWith("Every sunrise") }
+        showSaved(FakeQuotes.bundledQuotes + writeItDown + sunrise, subTab = "My Quotes")
+        scrollTo("Every sunrise")
+
+        // Unknown authors are no button and have no action.
+        assertEquals(0, compose.onAllNodes(hasText("Unknown") and hasClickAction()).count())
+        assertFalse("Explore this author" in cardActions("Every sunrise"))
+
+        scrollTo("Write it down")
+        compose.onNode(hasText("Write it down", substring = true)).performCustomAccessibilityActionWithLabel("Explore this author")
+        compose.settle()
+        compose.onNodeWithText("Read on Wikipedia").assertIsDisplayed()
+        assertEquals(2, compose.onAllNodesWithText("Sam Rivera").count())
     }
 }

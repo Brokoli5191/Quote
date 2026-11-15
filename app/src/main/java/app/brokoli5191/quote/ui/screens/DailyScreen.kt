@@ -36,8 +36,10 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -176,6 +178,7 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                         val authorImageUrl = authorInfo?.imageUrl?.takeIf { authorImagesEnabled }
                         val authorDescription = authorInfo?.description?.takeIf { it.isNotBlank() }
                         var showAuthorSheet by rememberSaveable(quote.id) { mutableStateOf(false) }
+                        val exploreAuthorLabel = uiText("Explore this author")
 
                         val alternateText = remember(quote) { quote.alternateText() }
                         val alternateLanguage = remember(quote) { quote.alternateLanguage() }
@@ -254,7 +257,20 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                                     } else {
                                         Spacer(Modifier.height(24.dp))
                                     }
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                    // A known author's row opens the same sheet as "Explore this author".
+                                    Row(
+                                        modifier = if (unknownAuthor) {
+                                            Modifier
+                                        } else {
+                                            Modifier
+                                                .clip(RoundedCornerShape(16.dp))
+                                                .clickable(onClickLabel = exploreAuthorLabel, role = Role.Button) {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                    showAuthorSheet = true
+                                                }
+                                        },
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
                                         AuthorAvatar(
                                             name = authorName,
                                             imageUrl = authorImageUrl,
@@ -409,7 +425,7 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                             ) {
                                 Icon(Icons.Default.Language, contentDescription = null)
                                 Spacer(Modifier.width(8.dp))
-                                Text(uiText("Explore this author"), maxLines = 2, textAlign = TextAlign.Center)
+                                Text(exploreAuthorLabel, maxLines = 2, textAlign = TextAlign.Center)
                               }
                             }
                             if (showAuthorSheet && !unknownAuthor) {
