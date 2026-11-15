@@ -5,14 +5,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.*
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.text.TextAutoSize
-import androidx.compose.ui.input.pointer.pointerInput
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.*
@@ -33,25 +29,14 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
-import app.brokoli5191.quote.data.QuoteEntity
 import app.brokoli5191.quote.data.alternateLanguage
 import app.brokoli5191.quote.data.alternateText
 import app.brokoli5191.quote.data.hasUnknownAuthor
@@ -169,12 +154,7 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                         val displayedText =
                             if (showTranslation && alternateText != null) alternateText else quote.text
                         // Picks the quotation marks of copied and shared text.
-                        val displayedLanguage = when {
-                            alternateLanguage == null -> quote.language
-                            showTranslation -> alternateLanguage
-                            alternateLanguage == QuoteLanguage.GERMAN -> QuoteLanguage.ENGLISH
-                            else -> QuoteLanguage.GERMAN
-                        }
+                        val displayedLanguage = QuoteSharing.textLanguage(quote, showTranslation)
                         var shareMenuOpen by remember(quote.id) { mutableStateOf(false) }
                         var imageShareRunning by remember { mutableStateOf(false) }
                         // Shown in both languages (also for anonymous quotes); the row keeps as many as fit.
@@ -289,7 +269,7 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                                     if (copyConfirmed) Icons.Default.Check else Icons.Default.ContentCopy,
                                     uiText(if (copyConfirmed) "Copied" else "Copy")
                                 ) {
-                                    QuoteSharing.copyText(context, displayedText, authorName, displayedLanguage)
+                                    QuoteSharing.copyText(context, displayedText, quote.author, displayedLanguage)
                                     copyConfirmed = true
                                     feedbackScope.launch {
                                         delay(1200)
@@ -311,7 +291,7 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                                                 leadingIcon = { Icon(Icons.Default.TextFields, contentDescription = null) },
                                                 onClick = {
                                                     shareMenuOpen = false
-                                                    QuoteSharing.shareText(context, displayedText, authorName, uiLanguage, displayedLanguage)
+                                                    QuoteSharing.shareText(context, displayedText, quote.author, uiLanguage, displayedLanguage)
                                                 }
                                             )
                                             DropdownMenuItem(
@@ -323,7 +303,7 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                                                     imageShareRunning = true
                                                     feedbackScope.launch {
                                                         try {
-                                                            QuoteSharing.shareImage(context, displayedText, authorName, uiLanguage, displayedLanguage)
+                                                            QuoteSharing.shareImage(context, displayedText, quote.author, uiLanguage, displayedLanguage)
                                                         } finally {
                                                             imageShareRunning = false
                                                         }

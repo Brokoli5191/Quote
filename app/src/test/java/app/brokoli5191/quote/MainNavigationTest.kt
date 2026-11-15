@@ -14,6 +14,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.brokoli5191.quote.screenshots.AppFrame
@@ -25,6 +26,7 @@ import app.brokoli5191.quote.screenshots.ShotConfig
 import app.brokoli5191.quote.screenshots.awaitCondition
 import app.brokoli5191.quote.screenshots.settle
 import app.brokoli5191.quote.ui.localizeUi
+import app.brokoli5191.quote.utils.AppLinks
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -38,8 +40,8 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * Back without a predictive gesture (button navigation, Android 13 and older) and leaving New Quote
- * through the bottom bar.
+ * Back without a predictive gesture (button navigation, Android 13 and older), leaving New Quote
+ * through the bottom bar and opening it again after an entry point closed it.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -157,6 +159,34 @@ class MainNavigationTest {
         assertEquals(0, compose.onAllNodesWithText(text("Discard draft?")).count())
         assertFalse(app.viewModel.showNewQuoteScreen.value)
         assertEquals("Library", app.viewModel.selectedTab.value)
+    }
+
+    @Test
+    fun newQuoteSlidesInAgainAfterAnEntryPointClosedIt() {
+        val app = showMain()
+        app.viewModel.selectTab("Saved")
+        app.viewModel.openNewQuoteScreen()
+        compose.settle()
+        // A widget tap while the form is empty closes it without its exit animation.
+        compose.runOnUiThread { app.viewModel.openDestination(AppLinks.DEST_DAILY) }
+        compose.settle()
+        assertFalse(app.viewModel.showNewQuoteScreen.value)
+
+        compose.mainClock.autoAdvance = false
+        compose.runOnUiThread { app.viewModel.openNewQuoteScreen() }
+        val width = compose.onRoot(useUnmergedTree = true).fetchSemanticsNode().size.width
+        // The first frame that has placed the form (its fields report 0 before that).
+        var left = 0f
+        repeat(20) {
+            if (left == 0f) {
+                compose.mainClock.advanceTimeByFrame()
+                left = compose.onAllNodesWithText(text("Quote or affirmation"), useUnmergedTree = true)
+                    .fetchSemanticsNodes().firstOrNull()?.boundsInRoot?.left ?: 0f
+            }
+        }
+        assertTrue("New Quote is still sliding in from the right", left > width / 2f)
+        compose.mainClock.autoAdvance = true
+        compose.settle()
     }
 
     private fun text(english: String) = localizeUi(english, config.language)

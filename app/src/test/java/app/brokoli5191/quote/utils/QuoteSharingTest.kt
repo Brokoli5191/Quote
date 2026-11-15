@@ -2,17 +2,24 @@ package app.brokoli5191.quote.utils
 
 import android.app.Application
 import android.content.ClipboardManager
+import android.content.ComponentName
+import android.content.ContextWrapper
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.core.content.FileProvider
 import androidx.test.core.app.ApplicationProvider
+import app.brokoli5191.quote.MainActivity
+import app.brokoli5191.quote.data.QuoteEntity
 import app.brokoli5191.quote.data.QuoteLanguage
+import app.brokoli5191.quote.data.localized
 import app.brokoli5191.quote.widget.QuoteCardRenderer
 import java.io.File
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -21,6 +28,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowToast
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -64,6 +72,31 @@ class QuoteSharingTest {
     }
 
     @Test
+    fun `the share sheet does not offer saving the quote back into Quote`() {
+        QuoteSharing.shareText(context, "Be yourself.", "Oscar Wilde", QuoteLanguage.ENGLISH)
+
+        val chooser = shadowOf(context).nextStartedActivity
+        val excluded = chooser.getParcelableArrayExtra(Intent.EXTRA_EXCLUDE_COMPONENTS, ComponentName::class.java)!!.toList()
+        assertEquals(listOf(ComponentName(context, MainActivity::class.java)), excluded)
+    }
+
+    @Test
+    fun `quotation marks follow the language of the text on screen`() {
+        val english = QuoteEntity(text = "Be yourself.", author = "Oscar Wilde", category = "Wisdom", textDe = "Sei du selbst.")
+        val shownInGerman = english.localized(QuoteLanguage.GERMAN)
+        assertEquals(QuoteLanguage.GERMAN, QuoteSharing.textLanguage(shownInGerman, showingTranslation = false))
+        assertEquals(QuoteLanguage.ENGLISH, QuoteSharing.textLanguage(shownInGerman, showingTranslation = true))
+        assertEquals(QuoteLanguage.ENGLISH, QuoteSharing.textLanguage(english.localized(QuoteLanguage.ENGLISH), showingTranslation = false))
+
+        val germanOnly = QuoteEntity(text = "Sei du selbst.", author = "Oscar Wilde", category = "Wisdom", language = QuoteLanguage.GERMAN)
+        assertEquals(QuoteLanguage.GERMAN, QuoteSharing.textLanguage(germanOnly.localized(QuoteLanguage.ENGLISH), showingTranslation = true))
+
+        // An own quote stores the app language it was written in, which says nothing about its text.
+        val own = QuoteEntity(text = "Mein Satz.", author = "", category = "Custom", isUserAdded = true, language = QuoteLanguage.GERMAN)
+        assertEquals(QuoteLanguage.ENGLISH, QuoteSharing.textLanguage(own, showingTranslation = false))
+    }
+
+    @Test
     fun `copy puts the formatted quote on the clipboard`() {
         QuoteSharing.copyText(context, "Sei du selbst.", "Unbekannt", QuoteLanguage.GERMAN)
 
@@ -94,6 +127,23 @@ class QuoteSharingTest {
         assertEquals("content", uri.scheme)
         assertEquals("${context.packageName}.fileprovider", uri.authority)
         assertEquals(uri, send.clipData!!.getItemAt(0).uri)
+    }
+
+    @Test
+    fun `share image shows a message instead of crashing when the file provider refuses the image`() {
+        // No provider is registered for this authority, so getUriForFile throws IllegalArgumentException,
+        // as it does for a provider whose paths no longer cover the shared folder.
+        val unknownAuthority = object : ContextWrapper(context) {
+            override fun getPackageName() = "app.brokoli5191.quote.other"
+        }
+
+        val started = runBlocking {
+            QuoteSharing.shareImage(unknownAuthority, "Be yourself.", "Oscar Wilde", QuoteLanguage.GERMAN)
+        }
+
+        assertFalse(started)
+        assertEquals("Das Bild konnte nicht erstellt werden.", ShadowToast.getTextOfLatestToast())
+        assertNull(shadowOf(context).nextStartedActivity)
     }
 
     @Test

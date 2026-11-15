@@ -182,9 +182,14 @@ class MainActivity : ComponentActivity() {
     }
 
     // openDestination keeps a New Quote form that holds a draft open, so no entry point drops it.
+    // setPendingDraft opens New Quote itself.
     private fun openAppLink(link: AppLinkRequest) {
-        link.draft?.let { viewModel.setPendingDraft(it.text, it.author) }
-        viewModel.openDestination(link.destination)
+        val draft = link.draft
+        if (draft != null) {
+            viewModel.setPendingDraft(draft.text, draft.author)
+        } else {
+            viewModel.openDestination(link.destination)
+        }
     }
 }
 
@@ -282,8 +287,12 @@ internal fun MainContent(
     var discardDraftForTab by rememberSaveable { mutableStateOf<String?>(null) }
 
     LaunchedEffect(showNewQuoteScreen) {
-        if (!showNewQuoteScreen) discardDraftForTab = null
-        if (showNewQuoteScreen && !newQuoteBackInProgress) {
+        if (!showNewQuoteScreen) {
+            discardDraftForTab = null
+            // Closed without its exit animation (an entry point opened another screen), so the
+            // next open slides in again.
+            if (!newQuoteBackInProgress) newQuoteProgressAnim.snapTo(1f)
+        } else if (!newQuoteBackInProgress) {
             newQuoteProgressAnim.animateTo(
                 0f,
                 animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing)

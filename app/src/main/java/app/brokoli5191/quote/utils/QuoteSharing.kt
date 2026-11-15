@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
@@ -11,6 +12,10 @@ import android.graphics.Bitmap
 import android.util.Log
 import android.widget.Toast
 import androidx.core.content.FileProvider
+import app.brokoli5191.quote.MainActivity
+import app.brokoli5191.quote.data.QuoteEntity
+import app.brokoli5191.quote.data.QuoteLanguage
+import app.brokoli5191.quote.data.alternateLanguage
 import app.brokoli5191.quote.data.isPlaceholderAuthor
 import app.brokoli5191.quote.data.normalizeAuthorName
 import app.brokoli5191.quote.data.normalizeQuoteText
@@ -30,7 +35,8 @@ import kotlinx.coroutines.withContext
  * marks of the quote's language. Also turns text shared into the app back into a draft.
  *
  * `language` is the app language (share-sheet title, messages); `textLanguage` is the language of
- * the shared text and picks its quotation marks. They differ when the user shows a translation.
+ * the shared text and picks its quotation marks, as [textLanguage] finds it for a quote on screen.
+ * They differ when the user shows a translation or the quote has none in the app language.
  */
 object QuoteSharing {
     private const val TAG = "QuoteSharing"
@@ -47,21 +53,43 @@ object QuoteSharing {
         return if (isPlaceholderAuthor(name)) "" else name
     }
 
+    /**
+     * The language of the quote text on screen, for its quotation marks: the translation's while
+     * [showingTranslation], otherwise the displayed version's. An own quote without a translation
+     * stores the app language it was written in, not its own, so it gets the neutral English marks.
+     */
+    fun textLanguage(quote: QuoteEntity, showingTranslation: Boolean): String {
+        val alternate = quote.alternateLanguage()
+        return when {
+            alternate == null && quote.isUserAdded -> QuoteLanguage.ENGLISH
+            alternate == null -> quote.language
+            showingTranslation -> alternate
+            alternate == QuoteLanguage.GERMAN -> QuoteLanguage.ENGLISH
+            else -> QuoteLanguage.GERMAN
+        }
+    }
+
     /** The copied/shared text, e.g. `"Be yourself." — Oscar Wilde` or `„Sei du selbst.“ — Oscar Wilde`. */
     fun quoteText(text: String, author: String, textLanguage: String): String =
         formattedQuote(text.trim(), attribution(author), textLanguage)
 
     /** A share sheet for the quote as plain text, e.g. for a notification action. */
-    fun textChooserIntent(text: String, author: String, language: String, textLanguage: String = language): Intent {
+    fun textChooserIntent(
+        context: Context,
+        text: String,
+        author: String,
+        language: String,
+        textLanguage: String = language
+    ): Intent {
         val send = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
             putExtra(Intent.EXTRA_TEXT, quoteText(text, author, textLanguage))
         }
-        return Intent.createChooser(send, localizeUi(CHOOSER_TITLE, language))
+        return chooser(context, send, language)
     }
 
     fun shareText(context: Context, text: String, author: String, language: String, textLanguage: String = language) {
-        context.startChooser(textChooserIntent(text, author, language, textLanguage))
+        context.startChooser(textChooserIntent(context, text, author, language, textLanguage))
     }
 
     fun copyText(context: Context, text: String, author: String, textLanguage: String) {
@@ -81,8 +109,13 @@ object QuoteSharing {
         language: String,
         textLanguage: String = language
     ): Boolean {
-        val image = try {
-            withContext(Dispatchers.IO) { writeShareImage(context, text.trim(), attribution(author)) }
+        // The content URI is made inside the try as well: a provider path that does not cover the
+        // file throws IllegalArgumentException, which must end in the toast, not a crash.
+        val uri = try {
+            withContext(Dispatchers.IO) {
+                val image = writeShareImage(context, text.trim(), attribution(author))
+                FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", image)
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -93,11 +126,10 @@ object QuoteSharing {
             null
         }
         return withContext(Dispatchers.Main.immediate) {
-            if (image == null) {
+            if (uri == null) {
                 Toast.makeText(context, localizeUi(IMAGE_FAILED, language), Toast.LENGTH_LONG).show()
                 return@withContext false
             }
-            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", image)
             val send = Intent(Intent.ACTION_SEND).apply {
                 type = "image/png"
                 putExtra(Intent.EXTRA_STREAM, uri)
@@ -106,7 +138,7 @@ object QuoteSharing {
                 clipData = ClipData.newRawUri("quote", uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            context.startChooser(Intent.createChooser(send, localizeUi(CHOOSER_TITLE, language)))
+            context.startChooser(chooser(context, send, language))
         }
     }
 
@@ -185,6 +217,13 @@ object QuoteSharing {
         if (!partial.renameTo(target)) throw IOException("Could not replace $target")
         return target
     }
+
+    // Quote's own "Save to Quote" target is left out: it would only store the quote again as an own quote.
+    private fun chooser(context: Context, send: Intent, language: String): Intent =
+        Intent.createChooser(send, localizeUi(CHOOSER_TITLE, language)).putExtra(
+            Intent.EXTRA_EXCLUDE_COMPONENTS,
+            arrayOf(ComponentName(context, MainActivity::class.java))
+        )
 
     private fun Context.startChooser(chooser: Intent): Boolean {
         if (findActivity() == null) chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
