@@ -7,6 +7,7 @@ import app.brokoli5191.quote.ui.strings.commonGermanUi
 import app.brokoli5191.quote.ui.strings.dailyGermanUi
 import app.brokoli5191.quote.ui.strings.libraryGermanUi
 import app.brokoli5191.quote.ui.strings.mainGermanUi
+import app.brokoli5191.quote.ui.strings.newQuoteGermanUi
 import app.brokoli5191.quote.ui.strings.onboardingGermanUi
 import app.brokoli5191.quote.ui.strings.savedGermanUi
 import app.brokoli5191.quote.ui.strings.settingsGermanUi
@@ -257,6 +258,7 @@ private val areaGermanUi: List<Map<String, String>> by lazy {
         dailyGermanUi,
         libraryGermanUi,
         savedGermanUi,
+        newQuoteGermanUi,
         settingsGermanUi,
         commonGermanUi
     )
