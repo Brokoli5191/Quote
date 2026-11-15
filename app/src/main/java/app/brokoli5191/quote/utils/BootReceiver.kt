@@ -1,26 +1,38 @@
 package app.brokoli5191.quote.utils
 
+import android.app.AlarmManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.util.Log
+import app.brokoli5191.quote.widget.WidgetRefreshScheduler
 
+/**
+ * Re-arms everything AlarmManager forgets: alarms are cleared on reboot and app update, the
+ * daily reminder is computed in local wall-clock time (so it must follow clock and time zone
+ * changes), and its exact/inexact choice depends on the exact-alarm permission.
+ */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        // Alarms are cleared on reboot and when the app is updated, so both reschedule the reminder.
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED ||
-            intent.action == Intent.ACTION_MY_PACKAGE_REPLACED ||
-            intent.action == "android.intent.action.QUICKBOOT_POWERON" ||
-            intent.action == "com.htc.intent.action.QUICKBOOT_POWERON"
-        ) {
-            Log.d("BootReceiver", "Received ${intent.action}, rescheduling alarms...")
-            val prefs = context.getSharedPreferences("aura_prefs", Context.MODE_PRIVATE)
-            val enabled = prefs.getBoolean("daily_reminder_enabled", false)
-            if (enabled) {
-                val hour = prefs.getInt("daily_reminder_hour", 8)
-                val minute = prefs.getInt("daily_reminder_minute", 0)
-                NotificationScheduler.scheduleDailyNotification(context, hour, minute)
-                Log.d("BootReceiver", "Rescheduled daily reminder alarm.")
+        val action = intent.action ?: return
+        if (action !in HANDLED_ACTIONS) return
+        Log.d("BootReceiver", "Received $action, rescheduling alarms...")
+        NotificationScheduler.ensureScheduled(context)
+        WidgetRefreshScheduler.scheduleMidnightRefresh(context)
+        WidgetRefreshScheduler.requestUpdate(context)
+    }
+
+    private companion object {
+        val HANDLED_ACTIONS: Set<String> = buildSet {
+            add(Intent.ACTION_BOOT_COMPLETED)
+            add(Intent.ACTION_MY_PACKAGE_REPLACED)
+            add(Intent.ACTION_TIME_CHANGED)
+            add(Intent.ACTION_TIMEZONE_CHANGED)
+            add("android.intent.action.QUICKBOOT_POWERON")
+            add("com.htc.intent.action.QUICKBOOT_POWERON")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                add(AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED)
             }
         }
     }

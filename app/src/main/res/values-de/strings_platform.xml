@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="save_to_quote">In Quote speichern</string>
+    <string name="shortcut_favorites_short">Favoriten</string>
+    <string name="shortcut_favorites_long">Favoriten öffnen</string>
+    <string name="shortcut_new_quote_short">Neues Quote</string>
+    <string name="shortcut_new_quote_long">Neues Quote hinzufügen</string>
+</resources>
