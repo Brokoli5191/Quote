@@ -1,6 +1,5 @@
 package app.brokoli5191.quote.screenshots
 
-import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
