@@ -19,6 +19,25 @@ export function cleanText(value: unknown): string {
     : "";
 }
 
+// SQLite's length() in the CHECK constraints counts code points while String.length counts
+// UTF-16 code units, so every length limit is checked in code points: "a😀" has two characters.
+export function characterCount(value: string): number {
+  return [...value].length;
+}
+
+export function isCheckViolation(error: unknown): boolean {
+  return String(error).includes("CHECK constraint failed");
+}
+
+export function isUniqueViolation(error: unknown): boolean {
+  return String(error).includes("UNIQUE constraint failed");
+}
+
+export async function sha256Hex(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
 export function normalizeForComparison(value: string): string {
   return value.normalize("NFKC").toLocaleLowerCase("en-US");
 }
@@ -27,6 +46,14 @@ export function normalizeForComparison(value: string): string {
 // only letters and digits count, so punctuation, quotation marks and spacing do not matter.
 export function quoteComparisonKey(value: string): string {
   return normalizeForComparison(cleanText(value)).replace(/[^\p{L}\p{N}]+/gu, "");
+}
+
+// One-way form of the comparison key, kept for texts a moderator deleted permanently so the
+// same text is refused again whatever its author or punctuation. Texts without letters or
+// digits have no key; for them only the exact content hash is blocked.
+export async function blockedTextHash(value: string): Promise<string | null> {
+  const key = quoteComparisonKey(value);
+  return key ? sha256Hex(key) : null;
 }
 
 export type LanguageResult =
@@ -80,6 +107,11 @@ function parseIpv6(value: string): number[] | null {
   const parts = [...head, ...Array<string>(halves.length === 2 ? missing : 0).fill("0"), ...rest];
   if (!parts.every(part => /^[0-9a-f]{1,4}$/.test(part))) return null;
   return parts.map(part => parseInt(part, 16));
+}
+
+// HEAD is served wherever GET is; the Worker's fetch handler drops the body.
+export function isReadRequest(request: Request): boolean {
+  return request.method === "GET" || request.method === "HEAD";
 }
 
 export type BodyReadResult =

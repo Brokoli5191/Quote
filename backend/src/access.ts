@@ -18,6 +18,16 @@ interface JwksResponse {
 
 type AccessJwk = JsonWebKey & { kid?: string };
 
+export type AccessResult =
+  | { status: "verified"; email: string }
+  | { status: "denied" }
+  // The signing keys could not be loaded, so the token could not be checked at all.
+  | { status: "unavailable" };
+
+class AccessKeysUnavailableError extends Error {}
+
+const DENIED: AccessResult = { status: "denied" };
+
 let cachedKeys: { expiresAt: number; fetchedAt: number; keys: AccessJwk[] } | undefined;
 
 // Minimum time between forced key refreshes, so tokens with made-up key IDs cannot
@@ -36,17 +46,35 @@ function decodeBytes(value: string): Uint8Array {
   return Uint8Array.from(atob(padded), character => character.charCodeAt(0));
 }
 
+async function fetchKeys(teamDomain: string): Promise<AccessJwk[]> {
+  const response = await fetch(`https://${teamDomain}/cdn-cgi/access/certs`);
+  if (!response.ok) throw new Error(`Access certs endpoint answered ${response.status}`);
+  const body = await response.json<JwksResponse>();
+  if (!Array.isArray(body?.keys)) throw new Error("Access certs response has no key list");
+  return body.keys;
+}
+
 async function getKeys(teamDomain: string, forceRefresh = false): Promise<AccessJwk[]> {
   const now = Date.now();
   if (cachedKeys && cachedKeys.expiresAt > now) {
     if (!forceRefresh || now - cachedKeys.fetchedAt < FORCED_REFRESH_INTERVAL_MS) return cachedKeys.keys;
   }
 
-  const response = await fetch(`https://${teamDomain}/cdn-cgi/access/certs`);
-  if (!response.ok) throw new Error("Could not load Cloudflare Access keys");
-  const body = await response.json<JwksResponse>();
-  cachedKeys = { keys: body.keys, fetchedAt: now, expiresAt: now + 60 * 60 * 1000 };
-  return body.keys;
+  try {
+    const keys = await fetchKeys(teamDomain);
+    cachedKeys = { keys, fetchedAt: now, expiresAt: now + 60 * 60 * 1000 };
+    return keys;
+  } catch (error) {
+    // An expired key set still verifies every token signed with a key that has not rotated,
+    // so a failed hourly refresh keeps it and tries again a minute later. A forced refresh
+    // is only needed for an unknown key, which the old set cannot verify.
+    if (cachedKeys && !forceRefresh) {
+      console.warn("Using the previous Cloudflare Access keys after a failed refresh", error);
+      cachedKeys = { ...cachedKeys, expiresAt: now + FORCED_REFRESH_INTERVAL_MS };
+      return cachedKeys.keys;
+    }
+    throw new AccessKeysUnavailableError(`Could not load Cloudflare Access keys: ${String(error)}`);
+  }
 }
 
 // Cloudflare Access rotates its signing keys; a token signed with a key that is not in the
@@ -57,13 +85,13 @@ async function findKey(teamDomain: string, kid: string): Promise<AccessJwk | und
   return (await getKeys(teamDomain, true)).find(key => key.kid === kid);
 }
 
-export async function verifyAccess(request: Request, env: Env): Promise<string | null> {
-  if (!env.ACCESS_TEAM_DOMAIN || !env.ACCESS_AUD) return null;
+export async function verifyAccess(request: Request, env: Env): Promise<AccessResult> {
+  if (!env.ACCESS_TEAM_DOMAIN || !env.ACCESS_AUD) return DENIED;
 
   const token = request.headers.get("Cf-Access-Jwt-Assertion");
-  if (!token) return null;
+  if (!token) return DENIED;
   const parts = token.split(".");
-  if (parts.length !== 3) return null;
+  if (parts.length !== 3) return DENIED;
 
   try {
     const header = decodePart<AccessHeader>(parts[0]);
@@ -79,11 +107,11 @@ export async function verifyAccess(request: Request, env: Env): Promise<string |
       payload.iss !== issuer ||
       !audiences.includes(env.ACCESS_AUD)
     ) {
-      return null;
+      return DENIED;
     }
 
     const jwk = await findKey(env.ACCESS_TEAM_DOMAIN, header.kid);
-    if (!jwk) return null;
+    if (!jwk) return DENIED;
     const key = await crypto.subtle.importKey(
       "jwk",
       jwk,
@@ -97,9 +125,13 @@ export async function verifyAccess(request: Request, env: Env): Promise<string |
       decodeBytes(parts[2]),
       new TextEncoder().encode(`${parts[0]}.${parts[1]}`)
     );
-    return valid ? payload.email : null;
+    return valid ? { status: "verified", email: payload.email } : DENIED;
   } catch (error) {
+    if (error instanceof AccessKeysUnavailableError) {
+      console.error(error.message);
+      return { status: "unavailable" };
+    }
     console.error("Access token verification failed", error);
-    return null;
+    return DENIED;
   }
 }
