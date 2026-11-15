@@ -54,11 +54,11 @@ jobs:
           node --test tools/*.test.mjs
           node tools/generate_tag_labels.mjs --check
 
-      - name: Set up Java 17
+      - name: Set up Java 21
         uses: actions/setup-java@v6
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "21"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
