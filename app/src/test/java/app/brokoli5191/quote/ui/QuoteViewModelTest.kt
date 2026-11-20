@@ -460,6 +460,22 @@ class QuoteViewModelTest {
     }
 
     @Test
+    fun anAppUpdateKeepsTodaysQuoteAlsoWhenItsTextWasCorrected() {
+        runBlocking { repository.preseedDatabase(context) }
+        // Installed by an older version, whose seed stored the text without its spaces.
+        prefs.edit().putBoolean("database_json_seeded_v14", true).commit()
+        val before = newViewModel().dailyQuote.await { it != null }!!
+        runBlocking { dao.updateText(before.id, before.text.replace(" ", ""), before.author, before.textDe, before.textEn) }
+
+        // The update: a new process re-seeds, then shows the stored pick with its corrected text.
+        store.clear()
+        val after = newViewModel()
+        after.checkAndSeedDatabase()
+        val shown = after.dailyQuote.await { it?.text == before.text }!!
+        assertEquals(before.id, shown.id)
+    }
+
+    @Test
     fun aDoubleTapAddsTheQuoteOnceInItsLanguage() {
         val vm = newViewModel()
         vm.addUserQuote("Stay curious.", "Me", "Life", "", language = QuoteLanguage.GERMAN)

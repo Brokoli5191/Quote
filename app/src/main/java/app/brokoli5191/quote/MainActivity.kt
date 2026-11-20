@@ -44,8 +44,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -67,7 +65,6 @@ import app.brokoli5191.quote.ui.QuoteViewModel
 import app.brokoli5191.quote.ui.QuoteViewModelFactory
 import app.brokoli5191.quote.ui.LocalAppLanguage
 import app.brokoli5191.quote.ui.uiText
-import app.brokoli5191.quote.ui.components.BottomNavigationBarFade
 import app.brokoli5191.quote.ui.components.BottomNavigationBarHeight
 import app.brokoli5191.quote.ui.components.QuoteEventsHost
 import app.brokoli5191.quote.ui.screens.DailyScreen
@@ -707,15 +704,12 @@ fun BottomNavigationBar(
     onTabSelected: (String) -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
-    val barColor = MaterialTheme.colorScheme.background.copy(alpha = if (blurEnabled) 0.72f else 1f)
+    // A surface of its own with a clear top edge: content scrolling under the bar (the "Another quote"
+    // button, list cards) must not look like part of it. With blur on, the blurred content shows
+    // through the translucent surface; the divider keeps the edge visible either way.
+    val barColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = if (blurEnabled) 0.75f else 1f)
     Column(modifier = Modifier.fillMaxWidth()) {
-        // Soft top edge instead of a divider line: content scrolling under the bar fades into it.
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(BottomNavigationBarFade)
-                .background(Brush.verticalGradient(listOf(Color.Transparent, barColor)))
-        )
+        HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
