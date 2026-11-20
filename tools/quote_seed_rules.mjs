@@ -331,14 +331,133 @@ export function cleanTags(rawTags, author) {
   return tags;
 }
 
+// Authors whose quotes are never shipped, even if the source dataset carries them.
+export const BLOCKED_AUTHORS = new Set(['Adolf Hitler']);
+
+// Hand corrections for source texts, keyed by the cleaned source text. The source dataset lost the
+// line breaks of multi-line quotes, so verse lines and dialogue turns ran into each other
+// ("bornAnd once"), and some texts lack end punctuation or carry stray marks. A correction only
+// changes spacing, punctuation and letter case, never the letters themselves (checked in the
+// tests), so installed apps can still match the corrected quote to the old row.
+export const TEXT_OVERRIDES = new Map([
+  ['Sometimes people are beautiful.Not in looks.Not in what they say.Just in what they are.', 'Sometimes people are beautiful. Not in looks. Not in what they say. Just in what they are.'],
+  ['Love looks not with the eyes, but with the mind,And therefore is winged Cupid painted blind.', 'Love looks not with the eyes, but with the mind, and therefore is winged Cupid painted blind.'],
+  ['If I had a flower for every time I thought of you...I could walk through my garden forever.', 'If I had a flower for every time I thought of you... I could walk through my garden forever.'],
+  ['′Classic′ - a book which people praise and don\'t read.', '\'Classic\' – a book which people praise and don\'t read.'],
+  ['Tis better to have loved and lostThan never to have loved at all.', '\'Tis better to have loved and lost than never to have loved at all.'],
+  ['Music expresses that which cannot be put into words and that which cannot remain silent', 'Music expresses that which cannot be put into words and that which cannot remain silent.'],
+  ['“Do you hate people?” “I don\'t hate them...I just feel better when they\'re not around.”', '“Do you hate people?” “I don\'t hate them... I just feel better when they\'re not around.”'],
+  ['Creativity is knowing how to hide your sources', 'Creativity is knowing how to hide your sources.'],
+  ['If you don\'t know where you\'re going, any road\'ll take you there', 'If you don\'t know where you\'re going, any road\'ll take you there.'],
+  ['You can love someone so much...But you can never love people as much as you can miss them.', 'You can love someone so much... but you can never love people as much as you can miss them.'],
+  ['I refuse to answer that question on the grounds that I don\'t know the answer', 'I refuse to answer that question on the grounds that I don\'t know the answer.'],
+  ['Hold fast to dreams,For if dreams dieLife is a broken-winged bird,That cannot fly.', 'Hold fast to dreams, for if dreams die, life is a broken-winged bird that cannot fly.'],
+  ['Peace begins with a smile..', 'Peace begins with a smile.'],
+  ['Unless someone like you cares a whole awful lot,Nothing is going to get better. It\'s not.', 'Unless someone like you cares a whole awful lot, nothing is going to get better. It\'s not.'],
+  ['I have decided to stick to love...Hate is too great a burden to bear.', 'I have decided to stick to love... Hate is too great a burden to bear.'],
+  ['What\'s meant to be will always find a way', 'What\'s meant to be will always find a way.'],
+  ['The mind is its own place, and in itself can make a heaven of hell, a hell of heaven..', 'The mind is its own place, and in itself can make a heaven of hell, a hell of heaven.'],
+  ['Of all sad words of tongue or pen, the saddest are these, \'It might have been.', 'Of all sad words of tongue or pen, the saddest are these: \'It might have been.\''],
+  ['For you, a thousand times over', 'For you, a thousand times over.'],
+  ['And, in the endThe love you takeis equal to the love you make.', 'And, in the end, the love you take is equal to the love you make.'],
+  ['"Wow," Thalia muttered. "Apollo is hot." "He\'s the sun god," I said."That\'s not what I meant."', '"Wow," Thalia muttered. "Apollo is hot." "He\'s the sun god," I said. "That\'s not what I meant."'],
+  ['Fear doesn\'t shut you down; it wakes you up', 'Fear doesn\'t shut you down; it wakes you up.'],
+  ['Maybe \'okay\' will be our \'always', 'Maybe \'okay\' will be our \'always.\''],
+  ['Life is for the living.Death is for the dead.Let life be like music. And death a note unsaid.', 'Life is for the living. Death is for the dead. Let life be like music. And death a note unsaid.'],
+  ['Do you think I\'m pretty?I think you\'re beautifulBeautiful?You are so beautiful, it hurts sometimes.', 'Do you think I\'m pretty? I think you\'re beautiful. Beautiful? You are so beautiful, it hurts sometimes.'],
+  ['I love you. Remember. They cannot take it', 'I love you. Remember. They cannot take it.'],
+  ['You pierce my soul. I am half agony, half hope...I have loved none but you.', 'You pierce my soul. I am half agony, half hope... I have loved none but you.'],
+  ['but for my own part, if a book is well written, I always find it too short.', 'But for my own part, if a book is well written, I always find it too short.'],
+  ['HopeSmiles from the threshold of the year to come, Whispering \'it will be happier\'...', 'Hope smiles from the threshold of the year to come, whispering \'it will be happier\'...'],
+  ['What would men be without women? Scarce, sir...mighty scarce.', 'What would men be without women? Scarce, sir... mighty scarce.'],
+  ['Life is to be enjoyed, not endured', 'Life is to be enjoyed, not endured.'],
+  ['Let everything happen to youBeauty and terrorJust keep goingNo feeling is final', 'Let everything happen to you: beauty and terror. Just keep going. No feeling is final.'],
+  ['You\'re off to Great Places!Today is your day!Your mountain is waiting,So... get on your way!', 'You\'re off to Great Places! Today is your day! Your mountain is waiting, so... get on your way!'],
+  ['I wantTo do with you what spring does with the cherry trees.', 'I want to do with you what spring does with the cherry trees.'],
+  ['As if you were on fire from within.The moon lives in the lining of your skin.', 'As if you were on fire from within. The moon lives in the lining of your skin.'],
+  ['You see things; you say, \'Why?\' But I dream things that never were; and I say \'Why not?', 'You see things; you say, \'Why?\' But I dream things that never were; and I say, \'Why not?\''],
+  ['‎Though nobody can go back and make a new beginning... Anyone can start over and make a new ending.', 'Though nobody can go back and make a new beginning... anyone can start over and make a new ending.'],
+  ['Tonight I can write the saddest linesI loved her, and sometimes she loved me too.', 'Tonight I can write the saddest lines: I loved her, and sometimes she loved me too.'],
+  ['Success is getting what you want, happiness is wanting what you get', 'Success is getting what you want, happiness is wanting what you get.'],
+  ['"How do you spell \'love\'?" - Piglet"You don\'t spell it...you feel it." - Pooh', '"How do you spell \'love\'?" – Piglet. "You don\'t spell it... you feel it." – Pooh.'],
+  ['‎Life is a shipwreck, but we must not forget to sing in the lifeboats.', 'Life is a shipwreck, but we must not forget to sing in the lifeboats.'],
+  ['Happiness [is] only real when shared', 'Happiness [is] only real when shared.'],
+  ['you can, you should, and if you’re brave enough to start, you will.', 'You can, you should, and if you’re brave enough to start, you will.'],
+  ['"Was it hard?" I ask.Letting go?"Not as hard as holding on to something that wasn\'t real."', '"Was it hard?" I ask. "Letting go?" "Not as hard as holding on to something that wasn\'t real."'],
+  ['“Stay gold, Ponyboy. Stay gold . . .” The pillow seemed to sink a little, and Johnny died.', '“Stay gold, Ponyboy. Stay gold...” The pillow seemed to sink a little, and Johnny died.'],
+  ['love the life you live.live the life you love.', 'Love the life you live. Live the life you love.'],
+  ['Knowledge speaks, but wisdom listens', 'Knowledge speaks, but wisdom listens.'],
+  ['A truth that\'s told with bad intentBeats all the lies you can invent.', 'A truth that\'s told with bad intent beats all the lies you can invent.'],
+  ['Do I contradict myself?Very well then I contradict myself,(I am large, I contain multitudes.)', 'Do I contradict myself? Very well then I contradict myself, (I am large, I contain multitudes.)'],
+  ['being alone never felt right. sometimes it felt good, but it never felt right.', 'Being alone never felt right. Sometimes it felt good, but it never felt right.'],
+  ['I cannot teach anybody anything. I can only make them think', 'I cannot teach anybody anything. I can only make them think.'],
+  ['You yourself, as much as anybody in the entire universe, deserve your love and affection', 'You yourself, as much as anybody in the entire universe, deserve your love and affection.'],
+  ['For whatever we lose (like a you or a me),It\'s always our self we find in the sea.', 'For whatever we lose (like a you or a me), it\'s always our self we find in the sea.'],
+  ['let me live, love, and say it well in good sentences', 'Let me live, love, and say it well in good sentences.'],
+  ['silence is the language of god, all else is poor translation.', 'Silence is the language of God, all else is poor translation.'],
+  ['Reading brings us unknown friends', 'Reading brings us unknown friends.'],
+  ['This is the way the world endsNot with a bang but a whimper.', 'This is the way the world ends: not with a bang but a whimper.'],
+  ['As it has been said:Love and a coughcannot be concealed.Even a small cough.Even a small love.', 'As it has been said: love and a cough cannot be concealed. Even a small cough. Even a small love.'],
+  ['Forgive, O Lord, my little jokes on TheeAnd I\'ll forgive Thy great big one on me.', 'Forgive, O Lord, my little jokes on Thee, and I\'ll forgive Thy great big one on me.'],
+  ['Do not be afraid; our fateCannot be taken from us; it is a gift.', 'Do not be afraid; our fate cannot be taken from us; it is a gift.'],
+  ['Animals are my friends...and I don\'t eat my friends.', 'Animals are my friends... and I don\'t eat my friends.'],
+  ['They say time heals all wounds, but that presumes the source of the grief is finite', 'They say time heals all wounds, but that presumes the source of the grief is finite.'],
+  ['One wordFrees us of all the weight and pain of life:That word is love.', 'One word frees us of all the weight and pain of life: that word is love.'],
+  ['The love of learning, the sequestered nooks,And all the sweet serenity of books', 'The love of learning, the sequestered nooks, and all the sweet serenity of books.'],
+  ['Some people have a way with words, and other people...oh, uh, not have way.', 'Some people have a way with words, and other people... oh, uh, not have way.'],
+  ['There is a crack in everything.That\'s how the light gets in.', 'There is a crack in everything. That\'s how the light gets in.'],
+  ['If you have good friends, no matter how much life is sucking , they can make you laugh.', 'If you have good friends, no matter how much life is sucking, they can make you laugh.'],
+  ['The only real prison is fear, and the only real freedom is freedom from fear', 'The only real prison is fear, and the only real freedom is freedom from fear.'],
+  ['The earth has its music for those who will listen', 'The earth has its music for those who will listen.'],
+  ['You only live twice:Once when you are bornAnd once when you look death in the face', 'You only live twice: once when you are born, and once when you look death in the face.'],
+  ['"I don\'t go out with strangers," I said."Good thing I do. I\'ll pick you up at five."', '"I don\'t go out with strangers," I said. "Good thing I do. I\'ll pick you up at five."'],
+  ['Heard melodies are sweet, but those unheard, are sweeter', 'Heard melodies are sweet, but those unheard, are sweeter.'],
+  ['I know how devastated you must be to miss me, but leave a message, and I\'ll try to ease your agony', 'I know how devastated you must be to miss me, but leave a message, and I\'ll try to ease your agony.'],
+  ['Whoever is careless with the truth in small matters cannot be trusted with important matters', 'Whoever is careless with the truth in small matters cannot be trusted with important matters.'],
+  ['All human wisdom is contained in these two words - Wait and Hope', 'All human wisdom is contained in these two words: Wait and Hope.'],
+  ['Sometimes you lose a battle. But mischief always wins the war', 'Sometimes you lose a battle. But mischief always wins the war.'],
+  ['Music is ... A higher revelation than all Wisdom & Philosophy', 'Music is... a higher revelation than all wisdom & philosophy.'],
+  ['Sometimes it takes a good fall to really know where you stand', 'Sometimes it takes a good fall to really know where you stand.'],
+  ['I don\'t hate you.. I just don\'t like that you exist', 'I don\'t hate you. I just don\'t like that you exist.'],
+  ['sex is the consolation you have when you can\'t have love', 'Sex is the consolation you have when you can\'t have love.'],
+  ['Whatever you can do or dream you can, begin it.Boldness has genius, power and magic in it!', 'Whatever you can do or dream you can, begin it. Boldness has genius, power and magic in it!'],
+  ['Silence is so freaking loud', 'Silence is so freaking loud.'],
+]);
+
+// A correction may restore spaces and punctuation that the source dropped, so a corrected text
+// may exceed MAX_QUOTE_LENGTH by this much. The length rule selects source quotes, not corrections.
+export const OVERRIDE_LENGTH_SLACK = 5;
+
+// Letters and digits only, lower case: equal for a source text and its correction.
+export function compactQuoteKey(value) {
+  return String(value || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+}
+
+// Signs that a text lost a line break or a space, or never got its end punctuation.
+export function textDefects(text) {
+  const defects = [];
+  if (/\p{Ll}\p{Lu}/u.test(text)) defects.push('lower-case letter directly followed by an upper-case one');
+  if (/\p{L}[,;:!?]\p{L}/u.test(text)) defects.push('no space after a comma, semicolon, colon or mark');
+  if (/\p{Ll}\.\p{Lu}/u.test(text)) defects.push('no space after a full stop');
+  if (/\p{L}\.{2,3}\p{L}/u.test(text) || /(?<!\.)\.\.(?!\.)/.test(text)) defects.push('ellipsis without a space or a doubled full stop');
+  if (/\p{Ll}[.!?]["“]\p{Lu}/u.test(text)) defects.push('no space before an opening quotation mark');
+  if (/[​‎‏⁠﻿]/.test(text)) defects.push('invisible formatting character');
+  if (/\s[,;:!?]/.test(text)) defects.push('space before punctuation');
+  if (/^\p{Ll}/u.test(text)) defects.push('starts with a lower-case letter');
+  if (!/[.!?…"”’')\]]$/.test(text)) defects.push('no end punctuation');
+  return defects;
+}
+
 export function buildSeed(records) {
   const seenQuotes = new Set();
   const quotes = [];
 
   for (const record of records) {
-    const quote = cleanText(record.quote);
+    const sourceQuote = cleanText(record.quote);
     const author = cleanAuthor(record.author);
-    if (!quote || !author || quote.length > MAX_QUOTE_LENGTH || !isProbablyEnglish(quote)) continue;
+    if (!sourceQuote || !author || sourceQuote.length > MAX_QUOTE_LENGTH || !isProbablyEnglish(sourceQuote)) continue;
+    if (BLOCKED_AUTHORS.has(author)) continue;
+    const quote = TEXT_OVERRIDES.get(sourceQuote) ?? sourceQuote;
 
     const key = quoteKey(quote);
     if (!key || seenQuotes.has(key)) continue;

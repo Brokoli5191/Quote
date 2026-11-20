@@ -2,7 +2,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CATEGORIES } from './category_mapper.mjs';
-import { authorKey, canonicalAuthor, isProbablyEnglish, MAX_QUOTE_LENGTH, MAX_TAGS, quoteKey } from './quote_seed_rules.mjs';
+import {
+  authorKey, BLOCKED_AUTHORS, canonicalAuthor, isProbablyEnglish, MAX_QUOTE_LENGTH, MAX_TAGS, OVERRIDE_LENGTH_SLACK, quoteKey,
+  TEXT_OVERRIDES, textDefects,
+} from './quote_seed_rules.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const rawDir = path.join(repoRoot, 'app/src/main/res/raw');
@@ -15,6 +18,8 @@ const quotes = JSON.parse(fs.readFileSync(seedPath, 'utf8'));
 const errors = [];
 const seen = new Map();
 const authorSpellings = new Map();
+const correctedTexts = new Set(TEXT_OVERRIDES.values());
+const uncorrectedTexts = new Set(TEXT_OVERRIDES.keys());
 
 function checkTags(item, label) {
   if (!Array.isArray(item.tags)) return errors.push(`${label}: tags must be an array`);
@@ -28,7 +33,11 @@ for (const [index, item] of quotes.entries()) {
   if (!item.quote?.trim()) errors.push(`${label}: missing quote`);
   if (!item.author?.trim()) errors.push(`${label}: missing author`);
   if (!isProbablyEnglish(item.quote)) errors.push(`${label}: quote is not confidently English: ${item.quote}`);
-  if (item.quote.length > MAX_QUOTE_LENGTH) errors.push(`${label}: quote exceeds ${MAX_QUOTE_LENGTH} characters`);
+  const maxLength = MAX_QUOTE_LENGTH + (correctedTexts.has(item.quote) ? OVERRIDE_LENGTH_SLACK : 0);
+  if (item.quote.length > maxLength) errors.push(`${label}: quote exceeds ${maxLength} characters`);
+  if (uncorrectedTexts.has(item.quote)) errors.push(`${label}: text has a correction in TEXT_OVERRIDES, run tools/apply_text_overrides.mjs: ${item.quote}`);
+  for (const defect of textDefects(item.quote)) errors.push(`${label}: ${defect}: ${item.quote}`);
+  if (BLOCKED_AUTHORS.has(item.author)) errors.push(`${label}: author is blocked: ${item.author}`);
   checkTags(item, label);
   if (!CATEGORIES.includes(item.category)) errors.push(`${label}: missing or unknown category: ${item.category}`);
 

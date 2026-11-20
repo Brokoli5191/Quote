@@ -10,6 +10,9 @@
 # - locally sourced additions from tools/curated_quotes.json are merged in
 # - tags come from tools/quote_tags.json (3-5 from tools/tag_vocabulary.json); the category is
 #   frozen from the source tags first
+# - texts listed in TEXT_OVERRIDES (quote_seed_rules.mjs) are replaced by their corrections, and
+#   quotes by BLOCKED_AUTHORS are dropped; to apply new corrections without downloading the
+#   dataset again, run tools/apply_text_overrides.mjs
 #
 # Usage: bash tools/build_quotes_seed.sh
 # Requires: curl, node.
