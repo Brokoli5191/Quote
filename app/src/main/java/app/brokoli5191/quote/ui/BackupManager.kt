@@ -290,6 +290,31 @@ private inline fun <T> failingWith(error: BackupError, block: () -> T): T = try 
     throw e
 } catch (e: Exception) {
     throw BackupException(error, e)
+} catch (e: OutOfMemoryError) {
+    // A file within the size cap can still expand into a JSON tree larger than a small heap; that
+    // must end as a failed restore, not as a crash. The tree is garbage once this returns.
+    throw BackupException(error, e)
+}
+
+// A backup nests four levels deep. org.json parses recursively, so a crafted file of a few thousand
+// opening brackets would overflow the stack (an Error, which nothing above would catch).
+private const val MAX_BACKUP_NESTING = 32
+
+/** Throws INVALID_FORMAT when arrays and objects in [content] nest deeper than a backup ever does. */
+internal fun checkBackupNesting(content: String) {
+    var depth = 0
+    var inString = false
+    var escaped = false
+    for (char in content) {
+        when {
+            escaped -> escaped = false
+            inString && char == '\\' -> escaped = true
+            char == '"' -> inString = !inString
+            inString -> Unit
+            char == '[' || char == '{' -> if (++depth > MAX_BACKUP_NESTING) throw BackupException(BackupError.INVALID_FORMAT)
+            char == ']' || char == '}' -> depth--
+        }
+    }
 }
 
 // Null when the stream holds more than [limit] bytes.
@@ -361,6 +386,7 @@ private val INSTALLATION_ID_PATTERN =
 
 /** Throws a BackupException, or org.json's exceptions for broken JSON, when the content is no usable backup. */
 private fun parseBackup(content: String): ParsedBackup {
+    checkBackupNesting(content)
     // Text after the value is ignored, as it always was: a file overwritten in "w" mode without truncation
     // (some providers since Android 10) still ends with the tail of the longer file it replaced.
     val root = JSONTokener(content).nextValue()

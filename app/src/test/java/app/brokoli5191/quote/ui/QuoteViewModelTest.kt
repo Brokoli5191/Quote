@@ -116,7 +116,7 @@ class QuoteViewModelTest {
         // returns. Wait for that while Main is still the test dispatcher: after resetMain it would resume on
         // the paused main looper and keep the lock from every later test in this JVM.
         runBlocking {
-            withTimeout(5_000) {
+            withTimeout(AWAIT_TIMEOUT_MS) {
                 CommunitySyncManager.mutex.withLock { }
                 repository.toggleFavorite(-1, false)
             }
@@ -484,7 +484,7 @@ class QuoteViewModelTest {
 
         val saved = CompletableDeferred<Boolean>()
         vm.updateUserQuote(displayed, displayed.text, displayed.author, displayed.category, "calm") { saved.complete(it) }
-        assertTrue(runBlocking { withTimeout(5_000) { saved.await() } })
+        assertTrue(runBlocking { withTimeout(AWAIT_TIMEOUT_MS) { saved.await() } })
         val tagged = runBlocking { dao.getQuoteById(id) }!!
         assertEquals("calm", tagged.tags)
         assertEquals("s-1", tagged.submissionId)
@@ -692,7 +692,7 @@ class QuoteViewModelTest {
         val vm = newViewModel(app = app, repository = QuoteRepository(gated, 42L))
         try {
             // The first load holds the repository lock while it stores its pick.
-            runBlocking { withTimeout(5_000) { gated.held.await() } }
+            runBlocking { withTimeout(AWAIT_TIMEOUT_MS) { gated.held.await() } }
             val readsBefore = gated.dayReads.get()
             TimeZone.setDefault(TimeZone.getTimeZone("Etc/GMT-14"))
             vm.loadDailyQuote()
@@ -735,7 +735,7 @@ class QuoteViewModelTest {
         try {
             vm.setAppLanguage(QuoteLanguage.GERMAN)
             // The German load now holds the repository lock and does not finish.
-            runBlocking { withTimeout(5_000) { gated.held.await() } }
+            runBlocking { withTimeout(AWAIT_TIMEOUT_MS) { gated.held.await() } }
             val readsBefore = gated.dayReads.get()
             vm.setAppLanguage(QuoteLanguage.ENGLISH)
             // The English load gets the lock while the German one would still hold it: it was cancelled.
@@ -815,7 +815,7 @@ class QuoteViewModelTest {
         val vm = newViewModel()
         val result = CompletableDeferred<SubmissionRefreshResult>()
         vm.refreshSubmissionStatuses { result.complete(it) }
-        assertFalse(runBlocking { withTimeout(5_000) { result.await() } }.complete)
+        assertFalse(runBlocking { withTimeout(AWAIT_TIMEOUT_MS) { result.await() } }.complete)
         vm.submissionRefreshRunning.await { !it }
     }
 
@@ -858,7 +858,7 @@ class QuoteViewModelTest {
     private fun update(vm: QuoteViewModel, quote: QuoteEntity, text: String, author: String, language: String? = null): Boolean {
         val saved = CompletableDeferred<Boolean>()
         vm.updateUserQuote(quote, text, author, quote.category, quote.tags, language) { saved.complete(it) }
-        return runBlocking { withTimeout(5_000) { saved.await() } }
+        return runBlocking { withTimeout(AWAIT_TIMEOUT_MS) { saved.await() } }
     }
 
     private fun submit(vm: QuoteViewModel, id: Int, language: String? = null): String {
@@ -871,7 +871,7 @@ class QuoteViewModelTest {
             language = language,
             onAlreadyPublished = { outcome.complete("published") }
         )
-        return runBlocking { withTimeout(5_000) { outcome.await() } }
+        return runBlocking { withTimeout(AWAIT_TIMEOUT_MS) { outcome.await() } }
     }
 
     private fun insert(vararg quotes: QuoteEntity): List<Int> = runBlocking { quotes.map { dao.insertQuote(it).toInt() } }
@@ -899,13 +899,15 @@ class QuoteViewModelTest {
         savedDate = if (favorite) "1000" else null
     )
 
-    private fun <T> Flow<T>.await(timeoutMs: Long = 5_000, predicate: (T) -> Boolean): T =
+    // Generous limits: the waits are real Room I/O, which can take seconds on a loaded CI machine;
+    // a passing test returns as soon as the condition holds.
+    private fun <T> Flow<T>.await(timeoutMs: Long = AWAIT_TIMEOUT_MS, predicate: (T) -> Boolean): T =
         runBlocking { withTimeout(timeoutMs) { first(predicate) } }
 
-    private fun Flow<QuoteUiEvent>.awaitFirst(): QuoteUiEvent = runBlocking { withTimeout(5_000) { first() } }
+    private fun Flow<QuoteUiEvent>.awaitFirst(): QuoteUiEvent = runBlocking { withTimeout(AWAIT_TIMEOUT_MS) { first() } }
 
     private fun awaitTrue(condition: () -> Boolean) {
-        val deadline = System.currentTimeMillis() + 5_000
+        val deadline = System.currentTimeMillis() + AWAIT_TIMEOUT_MS
         while (!condition()) {
             check(System.currentTimeMillis() < deadline) { "condition not met in time" }
             Thread.sleep(10)
@@ -1040,5 +1042,6 @@ class QuoteViewModelTest {
 
     private companion object {
         val workExecutor = Executors.newSingleThreadExecutor()
+        const val AWAIT_TIMEOUT_MS = 15_000L
     }
 }

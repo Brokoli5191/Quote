@@ -112,6 +112,18 @@ class AuthorRepositoryTest {
     }
 
     @Test
+    fun anErrorAnswerIsNotCachedAsNoMatch() = runBlocking {
+        val dao = FakeDao()
+        val repo = AuthorRepository(context, dao) {
+            """{"error":{"code":"maxlag","info":"Waiting for a database server"}}"""
+        }
+        repo.authorInfo("Zed Nobody", QuoteLanguage.ENGLISH, allowNetwork = true)
+        assertNull(dao.get("Zed Nobody"))
+        assertTrue(isWikimediaError("<html>Bad gateway</html>"))
+        assertFalse(isWikimediaError("""{"query":{"pages":[]}}"""))
+    }
+
+    @Test
     fun imagesOff_usesCacheOnlyAndDropsImage() = runBlocking {
         val dao = FakeDao(AuthorInfoEntity("Zed Nobody", "Zed Nobody", "https://upload.wikimedia.org/z.jpg", "Writer", expired))
         val repo = AuthorRepository(context, dao) { error("network must not be used") }

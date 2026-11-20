@@ -1,6 +1,7 @@
 package app.brokoli5191.quote.data
 
 import android.content.Context
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.Mutex
@@ -144,16 +145,22 @@ class QuoteRepository(
      * favorite changes and the daily pick take, so a heart tapped meanwhile is applied afterwards
      * to the same row instead of being overwritten.
      */
-    suspend fun reseedPreservingFavorites(context: Context) {
+    /**
+     * Returns false when the bundled seed could not be read; the stored quotes stay as they are and
+     * the caller tries again on the next start instead of marking this seed version as applied.
+     */
+    suspend fun reseedPreservingFavorites(context: Context): Boolean {
         val fresh = try {
             loadBundledQuotes(context)
         } catch (e: Exception) {
-            e.printStackTrace()
-            return
+            Log.e("QuoteRepository", "Bundled quotes could not be loaded", e)
+            return false
         }
+        if (fresh.isEmpty()) return false
         locked {
             quoteDao.replaceBundledQuotes(mergeReseed(quoteDao.getBundledQuotes(), fresh))
         }
+        return true
     }
 
     fun getQuotesByCategory(category: String): Flow<List<QuoteEntity>> {
@@ -310,7 +317,9 @@ class QuoteRepository(
         quotes: List<QuoteEntity>,
         deletedIds: List<String>,
         restoreFavorites: Map<String, String?> = emptyMap()
-    ): CommunityApplyResult {
+    ): CommunityApplyResult = locked {
+        // Read-then-replace: under the write lock, so a heart tapped meanwhile (toggleFavorite takes
+        // the same lock) is not overwritten with the favorite state read before it.
         val normalizedQuotes = quotes.map { it.normalizedText() }
         val existingByServerId = normalizedQuotes
             .mapNotNull { it.serverId }
@@ -383,7 +392,7 @@ class QuoteRepository(
                 quoteDao.deleteCommunityQuotes(chunk)
             }
         }
-        return CommunityApplyResult(
+        CommunityApplyResult(
             removedFavorites = removedFavorites,
             restoredFavorites = restored,
             changed = normalizedQuotes.isNotEmpty() || deletedIds.isNotEmpty()

@@ -379,6 +379,9 @@ class BackupManagerTest {
         )
         // A file far larger than any backup is not read into memory.
         assertEquals(BackupOutcome.Failed(BackupError.INVALID_FORMAT), import(device, ByteArray(16 * 1024 * 1024 + 1)))
+        // Deep nesting used to overflow the stack in org.json's recursive parser and crash the app.
+        assertEquals(BackupOutcome.Failed(BackupError.INVALID_FORMAT), import(device, "[".repeat(200_000)))
+        assertEquals(BackupOutcome.Failed(BackupError.INVALID_FORMAT), import(device, "{\"a\":".repeat(50_000)))
 
         assertEquals(before, device.quotes())
         assertFalse(prefs.contains(CommunitySyncManager.KEY_INSTALLATION_ID))
