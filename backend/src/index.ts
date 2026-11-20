@@ -1,5 +1,7 @@
 import { handleAdmin } from "./admin";
-import { INSTALLATION_LIMIT, IP_LIMIT, keepRateLimitSlots, recentSubmissionCount, removeExpiredSlots } from "./limits";
+import {
+  GLOBAL_DAILY_LIMIT, INSTALLATION_LIMIT, IP_LIMIT, keepRateLimitSlots, RECENT_TOTAL_SQL, recentSubmissionCount, removeExpiredSlots
+} from "./limits";
 import { privacyPage } from "./privacy";
 import {
   blockedTextHash,
@@ -204,18 +206,39 @@ function landingPage(): Response {
 interface ExistingSubmission {
   id: string;
   status: string;
+  storedStatus: string;
   reviewNote: string | null;
   communityQuoteId: string | null;
   installationHash: string;
+  quoteText: string;
+  author: string;
+  category: string;
+  tagsJson: string;
+  language: string;
 }
 
 function findSubmissionByContent(env: Env, contentHash: string): Promise<ExistingSubmission | null> {
   return env.DB.prepare(
-    `SELECT s.id, ${PUBLIC_STATUS_SQL} AS status, s.review_note AS reviewNote,
-      c.id AS communityQuoteId, s.installation_hash AS installationHash
+    `SELECT s.id, ${PUBLIC_STATUS_SQL} AS status, s.status AS storedStatus, s.review_note AS reviewNote,
+      c.id AS communityQuoteId, s.installation_hash AS installationHash, s.quote_text AS quoteText,
+      s.author, s.category, s.tags_json AS tagsJson, s.language
      FROM submissions s LEFT JOIN community_quotes c ON c.submission_id = s.id
      WHERE s.content_hash = ? LIMIT 1`
   ).bind(contentHash).first<ExistingSubmission>();
+}
+
+// A rejected submission whose author sends it again with something changed (category, tags,
+// language, capitalisation) goes back into review: a review note often asks for exactly that, and
+// the content hash alone (text and author, case-insensitive) cannot tell the new version apart.
+// The same version again is only a retry and gets the existing state back.
+function isRevisionOfRejected(existing: ExistingSubmission, submission: Submission): boolean {
+  return existing.storedStatus === "rejected" && (
+    existing.quoteText !== submission.quoteText ||
+    existing.author !== submission.author ||
+    existing.category !== submission.category ||
+    existing.tagsJson !== JSON.stringify(submission.tags) ||
+    existing.language !== submission.language
+  );
 }
 
 // A retry from the installation that already submitted this quote (lost response,
@@ -278,18 +301,28 @@ async function submit(request: Request, env: Env): Promise<Response> {
   const comparisonKey = quoteComparisonKey(submission.quoteText) || null;
 
   const existing = await findSubmissionByContent(env, contentHash);
-  if (existing && existing.installationHash === installationHash) {
+  const revision = existing !== null && existing.installationHash === installationHash &&
+    isRevisionOfRejected(existing, submission);
+  if (existing && existing.installationHash === installationHash && !revision) {
     return ownDuplicate(request, env, existing);
   }
 
   const limits = await env.DB.prepare(
     `SELECT ${recentSubmissionCount("installation_hash")} AS installationCount,
-      ${recentSubmissionCount("ip_hash")} AS ipCount`
-  ).bind(installationHash, installationHash, ipHash, ipHash).first<{ installationCount: number; ipCount: number }>();
-  if ((limits?.installationCount ?? 0) >= INSTALLATION_LIMIT || (limits?.ipCount ?? 0) >= IP_LIMIT) {
+      ${recentSubmissionCount("ip_hash")} AS ipCount, ${RECENT_TOTAL_SQL} AS totalCount`
+  ).bind(installationHash, installationHash, ipHash, ipHash)
+    .first<{ installationCount: number; ipCount: number; totalCount: number }>();
+  if (
+    (limits?.installationCount ?? 0) >= INSTALLATION_LIMIT ||
+    (limits?.ipCount ?? 0) >= IP_LIMIT ||
+    (limits?.totalCount ?? 0) >= GLOBAL_DAILY_LIMIT
+  ) {
     return rateLimited(request, env);
   }
 
+  if (existing && revision) {
+    return resubmitRejected(request, env, existing.id, submission, ipHash, installationHash);
+  }
   if (existing) {
     return duplicateError(request, env);
   }
@@ -312,7 +345,8 @@ async function submit(request: Request, env: Env): Promise<Response> {
         installation_hash, ip_hash, app_version, language
       )
       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-      WHERE ${recentSubmissionCount("installation_hash")} < ? AND ${recentSubmissionCount("ip_hash")} < ?`
+      WHERE ${recentSubmissionCount("installation_hash")} < ? AND ${recentSubmissionCount("ip_hash")} < ?
+        AND ${RECENT_TOTAL_SQL} < ${GLOBAL_DAILY_LIMIT}`
     ).bind(
       id,
       submission.quoteText,
@@ -353,6 +387,50 @@ async function submit(request: Request, env: Env): Promise<Response> {
     return rateLimited(request, env);
   }
 
+  return json(request, env, { id, status: "pending" }, 201);
+}
+
+// Puts a rejected submission back into review with the revised fields. It keeps its id, so the
+// app follows it as before; the old submission time stays counted in the rate limits and the new
+// one counts as a fresh submission.
+async function resubmitRejected(
+  request: Request,
+  env: Env,
+  id: string,
+  submission: Submission,
+  ipHash: string,
+  installationHash: string
+): Promise<Response> {
+  const [, update] = await env.DB.batch([
+    keepRateLimitSlots(env.DB, "id = ? AND status = 'rejected'", id),
+    env.DB.prepare(
+      `UPDATE submissions SET quote_text = ?, normalized_text = ?, author = ?, category = ?, tags_json = ?,
+        language = ?, app_version = ?, ip_hash = ?, status = 'pending', submitted_at = unixepoch(),
+        reviewed_at = NULL, reviewed_by = NULL, review_note = NULL
+      WHERE id = ? AND status = 'rejected'
+        AND ${recentSubmissionCount("installation_hash")} < ? AND ${recentSubmissionCount("ip_hash")} < ?
+        AND ${RECENT_TOTAL_SQL} < ${GLOBAL_DAILY_LIMIT}`
+    ).bind(
+      submission.quoteText,
+      normalizeForComparison(submission.quoteText),
+      submission.author,
+      submission.category,
+      JSON.stringify(submission.tags),
+      submission.language,
+      submission.appVersion ?? null,
+      ipHash,
+      id,
+      installationHash,
+      installationHash,
+      INSTALLATION_LIMIT,
+      ipHash,
+      ipHash,
+      IP_LIMIT
+    )
+  ]);
+  if (update.meta.changes === 0) {
+    return rateLimited(request, env);
+  }
   return json(request, env, { id, status: "pending" }, 201);
 }
 

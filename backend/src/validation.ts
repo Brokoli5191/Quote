@@ -2,10 +2,13 @@ export type QuoteLanguage = "en" | "de";
 
 export const QUOTE_LANGUAGES: readonly QuoteLanguage[] = ["en", "de"];
 
-// Zero-width, bidi embedding/override/isolate and other invisible format characters.
-// They let identical-looking quotes slip past duplicate detection and can disguise text
-// in the moderation dashboard.
-const INVISIBLE_CHARACTERS = /[­؜᠎​-‏‪-‮⁠-⁤⁦-⁩﻿]/g;
+// Zero-width, bidi embedding/override/isolate and other invisible format characters, blank
+// "letters" (Hangul fillers, the blank Braille pattern), interlinear annotation marks and Unicode
+// tag characters. They let identical-looking quotes slip past duplicate detection, pass the minimum
+// length while showing nothing, and can disguise or smuggle text in the moderation dashboard.
+// Variation selectors stay: they pick emoji presentation, and the comparison key drops them anyway.
+const INVISIBLE_CHARACTERS =
+  /[\u00AD\u034F\u061C\u115F\u1160\u17B4\u17B5\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u206F\u2800\u3164\uFEFF\uFFA0\uFFF9-\uFFFB\u{E0000}-\u{E007F}]/gu;
 // Control characters other than the whitespace ones, which are collapsed to a space instead.
 const CONTROL_CHARACTERS = /[\u0000-\u0008\u000E-\u001F\u007F-\u009F]/g;
 

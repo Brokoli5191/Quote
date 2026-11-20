@@ -180,6 +180,15 @@ describe("validateModeration", () => {
 });
 
 describe("cleanText", () => {
+  it("drops blank letters, annotation marks and tag characters but keeps emoji selectors", () => {
+    expect(cleanText("Buy cheap pills now\u3164")).toBe("Buy cheap pills now");
+    expect(cleanText("\u3164\u3164\u3164")).toBe("");
+    expect(cleanText("\u2800\u2800\u2800")).toBe("");
+    expect(cleanText("a\u115F\u1160\uFFA0b\uFFF9c\uFFFBd")).toBe("abcd");
+    expect(cleanText("hi\u{E0068}\u{E0069}")).toBe("hi");
+    expect(cleanText("I \u2764\uFE0F books")).toBe("I \u2764\uFE0F books");
+  });
+
   it("strips zero-width and bidi control characters", () => {
     const hidden = "\u200Bab\u200Cc\u200Dd\u200Ee\u200Ff\u202Ag\u202Bh\u202Ci\u202Dj\u202Ek"
       + "\u2060l\u2061m\u2062n\u2063o\u2064p\u2066q\u2067r\u2068s\u2069t\uFEFFu";
