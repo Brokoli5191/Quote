@@ -58,6 +58,7 @@ import app.brokoli5191.quote.utils.ReleaseCheckResult
 import app.brokoli5191.quote.utils.ReleaseInfo
 import app.brokoli5191.quote.utils.UpdateChecker
 import app.brokoli5191.quote.utils.UpdateStatus
+import app.brokoli5191.quote.widget.WidgetConfig
 import app.brokoli5191.quote.widget.WidgetRefreshScheduler
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
@@ -527,7 +528,11 @@ class QuoteViewModel(
         syncCommunityQuotes()
         reportFailedWithdrawals()
         CommunitySyncWorker.schedule(app)
-        viewModelScope.launch(Dispatchers.IO) { UpdateChecker.deleteInstalledUpdates(app, BuildConfig.VERSION_NAME) }
+        viewModelScope.launch(Dispatchers.IO) {
+            UpdateChecker.deleteInstalledUpdates(app, BuildConfig.VERSION_NAME)
+            // Starts the device-local list of widget ids that WidgetConfig.dropForeign relies on.
+            WidgetConfig.markKnown(app, emptyList())
+        }
     }
 
     // True when the app has never run on this install: every earlier start left a seed flag of its
