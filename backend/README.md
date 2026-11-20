@@ -58,9 +58,17 @@ The endpoint rejects invalid fields, bodies over 16 KiB (also without
 match an active community quote (letters and digits only, ignoring case and
 punctuation), texts a moderator deleted permanently (compared the same way, with
 any author), more than five submissions per installation in 24 hours, and more
-than twenty submissions per IP address (IPv6: per /64 prefix) in 24 hours.
-Withdrawn and deleted submissions keep counting toward both limits until 24 hours
+than twenty submissions per IP address (IPv6: per /64 prefix) in 24 hours, and
+more than 500 submissions from everyone together in 24 hours.
+Withdrawn and deleted submissions keep counting toward these limits until 24 hours
 after they were sent. The limits are checked atomically with the insert.
+A rejected submission sent again by the same installation with something changed
+(category, tags, language, capitalisation) goes back into review under the same
+`id` and answers `201` like a new one; it counts as a new submission for the limits.
+Sent unchanged, it gets the existing state back as described above.
+Invisible characters (zero-width and bidi controls, Hangul fillers, the blank
+Braille pattern, interlinear annotation marks and Unicode tag characters) are
+removed from every field before validation.
 A quote without any letters or digits (for example only emoji or punctuation) has
 an empty comparison key, so it is never matched against community quotes or
 blocked texts by that key; only text and author together are compared (ignoring

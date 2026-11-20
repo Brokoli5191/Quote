@@ -45,6 +45,7 @@ import app.brokoli5191.quote.data.normalizeAuthorName
 import app.brokoli5191.quote.data.normalizeQuoteText
 import app.brokoli5191.quote.data.quoteMatchesQuery
 import app.brokoli5191.quote.data.storedQuoteTextLength
+import app.brokoli5191.quote.data.parseQuoteTags
 import app.brokoli5191.quote.data.submissionLength
 import app.brokoli5191.quote.data.submissionValidationError
 import app.brokoli5191.quote.utils.AppLinks
@@ -320,6 +321,10 @@ class QuoteViewModel(
     /** Whether the open New Quote form holds unsaved input; leaving it then needs the discard dialog. */
     val newQuoteHasDraft: StateFlow<Boolean> = _newQuoteHasDraft.asStateFlow()
 
+    // Whether Saved shows the edit sheet of an own quote. Switching the tab disposes Saved and the
+    // sheet with whatever was typed into it, so entry points leave the tab alone while it is open.
+    private val _savedEditOpen = MutableStateFlow(false)
+
     private val _pendingDraft = MutableStateFlow<QuoteDraft?>(null)
 
     /** Text from another app waiting for New Quote, see [setPendingDraft]. */
@@ -477,7 +482,9 @@ class QuoteViewModel(
                             (q.origin == QuoteOrigin.PERSONAL && q.submissionStatus == QuoteSubmissionStatus.APPROVED)
                         "Local" -> q.origin == QuoteOrigin.PERSONAL &&
                             q.submissionStatus != QuoteSubmissionStatus.APPROVED
-                        else -> q.category.equals(cat, ignoreCase = true)
+                        // The source pseudo-categories add their own rows; a real category still
+                        // follows the chosen source, also when it is combined with one of them.
+                        else -> q.category.equals(cat, ignoreCase = true) && q.matchesSourceMode(sourceMode)
                     }
                 }
             }
@@ -520,6 +527,7 @@ class QuoteViewModel(
         syncCommunityQuotes()
         reportFailedWithdrawals()
         CommunitySyncWorker.schedule(app)
+        viewModelScope.launch(Dispatchers.IO) { UpdateChecker.deleteInstalledUpdates(app, BuildConfig.VERSION_NAME) }
     }
 
     // True when the app has never run on this install: every earlier start left a seed flag of its
@@ -925,9 +933,24 @@ class QuoteViewModel(
         job.start()
     }
 
-    /** Picks up a new day; the widget follows, since the app now shows the new day's quote. */
+    /**
+     * Picks up a new day; the widget follows, since the app now shows the new day's quote. On the same
+     * day it re-reads the saved state of the shown quote: "Save" on the reminder notification writes
+     * it straight to the database.
+     */
     fun refreshDailyQuoteIfNeeded() {
-        if (_dailyDate.value != dailyDateKey()) loadDailyQuote()
+        if (_dailyDate.value != dailyDateKey()) {
+            loadDailyQuote()
+            return
+        }
+        val shownId = _dailyQuote.value?.id ?: return
+        viewModelScope.launch {
+            val favorite = repository.getQuoteById(shownId)?.isFavorite ?: return@launch
+            val shown = _dailyQuote.value
+            if (shown != null && shown.id == shownId && shown.isFavorite != favorite) {
+                _dailyQuote.value = shown.copy(isFavorite = favorite)
+            }
+        }
     }
 
     /**
@@ -1023,6 +1046,11 @@ class QuoteViewModel(
         _newQuoteHasDraft.value = false
     }
 
+    /** Called by Saved when its edit sheet opens or closes. */
+    fun setSavedEditOpen(open: Boolean) {
+        _savedEditOpen.value = open
+    }
+
     /** Called by New Quote whenever its form gains or loses unsaved input. */
     fun setNewQuoteHasDraft(hasDraft: Boolean) {
         _newQuoteHasDraft.value = hasDraft && _showNewQuoteScreen.value
@@ -1049,7 +1077,8 @@ class QuoteViewModel(
      * Opens an entry point's destination ([AppLinks] DEST_* from the widget, a notification, a launcher
      * shortcut or the share sheet): closes the developer screen and selects the tab and sub-tab. New
      * Quote opens above Saved > My Quotes, where the added quote shows. An open New Quote form with a
-     * draft stays open, so no entry point throws away what the user typed. Unknown values are ignored.
+     * draft stays open, and so does Saved while its edit sheet is open, so no entry point throws away
+     * what the user typed. Unknown values are ignored.
      */
     fun openDestination(dest: String) {
         val (tab, subTab) = when (dest) {
@@ -1059,7 +1088,8 @@ class QuoteViewModel(
             else -> return
         }
         _showDevScreen.value = false
-        selectTab(tab)
+        val keepSavedEdit = _savedEditOpen.value && _selectedTab.value == TAB_SAVED && tab != TAB_SAVED
+        if (!keepSavedEdit) selectTab(tab)
         subTab?.let(::selectSavedSubTab)
         if (dest == AppLinks.DEST_NEW_QUOTE) {
             openNewQuoteScreen()
@@ -1148,10 +1178,15 @@ class QuoteViewModel(
     fun toggleFavorite(quote: QuoteEntity) {
         val favorite = !quote.isFavorite
         viewModelScope.launch {
+            var copies = emptySet<Int>()
             val exists = quoteEditMutex.withLock {
-                if (!favorite) rememberUnfavorited(quote.id)
+                if (!favorite) {
+                    rememberUnfavorited(quote.id)
+                    copies = unfavoriteCommunityCopies(setOf(quote.id))
+                }
                 repository.toggleFavorite(quote.id, favorite)
             }
+            markDailyQuoteFavorite(copies, false)
             if (exists) {
                 markDailyQuoteFavorite(setOf(quote.id), favorite)
             } else if (_dailyQuote.value?.id == quote.id) {
@@ -1165,13 +1200,15 @@ class QuoteViewModel(
     fun unfavoriteQuotes(ids: Set<Int>) {
         if (ids.isEmpty()) return
         viewModelScope.launch {
-            quoteEditMutex.withLock {
+            val copies = quoteEditMutex.withLock {
+                val copies = unfavoriteCommunityCopies(ids)
                 ids.forEach { id ->
                     rememberUnfavorited(id)
                     repository.toggleFavorite(id, false)
                 }
+                copies
             }
-            markDailyQuoteFavorite(ids, false)
+            markDailyQuoteFavorite(ids + copies, false)
         }
     }
 
@@ -1191,6 +1228,17 @@ class QuoteViewModel(
             }
             markDailyQuoteFavorite(quotes.mapTo(HashSet()) { it.id }, true)
         }
+    }
+
+    // Saved hides the favorited community copy of a favorited own quote (they are one quote), so
+    // removing the own one must remove the copy too, or an identical card would take its place.
+    private suspend fun unfavoriteCommunityCopies(ownIds: Set<Int>): Set<Int> {
+        val copies = repository.favoritedCommunityCopies(ownIds) - ownIds
+        copies.forEach { id ->
+            rememberUnfavorited(id)
+            repository.toggleFavorite(id, false)
+        }
+        return copies
     }
 
     private suspend fun rememberUnfavorited(id: Int) {
@@ -1290,8 +1338,7 @@ class QuoteViewModel(
             tags.size <= SubmissionLimits.MAX_TAGS &&
             tags.all { submissionLength(it) in 1..SubmissionLimits.MAX_TAG_LENGTH }
 
-    private fun parseTags(tags: String): List<String> =
-        tags.split(',').map { it.trim() }.filter { it.isNotEmpty() }.distinctBy { it.lowercase() }
+    private fun parseTags(tags: String): List<String> = parseQuoteTags(tags)
 
     private fun supportedLanguage(language: String): String? =
         language.takeIf { it == QuoteLanguage.ENGLISH || it == QuoteLanguage.GERMAN }
@@ -1503,7 +1550,7 @@ class QuoteViewModel(
         prefs.edit().putBoolean("daily_reminder_enabled", enabled).apply()
 
         if (enabled) {
-            NotificationScheduler.scheduleDailyNotification(app, _dailyReminderHour.value, _dailyReminderMinute.value)
+            NotificationScheduler.scheduleForUserChange(app, _dailyReminderHour.value, _dailyReminderMinute.value)
         } else {
             NotificationScheduler.cancelDailyNotification(app)
         }
@@ -1518,7 +1565,7 @@ class QuoteViewModel(
             .apply()
 
         if (_dailyReminderEnabled.value) {
-            NotificationScheduler.scheduleDailyNotification(app, hour, minute)
+            NotificationScheduler.scheduleForUserChange(app, hour, minute)
         }
     }
 
@@ -1658,7 +1705,7 @@ class QuoteViewModel(
         const val SEEDED_FLAG_PREFIX = "database_json_seeded_"
         // Bumped to v14 so installs that seeded before the normalizer and category fixes re-seed;
         // the re-seed keeps bundled ids, favorites and the daily history.
-        const val SEEDED_FLAG = "${SEEDED_FLAG_PREFIX}v14"
+        const val SEEDED_FLAG = "${SEEDED_FLAG_PREFIX}v15"
         // v3: the normalizer now also drops the stray space before German closing marks („Real. “).
         const val KEY_TEXT_REPAIRED = "stored_quote_text_repaired_v3"
         const val MIN_SEEDED_QUOTES = 30

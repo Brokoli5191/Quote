@@ -113,8 +113,9 @@ open class QuoteSubmissionClient {
     }
 
     /**
-     * Current server state of a submission. A 404 (withdrawn, deleted, or another installation id) reads as
-     * [QuoteSubmissionStatus.REMOVED] with [SubmissionStatusInfo.notFound] set.
+     * Current server state of a submission. The backend's own 404 (withdrawn, deleted, or another
+     * installation id) reads as [QuoteSubmissionStatus.REMOVED] with [SubmissionStatusInfo.notFound]
+     * set. Any other 404 (route not deployed, a proxy) is an error, so it never detaches submissions.
      */
     open suspend fun status(submissionId: String, installationId: String): Result<SubmissionStatusInfo> =
         withContext(Dispatchers.IO) {
@@ -130,8 +131,9 @@ open class QuoteSubmissionClient {
                     when (connection.responseCode) {
                         HttpURLConnection.HTTP_OK ->
                             parseSubmissionStatusInfo(connection.inputStream.bufferedReader().use { it.readText() })
-                        HttpURLConnection.HTTP_NOT_FOUND ->
-                            SubmissionStatusInfo(QuoteSubmissionStatus.REMOVED, notFound = true)
+                        HttpURLConnection.HTTP_NOT_FOUND -> parseStatusNotFound(
+                            connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
+                        )
                         else -> throw IllegalStateException("Status service returned ${connection.responseCode}")
                     }
                 } finally {
@@ -192,6 +194,12 @@ internal fun parseSubmitResponse(responseCode: Int, responseText: String): Quote
     )
 }
 
+/** A status 404 means "gone" only when the backend says so; anything else is a failed request. */
+internal fun parseStatusNotFound(body: String): SubmissionStatusInfo {
+    check(parseErrorCode(body) == SubmissionError.NOT_FOUND) { "Status service returned 404 without not_found" }
+    return SubmissionStatusInfo(QuoteSubmissionStatus.REMOVED, notFound = true)
+}
+
 internal fun parseWithdrawError(responseCode: Int, code: String?): WithdrawResult = when {
     responseCode == HttpURLConnection.HTTP_NOT_FOUND && code == SubmissionError.NOT_FOUND -> WithdrawResult.NotFound
     responseCode == HttpURLConnection.HTTP_NOT_FOUND -> WithdrawResult.Error(SubmissionError.SERVER)
@@ -241,8 +249,10 @@ object SubmissionLimits {
 
 // The backend's cleanText: invisible format characters and control characters are dropped, and runs of
 // whitespace (JavaScript's \s) become one space.
-private val SERVER_INVISIBLE_CHARACTERS =
-    Regex("[\\u00AD\\u061C\\u180E\\u200B-\\u200F\\u202A-\\u202E\\u2060-\\u2064\\u2066-\\u2069\\uFEFF]")
+private val SERVER_INVISIBLE_CHARACTERS = Regex(
+    "[\\u00AD\\u034F\\u061C\\u115F\\u1160\\u17B4\\u17B5\\u180E\\u200B-\\u200F\\u202A-\\u202E\\u2060-\\u2064" +
+        "\\u2066-\\u206F\\u2800\\u3164\\uFEFF\\uFFA0\\uFFF9-\\uFFFB\\x{E0000}-\\x{E007F}]"
+)
 private val SERVER_CONTROL_CHARACTERS = Regex("[\\u0000-\\u0008\\u000E-\\u001F\\u007F-\\u009F]")
 private val SERVER_WHITESPACE =
     Regex("[\\t\\n\\u000B\\f\\r \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]+")
@@ -251,6 +261,14 @@ private val SERVER_WHITESPACE =
  * Length of [value] as the backend validates it: in Unicode code points (an emoji counts once, like
  * SQLite's length()), after the server's cleanup of invisible characters and whitespace.
  */
+/**
+ * Tags typed or pasted as "a, b, c": trimmed, without duplicates (ignoring case) and without entries
+ * that are empty once the backend strips invisible characters, so a stray zero-width space never
+ * makes a quote unsavable.
+ */
+fun parseQuoteTags(tags: String): List<String> =
+    tags.split(',').map { it.trim() }.filter { submissionLength(it) > 0 }.distinctBy { it.lowercase() }
+
 fun submissionLength(value: String): Int {
     val cleaned = value
         .replace(SERVER_INVISIBLE_CHARACTERS, "")

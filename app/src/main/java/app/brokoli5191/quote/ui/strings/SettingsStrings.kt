@@ -10,6 +10,8 @@ internal val settingsGermanUi: Map<String, String> = mapOf(
     // Daily reminder time
     "Change time" to "Uhrzeit ändern",
     "Scheduled daily at {time}" to "Täglich um {time}",
+    "Android may deliver the reminder up to an hour late." to "Android kann die Erinnerung bis zu einer Stunde später zustellen.",
+    "Allow exact time" to "Genaue Uhrzeit erlauben",
 
     // Review decisions
     "Notify me about review decisions" to "Über Prüfergebnisse benachrichtigen",

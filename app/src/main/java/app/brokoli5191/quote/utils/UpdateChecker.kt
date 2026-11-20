@@ -182,6 +182,17 @@ object UpdateChecker {
     }
 
     /**
+     * Deletes downloaded update APKs (and partial downloads) whose version is already installed, so a
+     * finished update does not leave the whole APK in the cache until the next one is downloaded.
+     */
+    fun deleteInstalledUpdates(context: Context, installedVersion: String) {
+        context.cacheDir.listFiles { f -> f.name.startsWith("update-v") }?.forEach { file ->
+            val version = file.name.removePrefix("update-v").removeSuffix(".part").removeSuffix(".apk")
+            if (compareVersions(version, installedVersion) <= 0) file.delete()
+        }
+    }
+
+    /**
      * Downloads the APK to the cache directory and returns its path, or null on any failure.
      * Requires HTTP 200 and, when [expectedSize] is known, a matching length. The release
      * workflow publishes `<apk>.sha256` next to the APK; when it exists the download must match

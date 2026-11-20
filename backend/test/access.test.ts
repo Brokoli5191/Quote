@@ -74,6 +74,24 @@ describe("verifyAccess", () => {
   });
 });
 
+describe("certs outage", () => {
+  it("asks the certs endpoint at most once a minute while it fails", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    certsAvailable = false;
+    const { verifyAccess } = await loadAccess();
+    const token = await signer.sign("mod@example.com");
+    for (let i = 0; i < 5; i++) {
+      expect(await verifyAccess(requestWith(token), env)).toEqual({ status: "unavailable" });
+    }
+    expect(certsRequests).toBe(1);
+
+    vi.setSystemTime(Date.now() + 61_000);
+    certsAvailable = true;
+    expect(await verifyAccess(requestWith(token), env)).toEqual({ status: "verified", email: "mod@example.com" });
+    expect(certsRequests).toBe(2);
+  });
+});
+
 describe("handleAdmin", () => {
   it("answers 503 when the Access keys cannot be loaded", async () => {
     certsAvailable = false;

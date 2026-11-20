@@ -176,6 +176,19 @@ class QuoteViewModelTest {
     }
 
     @Test
+    fun entryPointsKeepSavedWhileItsEditSheetIsOpen() {
+        val vm = newViewModel()
+        vm.openDestination(AppLinks.DEST_MY_QUOTES)
+        vm.setSavedEditOpen(true)
+        vm.openDestination(AppLinks.DEST_DAILY)
+        assertEquals("an entry point never drops an open edit", "Saved", vm.selectedTab.value)
+
+        vm.setSavedEditOpen(false)
+        vm.openDestination(AppLinks.DEST_DAILY)
+        assertEquals("Daily", vm.selectedTab.value)
+    }
+
+    @Test
     fun entryPointsOpenTheirScreenAndKeepADraft() {
         val vm = newViewModel()
         vm.openDevScreen()
@@ -326,6 +339,36 @@ class QuoteViewModelTest {
         assertEquals(listOf("Mark Twain"), vm.filteredQuotes.await { it.size == 1 }.map { it.author })
         vm.setSearchQuery("bronte")
         assertEquals(listOf("Charlotte Brontë"), vm.filteredQuotes.await { list -> list.any { it.author != "Mark Twain" } }.map { it.author })
+    }
+
+    @Test
+    fun aCategoryCombinedWithLocalStillFollowsTheSourceMode() {
+        insert(
+            bundled("A curated thought."),
+            QuoteEntity(text = "A community thought.", author = "Reader", category = "Life", origin = QuoteOrigin.COMMUNITY, serverId = "c-1"),
+            own("My own thought.")
+        )
+        val vm = newViewModel()
+        vm.setQuoteSourceMode(QuoteSourceMode.CURATED)
+        vm.setSelectedCategories(setOf("Life", "Local"))
+        val texts = vm.filteredQuotes.await { it.size >= 2 }.map { it.text }.toSet()
+        assertEquals(setOf("A curated thought.", "My own thought."), texts)
+    }
+
+    @Test
+    fun unfavoritingAnOwnQuoteAlsoUnfavoritesItsCommunityCopy() {
+        val (ownId, copyId) = insert(
+            own("Kindness is free.", status = QuoteSubmissionStatus.APPROVED, submissionId = "sub-9", favorite = true)
+                .copy(linkedServerId = "c-9", savedDate = "1"),
+            QuoteEntity(
+                text = "Kindness is free.", author = "Me", category = "Life", origin = QuoteOrigin.COMMUNITY,
+                serverId = "c-9", isFavorite = true, savedDate = "2"
+            )
+        )
+        val vm = newViewModel()
+        vm.toggleFavorite(runBlocking { dao.getQuoteById(ownId) }!!)
+        awaitTrue { runBlocking { dao.getQuoteById(ownId) }?.isFavorite == false }
+        awaitTrue { runBlocking { dao.getQuoteById(copyId) }?.isFavorite == false }
     }
 
     @Test

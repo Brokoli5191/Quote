@@ -80,6 +80,21 @@ class QuoteSubmissionClientTest {
     }
 
     @Test
+    fun parseQuoteTags_dropsTagsThatAreEmptyOnceInvisibleCharactersAreRemoved() {
+        assertEquals(listOf("wisdom", "life"), parseQuoteTags("wisdom, \u200B, Wisdom , life,,"))
+        assertEquals(emptyList<String>(), parseQuoteTags("\u200B\u00AD, "))
+    }
+
+    @Test
+    fun parseStatusNotFound_onlyTheBackendsOwn404MeansGone() {
+        val gone = parseStatusNotFound("""{"code":"not_found","error":"Not found."}""")
+        assertEquals(QuoteSubmissionStatus.REMOVED, gone.status)
+        assertTrue(gone.notFound)
+        assertTrue(runCatching { parseStatusNotFound("<html>404 Not Found</html>") }.isFailure)
+        assertTrue(runCatching { parseStatusNotFound("") }.isFailure)
+    }
+
+    @Test
     fun parseWithdrawError_bare404IsNotTreatedAsGone() {
         assertEquals(WithdrawResult.NotFound, parseWithdrawError(404, SubmissionError.NOT_FOUND))
         assertEquals(WithdrawResult.Error(SubmissionError.SERVER), parseWithdrawError(404, null))

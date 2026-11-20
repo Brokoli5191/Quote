@@ -29,6 +29,9 @@ class AccessKeysUnavailableError extends Error {}
 const DENIED: AccessResult = { status: "denied" };
 
 let cachedKeys: { expiresAt: number; fetchedAt: number; keys: AccessJwk[] } | undefined;
+// When fetching the key set last failed. While the certs endpoint is down, it is asked at most
+// once a minute, not once per admin request.
+let lastFailedFetchAt = Number.NEGATIVE_INFINITY;
 
 // Minimum time between forced key refreshes, so tokens with made-up key IDs cannot
 // make the Worker fetch the key set on every request.
@@ -60,11 +63,17 @@ async function getKeys(teamDomain: string, forceRefresh = false): Promise<Access
     if (!forceRefresh || now - cachedKeys.fetchedAt < FORCED_REFRESH_INTERVAL_MS) return cachedKeys.keys;
   }
 
+  if (now - lastFailedFetchAt < FORCED_REFRESH_INTERVAL_MS) {
+    if (cachedKeys && !forceRefresh) return cachedKeys.keys;
+    throw new AccessKeysUnavailableError("Cloudflare Access keys could not be loaded less than a minute ago");
+  }
+
   try {
     const keys = await fetchKeys(teamDomain);
     cachedKeys = { keys, fetchedAt: now, expiresAt: now + 60 * 60 * 1000 };
     return keys;
   } catch (error) {
+    lastFailedFetchAt = now;
     // An expired key set still verifies every token signed with a key that has not rotated,
     // so a failed hourly refresh keeps it and tries again a minute later. A forced refresh
     // is only needed for an unknown key, which the old set cannot verify.

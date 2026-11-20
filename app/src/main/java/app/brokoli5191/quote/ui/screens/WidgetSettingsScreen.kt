@@ -4,8 +4,12 @@ import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.ActivityNotFoundException
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import android.text.format.DateFormat
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -63,6 +67,7 @@ import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import app.brokoli5191.quote.ui.theme.accentSwatchColor
 import app.brokoli5191.quote.utils.CommunitySyncWorker
+import app.brokoli5191.quote.utils.NotificationScheduler
 import app.brokoli5191.quote.utils.UpdateStatus
 import app.brokoli5191.quote.widget.QuoteWidgetProvider
 import app.brokoli5191.quote.widget.WidgetConfigureActivity
@@ -109,8 +114,11 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
             PackageManager.PERMISSION_GRANTED
     var notificationsAllowed by remember { mutableStateOf(notificationsGranted()) }
+    // Changed in the system settings, so it is read again whenever the screen comes back.
+    var exactAlarmsAllowed by remember { mutableStateOf(NotificationScheduler.canScheduleExact(context)) }
     LifecycleResumeEffect(Unit) {
         notificationsAllowed = notificationsGranted()
+        exactAlarmsAllowed = NotificationScheduler.canScheduleExact(context)
         onPauseOrDispose { }
     }
     val setSubmissionNotifications = { enabled: Boolean ->
@@ -636,6 +644,32 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                                     textAlign = TextAlign.Center
                                 )
+
+                                if (!exactAlarmsAllowed && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                    Text(
+                                        text = uiText("Android may deliver the reminder up to an hour late."),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                                        textAlign = TextAlign.Center
+                                    )
+                                    ExpressiveTextButton(
+                                        onClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            try {
+                                                context.startActivity(
+                                                    Intent(
+                                                        Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                                                        Uri.parse("package:${context.packageName}")
+                                                    )
+                                                )
+                                            } catch (e: ActivityNotFoundException) {
+                                                Log.w("WidgetSettingsScreen", "No exact alarm settings screen", e)
+                                            }
+                                        }
+                                    ) {
+                                        Text(uiText("Allow exact time"))
+                                    }
+                                }
                             }
                         }
                     }
@@ -1111,7 +1145,13 @@ fun WidgetSettingsScreen(viewModel: QuoteViewModel) {
                                     ) {
                                         // Runtime permissions are device-specific and cannot be part of a backup.
                                         viewModel.setDailyReminderEnabled(false)
-                                        permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                        try {
+                                            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                        } catch (e: IllegalStateException) {
+                                            // Settings was left or recreated while the restore ran, so the
+                                            // launcher is gone; the reminder stays off until it is switched on.
+                                            Log.w("WidgetSettingsScreen", "Notification permission not requested", e)
+                                        }
                                     }
                                     viewModel.runVerification()
                                 },

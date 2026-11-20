@@ -27,6 +27,7 @@ import app.brokoli5191.quote.data.hasUnknownAuthor
 import app.brokoli5191.quote.ui.formattedQuote
 import app.brokoli5191.quote.ui.localizeUi
 import app.brokoli5191.quote.utils.AppLinks
+import app.brokoli5191.quote.utils.NotificationScheduler
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -67,8 +68,14 @@ class QuoteWidgetProvider : AppWidgetProvider() {
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         when (intent.action) {
-            AppLinks.ACTION_UPDATE_WIDGET, WidgetRefreshScheduler.ACTION_MIDNIGHT_REFRESH ->
+            AppLinks.ACTION_UPDATE_WIDGET ->
                 updateWidgets(context, AppWidgetManager.getInstance(context), placedWidgetIds(context))
+            WidgetRefreshScheduler.ACTION_MIDNIGHT_REFRESH -> {
+                // Wakes the app once a day: a reminder the system dropped (exact-alarm permission
+                // revoked) is put back here too.
+                NotificationScheduler.ensureScheduled(context)
+                updateWidgets(context, AppWidgetManager.getInstance(context), placedWidgetIds(context))
+            }
         }
     }
 

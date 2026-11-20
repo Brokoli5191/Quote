@@ -101,6 +101,43 @@ class QuoteRepositoryTest {
     }
 
     @Test
+    fun mergeReseed_followsTextCorrectionsThatOnlyRestoreSpacesAndPunctuation() {
+        val old = listOf(
+            QuoteEntity(
+                id = 20,
+                text = "You only live twice:Once when you are bornAnd once when you look death in the face",
+                author = "Ian Fleming",
+                category = "Life",
+                isFavorite = true,
+                savedDate = "9",
+                timestamp = 1
+            ),
+            QuoteEntity(id = 21, text = "Silence is so freaking loud", author = "Sarah Dessen", category = "Life", timestamp = 1),
+            // Two old rows with the same letters: ambiguous, so neither is taken over by letters.
+            QuoteEntity(id = 22, text = "Same words", author = "A", category = "Life"),
+            QuoteEntity(id = 23, text = "Same, words", author = "B", category = "Life")
+        )
+        val fresh = listOf(
+            QuoteEntity(
+                text = "You only live twice: once when you are born, and once when you look death in the face.",
+                author = "Ian Fleming",
+                category = "Life",
+                timestamp = 99
+            ),
+            QuoteEntity(text = "Silence is so freaking loud.", author = "Sarah Dessen", category = "Life", timestamp = 99),
+            QuoteEntity(text = "Same. Words.", author = "C", category = "Life", timestamp = 99)
+        )
+
+        val merged = mergeReseed(old, fresh)
+
+        assertEquals(listOf(20, 21, 0), merged.map { it.id })
+        assertTrue(merged[0].isFavorite)
+        assertEquals("9", merged[0].savedDate)
+        assertEquals(fresh[0].text, merged[0].text)
+        assertEquals(1L, merged[1].timestamp)
+    }
+
+    @Test
     fun sourceModes_excludePersonalQuotesFromAutomaticCollections() {
         val bundled = QuoteEntity(text = "Bundled", author = "Author", category = "Life")
         val community = QuoteEntity(

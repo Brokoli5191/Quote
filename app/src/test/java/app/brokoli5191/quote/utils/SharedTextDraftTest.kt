@@ -5,6 +5,7 @@ import app.brokoli5191.quote.ui.QuoteDraft
 import app.brokoli5191.quote.ui.formattedQuote
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SharedTextDraftTest {
@@ -69,5 +70,16 @@ class SharedTextDraftTest {
     fun emptyTextGivesNoDraft() {
         assertNull(draft("   "))
         assertNull(draft("\"\""))
+    }
+
+    @Test
+    fun hugeSharedTextIsCutBeforeParsing() {
+        // Many " - " separators followed by a last line made the author regex backtrack for seconds.
+        val hostile = "a - ".repeat(50_000) + "a\nx"
+        val start = System.nanoTime()
+        val result = draft(hostile)
+        val millis = (System.nanoTime() - start) / 1_000_000
+        assertTrue("took $millis ms", millis < 1_000)
+        assertTrue(result!!.text.length <= QuoteSharing.MAX_SHARED_TEXT_LENGTH)
     }
 }

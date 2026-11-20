@@ -477,7 +477,9 @@ internal fun MainContent(
                     ) {
                         // Composed once when the gesture starts; progress is only read in
                         // graphicsLayer above, so gesture frames don't recompose it.
-                        DailyScreen(viewModel)
+                        Box(Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))) {
+                            DailyScreen(viewModel)
+                        }
                     }
                 }
 
@@ -531,7 +533,11 @@ internal fun MainContent(
                                 }
                             }
                         },
-                        modifier = Modifier.fillMaxSize(),
+                        // The Scaffold passes no insets; the tabs handle top and bottom themselves,
+                        // and this keeps their content clear of side navigation bars and cutouts.
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
                         contentAlignment = Alignment.Center,
                         label = "MainTabsTransition"
                     ) { tab ->

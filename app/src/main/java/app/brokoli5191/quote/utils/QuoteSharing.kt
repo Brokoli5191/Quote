@@ -148,7 +148,9 @@ object QuoteSharing {
      * Null when no text is left.
      */
     internal fun draftFromSharedText(raw: String): QuoteDraft? {
-        val shared = raw.trim().replace(TRAILING_LINK, "").trim()
+        // Runs on the main thread for text from any app, and the regexes below backtrack on long
+        // input; New Quote keeps 2,000 characters anyway, so longer text is cut first.
+        val shared = raw.capForParsing().trim().replace(TRAILING_LINK, "").trim()
         if (shared.isEmpty()) return null
         val split = TRAILING_AUTHOR.matchEntire(shared)?.takeIf { match ->
             val quote = match.groupValues[1].trim()
@@ -169,6 +171,13 @@ object QuoteSharing {
     private val TRAILING_AUTHOR =
         Regex("""^(.+)(?:\s+[—–―]\s*|\s+-\s+|\s*\n\s*-\s*)([^\n]+)$""", RegexOption.DOT_MATCHES_ALL)
     private val TRAILING_LINK = Regex("""\s+https?://\S+$""")
+    internal const val MAX_SHARED_TEXT_LENGTH = 4_000
+
+    private fun String.capForParsing(): String {
+        if (length <= MAX_SHARED_TEXT_LENGTH) return this
+        val end = if (this[MAX_SHARED_TEXT_LENGTH - 1].isHighSurrogate()) MAX_SHARED_TEXT_LENGTH - 1 else MAX_SHARED_TEXT_LENGTH
+        return substring(0, end)
+    }
     private val WHITESPACE = Regex("""\s+""")
     private const val OPENING_MARKS = "\"“„«»‚‘"
     private const val CLOSING_MARKS = "\"”“»«’‘"

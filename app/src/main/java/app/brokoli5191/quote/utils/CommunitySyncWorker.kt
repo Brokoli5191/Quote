@@ -16,6 +16,9 @@ import java.util.concurrent.TimeUnit
 
 class CommunitySyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
+        // Revoking the exact-alarm permission cancels the reminder without telling the app; this
+        // work runs twice a day anyway, so it puts the alarm back (idempotent).
+        NotificationScheduler.ensureScheduled(applicationContext)
         val repository = QuoteRepository(
             AppDatabase.getInstance(applicationContext).quoteDao(),
             InstallationSeed.get(applicationContext)

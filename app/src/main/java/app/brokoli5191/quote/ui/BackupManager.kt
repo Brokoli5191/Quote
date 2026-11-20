@@ -17,6 +17,7 @@ import app.brokoli5191.quote.data.QuoteSourceMode
 import app.brokoli5191.quote.data.QuoteSubmissionStatus
 import app.brokoli5191.quote.data.isVocabularyTag
 import app.brokoli5191.quote.data.normalizedText
+import app.brokoli5191.quote.data.quoteCompactKey
 import app.brokoli5191.quote.data.quoteMatchKey
 import app.brokoli5191.quote.utils.CommunitySyncWorker
 import kotlinx.coroutines.CancellationException
@@ -518,6 +519,7 @@ private class FavoriteIndex(rows: List<QuoteEntity>) {
     private val byServerId = HashMap<String, QuoteEntity>()
     private val byKey = HashMap<Pair<String, String>, MutableList<QuoteEntity>>()
     private val bundledByText = HashMap<String, MutableList<QuoteEntity>>()
+    private val bundledByLetters = HashMap<String, MutableList<QuoteEntity>>()
     private val favoriteIds = HashSet<Int>()
 
     init {
@@ -528,7 +530,10 @@ private class FavoriteIndex(rows: List<QuoteEntity>) {
         val key = row.matchKey()
         row.serverId?.let { byServerId[it] = row }
         byKey.getOrPut(key) { ArrayList(1) } += row
-        if (row.origin == QuoteOrigin.BUNDLED) bundledByText.getOrPut(key.first) { ArrayList(1) } += row
+        if (row.origin == QuoteOrigin.BUNDLED) {
+            bundledByText.getOrPut(key.first) { ArrayList(1) } += row
+            bundledByLetters.getOrPut(quoteCompactKey(row.text)) { ArrayList(1) } += row
+        }
         if (row.isFavorite) favoriteIds += row.id
     }
 
@@ -538,7 +543,10 @@ private class FavoriteIndex(rows: List<QuoteEntity>) {
         val origin = quote.origin ?: QuoteOrigin.BUNDLED
         byKey[quote.key]?.let { rows -> return rows.firstOrNull { it.origin == origin } ?: rows.first() }
         if (origin != QuoteOrigin.BUNDLED) return null
+        // Then by its letters alone: a backup made before a bundled text was corrected (lost spaces
+        // and line breaks, missing punctuation) still finds the corrected row.
         return bundledByText[quote.key.first]?.singleOrNull()
+            ?: bundledByLetters[quoteCompactKey(quote.text)]?.singleOrNull()
     }
 
     /** Records [row] as a favorite; false when it already is one. */

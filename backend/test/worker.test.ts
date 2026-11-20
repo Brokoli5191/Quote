@@ -37,6 +37,8 @@ interface SubmitOptions {
   author?: string;
   installationId?: string;
   ip?: string;
+  category?: string;
+  language?: string;
 }
 
 async function submit(options: SubmitOptions = {}, target: Env = env) {
@@ -46,11 +48,11 @@ async function submit(options: SubmitOptions = {}, target: Env = env) {
     body: JSON.stringify({
       quoteText: options.quoteText ?? "The obstacle is the way.",
       author: options.author ?? "Marcus Aurelius",
-      category: "Stoicism",
+      category: options.category ?? "Stoicism",
       tags: ["wisdom"],
       installationId: options.installationId ?? INSTALLATION,
       appVersion: "2.1.0",
-      language: "en"
+      language: options.language ?? "en"
     })
   }), target);
   return { response, body: await response.json() as Record<string, unknown> };
@@ -147,6 +149,53 @@ describe("submission rate limits", () => {
     await runMaintenance(env);
     expect(database.sqlite.prepare("SELECT installation_hash AS hash FROM deleted_submission_slots").all())
       .toEqual([expect.objectContaining({ hash: "recent" })]);
+  });
+});
+
+describe("resubmission", () => {
+  async function rejected() {
+    const { body } = await submit();
+    const review = await admin("PATCH", `/admin/api/submissions/${body.id}`, approval({ action: "reject", reviewNote: "Wrong category." }));
+    expect(review.response.status).toBe(200);
+    return body.id as string;
+  }
+
+  it("puts a revised rejected submission back into review under the same id", async () => {
+    const id = await rejected();
+    const again = await submit({ category: "Philosophy", language: "de" });
+    expect(again.response.status).toBe(201);
+    expect(again.body).toMatchObject({ id, status: "pending" });
+    expect(row("SELECT status, category, language, review_note AS note FROM submissions WHERE id = ?", id))
+      .toEqual({ status: "pending", category: "Philosophy", language: "de", note: null });
+  });
+
+  it("answers an unchanged resubmission of a rejected quote with its state", async () => {
+    const id = await rejected();
+    const again = await submit();
+    expect(again.response.status).toBe(200);
+    expect(again.body).toMatchObject({ id, status: "rejected", duplicate: true });
+  });
+
+  it("counts a resubmission against the installation limit", async () => {
+    const id = await rejected();
+    for (let i = 0; i < 4; i++) {
+      expect((await submit({ quoteText: `Another thought number ${i}.` })).response.status).toBe(201);
+    }
+    expect((await submit({ category: "Philosophy" })).response.status).toBe(429);
+    expect(row("SELECT status FROM submissions WHERE id = ?", id)).toEqual({ status: "rejected" });
+  });
+});
+
+describe("global daily limit", () => {
+  it("refuses submissions once everyone together reached the daily limit", async () => {
+    const insert = database.sqlite.prepare(
+      `INSERT INTO submissions (id, quote_text, normalized_text, author, category, content_hash, installation_hash, ip_hash)
+       VALUES (?, 'Some text here', 'some text here', '', 'Life', ?, 'i', 'p')`
+    );
+    for (let i = 0; i < 500; i++) insert.run(crypto.randomUUID(), `hash-${i}`);
+    const { response, body } = await submit();
+    expect(response.status).toBe(429);
+    expect(body).toMatchObject({ code: "rate_limited" });
   });
 });
 

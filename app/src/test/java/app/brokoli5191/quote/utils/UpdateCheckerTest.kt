@@ -14,6 +14,22 @@ import org.robolectric.annotation.Config
 class UpdateCheckerTest {
 
     @Test
+    fun `installed update APKs are deleted, newer ones are kept`() {
+        val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+        val installed = java.io.File(context.cacheDir, "update-v2.1.1.apk").apply { writeText("apk") }
+        val older = java.io.File(context.cacheDir, "update-v2.1.0.apk.part").apply { writeText("part") }
+        val newer = java.io.File(context.cacheDir, "update-v2.2.0.apk").apply { writeText("apk") }
+        val other = java.io.File(context.cacheDir, "shared").apply { mkdirs() }
+
+        UpdateChecker.deleteInstalledUpdates(context, "2.1.1")
+
+        assertFalse(installed.exists())
+        assertFalse(older.exists())
+        assertTrue(newer.exists())
+        assertTrue(other.exists())
+    }
+
+    @Test
     fun `numeric versions compare per segment`() {
         assertTrue(UpdateChecker.isNewerVersion("2.0.2", "2.0.10"))
         assertTrue(UpdateChecker.isNewerVersion("2.0.2", "v2.1"))

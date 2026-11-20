@@ -11,22 +11,28 @@ on:
     tags:
       - "[0-9]+.[0-9]+.[0-9]+"
 
+# Read-only by default: the build job runs third-party actions next to the signing key. Only the
+# publish job, which runs no third-party action, may write (create the release).
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build-release:
     name: Build signed APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      version: ${{ steps.release_files.outputs.version }}
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Validate version, tag and release notes
         id: version
         shell: bash
+        env:
+          PUBLISH: ${{ inputs.publish }}
         run: |
           version="$(sed -n 's/^ *versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts)"
           if [ -z "$version" ]; then
@@ -37,6 +43,15 @@ jobs:
             echo "Tag $GITHUB_REF_NAME must equal versionName $version (bare X.Y.Z, no v prefix)"
             exit 1
           fi
+          # A manual publish creates the tag at this commit. If the tag already exists elsewhere,
+          # gh would keep it there and attach an APK built from a different commit.
+          if [ "$GITHUB_REF_TYPE" != "tag" ] && [ "$PUBLISH" = "true" ]; then
+            tagged="$(git ls-remote --tags origin "refs/tags/$version^{}" "refs/tags/$version" | head -n 1 | cut -f 1)"
+            if [ -n "$tagged" ] && [ "$tagged" != "$GITHUB_SHA" ]; then
+              echo "Tag $version already points at $tagged, not at $GITHUB_SHA; bump versionName or run from the tag"
+              exit 1
+            fi
+          fi
           if [ ! -f ".github/release-notes/$version.md" ]; then
             echo "Missing .github/release-notes/$version.md"
             exit 1
@@ -44,7 +59,7 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Set up Node.js 22
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: "22"
 
@@ -55,13 +70,13 @@ jobs:
           node tools/generate_tag_labels.mjs --check
 
       - name: Set up Java 21
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: "21"
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
           cache-provider: basic
 
@@ -108,29 +123,45 @@ jobs:
              > "release/quote-$version.apk.sha256"
           cp app/build/outputs/mapping/release/mapping.txt \
              "release/quote-$version-mapping.txt"
+          cp ".github/release-notes/$version.md" release/release-notes.md
 
       - name: Upload release APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: quote-${{ steps.release_files.outputs.version }}
           path: release/*
           if-no-files-found: error
           retention-days: 30
 
+  publish-release:
+    name: Publish GitHub release
+    needs: build-release
+    if: startsWith(github.ref, 'refs/tags/') || inputs.publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download release files
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: quote-${{ needs.build-release.outputs.version }}
+          path: release
+
       - name: Publish GitHub release
-        if: startsWith(github.ref, 'refs/tags/') || inputs.publish
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.release_files.outputs.version }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.build-release.outputs.version }}
         run: |
           TAG="$VERSION"
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release $TAG already exists"
             exit 1
           fi
-          notes="release-notes.md"
-          cp ".github/release-notes/$VERSION.md" "$notes"
+          notes="release/release-notes.md"
           printf '\n**SHA-256:** `%s`\n' "$(cut -d ' ' -f 1 "release/quote-$VERSION.apk.sha256")" >> "$notes"
 
           gh release create "$TAG" \

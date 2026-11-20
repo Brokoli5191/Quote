@@ -164,6 +164,16 @@ class QuoteRepository(
         return quoteDao.getQuoteById(id)
     }
 
+    /** Ids of the favorited community copies of the own quotes among [ids] (published and linked). */
+    suspend fun favoritedCommunityCopies(ids: Collection<Int>): Set<Int> {
+        val serverIds = ids.mapNotNull { id -> quoteDao.getQuoteById(id)?.takeIf { it.isUserAdded }?.linkedServerId }
+        if (serverIds.isEmpty()) return emptySet()
+        return serverIds.chunked(500)
+            .flatMap { quoteDao.getQuotesByServerIds(it) }
+            .filter { it.isFavorite && it.origin == QuoteOrigin.COMMUNITY }
+            .mapTo(HashSet()) { it.id }
+    }
+
     /** Returns false when the quote no longer exists, so the caller can reload what it shows. */
     suspend fun toggleFavorite(id: Int, isFav: Boolean): Boolean = locked {
         val savedString = if (isFav) System.currentTimeMillis().toString() else null
@@ -583,14 +593,16 @@ internal fun currentNoRepeatCycle(historyOldestFirst: List<Int>, candidates: Set
 /**
  * The rows a re-seed writes. Each [fresh] row takes over the id, favorite state, saved date and
  * timestamp of the old bundled row it matches: by (text, author) first, then by text alone when
- * that text is unique among the old rows, for author names the new seed corrected. Old favorites
- * that left the seed are kept as they were, but with only their curated tags (older seeds carried
- * noisy source tags). Other old rows are dropped.
+ * that text is unique among the old rows, for author names the new seed corrected, and last by its
+ * letters alone when those are unique, for texts the new seed corrected (lost spaces and line
+ * breaks, missing punctuation). Old favorites that left the seed are kept as they were, but with
+ * only their curated tags (older seeds carried noisy source tags). Other old rows are dropped.
  */
 internal fun mergeReseed(old: List<QuoteEntity>, fresh: List<QuoteEntity>): List<QuoteEntity> {
     val oldKeys = old.map { quoteMatchKey(it.text) to quoteMatchKey(it.author) }
     val byTextAndAuthor = old.indices.groupBy({ oldKeys[it] }, { old[it] })
     val byText = old.indices.groupBy({ oldKeys[it].first }, { old[it] }).filterValues { it.size == 1 }
+    val byLetters = old.groupBy { quoteCompactKey(it.text) }.filterValues { it.size == 1 }
     val matched = HashSet<Int>()
     fun claim(rows: List<QuoteEntity>?): QuoteEntity? =
         rows?.firstOrNull { it.id !in matched }?.also { matched += it.id }
@@ -599,7 +611,10 @@ internal fun mergeReseed(old: List<QuoteEntity>, fresh: List<QuoteEntity>): List
     val exact = freshKeys.map { claim(byTextAndAuthor[it]) }
     val now = System.currentTimeMillis().toString()
     val merged = fresh.mapIndexed { index, quote ->
-        val match = exact[index] ?: claim(byText[freshKeys[index].first]) ?: return@mapIndexed quote
+        val match = exact[index]
+            ?: claim(byText[freshKeys[index].first])
+            ?: claim(byLetters[quoteCompactKey(quote.text)])
+            ?: return@mapIndexed quote
         quote.copy(
             id = match.id,
             isFavorite = match.isFavorite,
