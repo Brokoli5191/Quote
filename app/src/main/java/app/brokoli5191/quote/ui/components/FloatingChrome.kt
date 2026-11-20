@@ -31,9 +31,6 @@ import dev.chrisbanes.haze.hazeEffect
 // Height of the main bottom navigation bar above the system navigation inset.
 val BottomNavigationBarHeight = 81.dp
 
-// Fade above the bottom navigation bar; drawn over content, which keeps 32dp extra bottom padding.
-val BottomNavigationBarFade = 24.dp
-
 /** Distance from the screen bottom to the top edge of the floating bottom navigation bar. */
 @Composable
 fun floatingBottomBarHeight(): Dp =
