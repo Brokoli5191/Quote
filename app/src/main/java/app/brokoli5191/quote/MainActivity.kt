@@ -705,8 +705,9 @@ fun BottomNavigationBar(
 ) {
     val haptic = LocalHapticFeedback.current
     // A surface of its own with a clear top edge: content scrolling under the bar (the "Another quote"
-    // button, list cards) must not look like part of it. With blur on, a little of it still shows.
-    val barColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = if (blurEnabled) 0.94f else 1f)
+    // button, list cards) must not look like part of it. With blur on, the blurred content shows
+    // through the translucent surface; the divider keeps the edge visible either way.
+    val barColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = if (blurEnabled) 0.75f else 1f)
     Column(modifier = Modifier.fillMaxWidth()) {
         HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant)
         Row(
