@@ -634,9 +634,11 @@ class QuoteViewModel(
         if (!prefs.getBoolean(SEEDED_FLAG, false) || repository.getQuotesCount() < MIN_SEEDED_QUOTES) {
             // Favorite-preserving re-seed: keeps user-added and community quotes, and bundled rows keep
             // their ids, favorites and saved dates, so today's quote and the no-repeat history stay.
-            repository.reseedPreservingFavorites(app)
-            prefs.edit().putBoolean(SEEDED_FLAG, true).apply()
-            changed = true
+            // Only a seed that was actually applied counts; a failed read is retried on the next start.
+            if (repository.reseedPreservingFavorites(app)) {
+                prefs.edit().putBoolean(SEEDED_FLAG, true).apply()
+                changed = true
+            }
         }
         if (!prefs.getBoolean(KEY_TEXT_REPAIRED, false)) {
             // The bundled rows were just re-seeded with the current normalizer, so only own and

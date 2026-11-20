@@ -5,6 +5,11 @@ plugins {
   alias(libs.plugins.roborazzi)
 }
 
+// Room writes the database schema of every version here; the JSON files are committed.
+ksp {
+  arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 android {
   namespace = "app.brokoli5191.quote"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
@@ -13,8 +18,8 @@ android {
     applicationId = "app.brokoli5191.quote"
     minSdk = 24
     targetSdk = 36
-    versionCode = 20
-    versionName = "2.1.1"
+    versionCode = 21
+    versionName = "2.1.2"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }

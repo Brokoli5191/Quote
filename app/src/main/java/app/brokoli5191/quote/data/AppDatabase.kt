@@ -7,10 +7,14 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
+/** Current schema version; bump it together with a new entry in [AppDatabase.MIGRATIONS]. */
+internal const val DATABASE_VERSION = 7
+
 @Database(
     entities = [QuoteEntity::class, DailySelectionEntity::class, AuthorInfoEntity::class],
-    version = 7,
-    exportSchema = false
+    version = DATABASE_VERSION,
+    // Exported to app/schemas, so later migrations can be tested against the real schema.
+    exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun quoteDao(): QuoteDao
@@ -32,8 +36,11 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "aura_database"
                 )
-                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
-                .fallbackToDestructiveMigration(dropAllTables = true)
+                .addMigrations(*MIGRATIONS)
+                // Only databases from before 1.4.0 (version 1, no migration) may be recreated. A
+                // missing migration for any later version must fail loudly (MigrationChainTest)
+                // instead of silently deleting own quotes and favorites.
+                .fallbackToDestructiveMigrationFrom(true, *RECREATED_VERSIONS.toIntArray())
                 .addCallback(object : RoomDatabase.Callback() {
                     // A recreated database has no community rows, so the sync cursor must start over.
                     override fun onDestructiveMigration(db: SupportSQLiteDatabase) {
@@ -89,5 +96,11 @@ abstract class AppDatabase : RoomDatabase() {
                 )
             }
         }
+
+        /** Every migration, oldest first; MigrationChainTest checks they reach the current version. */
+        internal val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+
+        /** Database versions that have no migration and may be recreated (see getInstance). */
+        internal val RECREATED_VERSIONS = setOf(1)
     }
 }

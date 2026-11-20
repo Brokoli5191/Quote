@@ -1,0 +1,222 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 7,
+    "identityHash": "8d8468dd74914417f6b1fdf935444056",
+    "entities": [
+      {
+        "tableName": "quotes",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `text` TEXT NOT NULL, `author` TEXT NOT NULL, `category` TEXT NOT NULL, `isFavorite` INTEGER NOT NULL, `isUserAdded` INTEGER NOT NULL, `timestamp` INTEGER NOT NULL, `aboutAuthor` TEXT NOT NULL, `tags` TEXT NOT NULL, `savedDate` TEXT, `submissionStatus` TEXT NOT NULL, `submissionId` TEXT, `submittedAt` INTEGER, `origin` TEXT NOT NULL, `serverId` TEXT, `serverRevision` INTEGER, `textDe` TEXT, `language` TEXT NOT NULL, `isAnonymous` INTEGER NOT NULL, `reviewNote` TEXT, `linkedServerId` TEXT, `textEn` TEXT)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "text",
+            "columnName": "text",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "author",
+            "columnName": "author",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "category",
+            "columnName": "category",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isFavorite",
+            "columnName": "isFavorite",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isUserAdded",
+            "columnName": "isUserAdded",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timestamp",
+            "columnName": "timestamp",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "aboutAuthor",
+            "columnName": "aboutAuthor",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tags",
+            "columnName": "tags",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "savedDate",
+            "columnName": "savedDate",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "submissionStatus",
+            "columnName": "submissionStatus",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "submissionId",
+            "columnName": "submissionId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "submittedAt",
+            "columnName": "submittedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "origin",
+            "columnName": "origin",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "serverId",
+            "columnName": "serverId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "serverRevision",
+            "columnName": "serverRevision",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "textDe",
+            "columnName": "textDe",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "language",
+            "columnName": "language",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isAnonymous",
+            "columnName": "isAnonymous",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reviewNote",
+            "columnName": "reviewNote",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "linkedServerId",
+            "columnName": "linkedServerId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "textEn",
+            "columnName": "textEn",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_quotes_serverId",
+            "unique": true,
+            "columnNames": [
+              "serverId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_quotes_serverId` ON `${TABLE_NAME}` (`serverId`)"
+          }
+        ]
+      },
+      {
+        "tableName": "daily_selections",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`date` TEXT NOT NULL, `quoteId` INTEGER NOT NULL, PRIMARY KEY(`date`))",
+        "fields": [
+          {
+            "fieldPath": "date",
+            "columnName": "date",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "quoteId",
+            "columnName": "quoteId",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "date"
+          ]
+        }
+      },
+      {
+        "tableName": "author_info",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`name` TEXT NOT NULL, `wikiTitle` TEXT, `imageUrl` TEXT, `description` TEXT, `fetchedAt` INTEGER NOT NULL, PRIMARY KEY(`name`))",
+        "fields": [
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "wikiTitle",
+            "columnName": "wikiTitle",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "imageUrl",
+            "columnName": "imageUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "description",
+            "columnName": "description",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "fetchedAt",
+            "columnName": "fetchedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "name"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '8d8468dd74914417f6b1fdf935444056')"
+    ]
+  }
+}

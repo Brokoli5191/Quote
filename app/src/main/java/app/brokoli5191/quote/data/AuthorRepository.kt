@@ -123,11 +123,15 @@ class AuthorRepository internal constructor(
                     "&prop=pageimages%7Cdescription%7Cpageprops&piprop=thumbnail&pithumbsize=330&titles=" +
                     URLEncoder.encode(name, "UTF-8")
             ) ?: return@withContext null
+            // An error answer (maxlag, read-only mode, internal error) also comes as HTTP 200; it is
+            // a failed lookup, not a definite "no match" to remember for 30 days.
+            if (isWikimediaError(pageJson)) return@withContext null
             val page = runCatching { parseWikipediaPage(pageJson) }.getOrNull() ?: return@withContext noMatch
             val claimsJson = httpGet(
                 "https://www.wikidata.org/w/api.php?action=wbgetclaims&format=json&property=P31&entity=" +
                     URLEncoder.encode(page.wikidataId, "UTF-8")
             ) ?: return@withContext null
+            if (isWikimediaError(claimsJson)) return@withContext null
             if (!runCatching { isHumanEntity(claimsJson) }.getOrDefault(false)) return@withContext noMatch
             AuthorInfoEntity(key, page.title, page.imageUrl, page.description, now)
         }
@@ -156,6 +160,10 @@ class AuthorRepository internal constructor(
             "https://$wikiLanguage.wikipedia.org/wiki/" + URLEncoder.encode(title.replace(' ', '_'), "UTF-8")
     }
 }
+
+/** True for a MediaWiki/Wikibase error answer or a body that is no JSON object at all. */
+internal fun isWikimediaError(json: String): Boolean =
+    runCatching { JSONObject(json).has("error") }.getOrDefault(true)
 
 internal fun wikimediaHttpGet(url: String): String? = try {
     val connection = (URL(url).openConnection() as HttpURLConnection).apply {
