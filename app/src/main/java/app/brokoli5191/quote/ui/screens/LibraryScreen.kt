@@ -73,6 +73,7 @@ import app.brokoli5191.quote.ui.components.ExpressiveIconButton
 import app.brokoli5191.quote.ui.components.ExpressiveTextButton
 import app.brokoli5191.quote.ui.components.AnimatedTranslation
 import app.brokoli5191.quote.ui.components.TranslationToggle
+import app.brokoli5191.quote.ui.components.CenteredEmptyState
 import app.brokoli5191.quote.ui.components.bottomBarContentPadding
 import app.brokoli5191.quote.ui.components.rememberExpressiveShape
 import app.brokoli5191.quote.ui.theme.SerifFontFamily
@@ -769,151 +770,153 @@ fun CategoryBrowseViewInPlace(
                 )
             }
 
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(start = 20.dp, top = topContentPadding, end = 20.dp, bottom = 32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                // Beautiful Multi-layer Material Illustration Frame
-                Box(
+            CenteredEmptyState(top = topContentPadding) {
+                Column(
                     modifier = Modifier
-                        .size(160.dp)
-                        .graphicsLayer {
-                            translationY = floatAnim
-                            scaleX = scaleAnim
-                            scaleY = scaleAnim
-                            alpha = alphaPulse
-                        },
-                    contentAlignment = Alignment.Center
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
-                    // Soft glowing background circle
+                    // Beautiful Multi-layer Material Illustration Frame
                     Box(
                         modifier = Modifier
-                            .size(120.dp)
-                            .background(
-                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f),
-                                shape = CircleShape
-                            )
-                    )
-                    
-                    // Stacked decorative card representing missing quotes
-                    Box(
-                        modifier = Modifier
-                            .size(80.dp)
-                            .graphicsLayer { rotationZ = -12f }
-                            .background(
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                                shape = RoundedCornerShape(16.dp)
-                            )
-                    )
-                    
-                    Box(
-                        modifier = Modifier
-                            .size(80.dp)
-                            .graphicsLayer { rotationZ = 8f }
-                            .background(
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                                shape = RoundedCornerShape(16.dp)
-                            )
-                            .border(
-                                1.5.dp,
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
-                                RoundedCornerShape(16.dp)
-                            )
-                    )
-                    
-                    // Main illustration icon
-                    Icon(
-                        imageVector = Icons.Default.SearchOff,
-                        // Decorative: the heading below says what the screen is about.
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(56.dp)
-                    )
-                    
-                    // Micro-interaction star on upper right
-                    Icon(
-                        imageVector = Icons.Default.AutoAwesome,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f),
-                        modifier = Modifier
-                            .size(18.dp)
-                            .align(Alignment.TopEnd)
+                            .size(160.dp)
                             .graphicsLayer {
-                                translationX = -20f
-                                translationY = 15f
-                            }
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-                
-                Text(
-                    text = if (communityEmpty) uiText("No Community Quotes Yet") else uiText("No Wisdom Matches"),
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = SerifFontFamily
-                    ),
-                    color = MaterialTheme.colorScheme.onBackground,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.semantics { heading() }
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = when {
-                        !communityEmpty -> uiText("Try a different search or clear the filters.")
-                        syncRunning -> uiText("Checking for newly approved community quotes...")
-                        syncState is SyncUiState.Failed ->
-                            uiText("The community quotes could not be loaded. Check your connection and try again.")
-                        // Community quotes without a German version are not listed in German.
-                        language == QuoteLanguage.GERMAN ->
-                            uiText("Approved community quotes appear here once they have a German version, after the next sync.")
-                        else -> uiText("Approved community quotes will appear here after the next sync.")
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth(0.85f)
-                        .padding(bottom = 24.dp)
-                )
-
-                // Community: look for quotes again. Otherwise: clear the filters that matched nothing.
-                ExpressiveButton(
-                    onClick = if (communityEmpty) onRetrySync else onBackWithHaptic,
-                    enabled = !(communityEmpty && syncRunning),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
-                    ),
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
-                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
-                    restingCorner = 24.dp
-                ) {
-                    if (communityEmpty && syncRunning) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                translationY = floatAnim
+                                scaleX = scaleAnim
+                                scaleY = scaleAnim
+                                alpha = alphaPulse
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        // Soft glowing background circle
+                        Box(
+                            modifier = Modifier
+                                .size(120.dp)
+                                .background(
+                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f),
+                                    shape = CircleShape
+                                )
                         )
-                    } else {
+                    
+                        // Stacked decorative card representing missing quotes
+                        Box(
+                            modifier = Modifier
+                                .size(80.dp)
+                                .graphicsLayer { rotationZ = -12f }
+                                .background(
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                    shape = RoundedCornerShape(16.dp)
+                                )
+                        )
+                    
+                        Box(
+                            modifier = Modifier
+                                .size(80.dp)
+                                .graphicsLayer { rotationZ = 8f }
+                                .background(
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                    shape = RoundedCornerShape(16.dp)
+                                )
+                                .border(
+                                    1.5.dp,
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+                                    RoundedCornerShape(16.dp)
+                                )
+                        )
+                    
+                        // Main illustration icon
                         Icon(
-                            imageVector = Icons.Default.Refresh,
+                            imageVector = Icons.Default.SearchOff,
+                            // Decorative: the heading below says what the screen is about.
                             contentDescription = null,
-                            modifier = Modifier.size(18.dp)
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(56.dp)
+                        )
+                    
+                        // Micro-interaction star on upper right
+                        Icon(
+                            imageVector = Icons.Default.AutoAwesome,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f),
+                            modifier = Modifier
+                                .size(18.dp)
+                                .align(Alignment.TopEnd)
+                                .graphicsLayer {
+                                    translationX = -20f
+                                    translationY = 15f
+                                }
                         )
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Spacer(modifier = Modifier.height(24.dp))
+                
+                    Text(
+                        text = if (communityEmpty) uiText("No Community Quotes Yet") else uiText("No Wisdom Matches"),
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = SerifFontFamily
+                        ),
+                        color = MaterialTheme.colorScheme.onBackground,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.semantics { heading() }
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = when {
-                            !communityEmpty -> uiText("Reset All Filters")
-                            syncState is SyncUiState.Failed -> uiText("Try again")
-                            else -> uiText("Sync again")
+                            !communityEmpty -> uiText("Try a different search or clear the filters.")
+                            syncRunning -> uiText("Checking for newly approved community quotes...")
+                            syncState is SyncUiState.Failed ->
+                                uiText("The community quotes could not be loaded. Check your connection and try again.")
+                            // Community quotes without a German version are not listed in German.
+                            language == QuoteLanguage.GERMAN ->
+                                uiText("Approved community quotes appear here once they have a German version, after the next sync.")
+                            else -> uiText("Approved community quotes will appear here after the next sync.")
                         },
-                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth(0.85f)
+                            .padding(bottom = 24.dp)
                     )
+
+                    // Community: look for quotes again. Otherwise: clear the filters that matched nothing.
+                    ExpressiveButton(
+                        onClick = if (communityEmpty) onRetrySync else onBackWithHaptic,
+                        enabled = !(communityEmpty && syncRunning),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        ),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
+                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
+                        restingCorner = 24.dp
+                    ) {
+                        if (communityEmpty && syncRunning) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = when {
+                                !communityEmpty -> uiText("Reset All Filters")
+                                syncState is SyncUiState.Failed -> uiText("Try again")
+                                else -> uiText("Sync again")
+                            },
+                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+                        )
+                    }
                 }
             }
         } else {

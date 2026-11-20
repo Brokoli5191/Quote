@@ -21,9 +21,14 @@ abstract class AppDatabase : RoomDatabase() {
         private var INSTANCE: AppDatabase? = null
 
         fun getInstance(context: Context): AppDatabase {
-            return INSTANCE ?: synchronized(this) {
+            INSTANCE?.let { return it }
+            // Only the application context is kept: the callback below lives as long as the process.
+            val appContext = context.applicationContext
+            return synchronized(this) {
+                // A caller that waited for the lock finds the instance the first one built.
+                INSTANCE?.let { return@synchronized it }
                 val instance = Room.databaseBuilder(
-                    context.applicationContext,
+                    appContext,
                     AppDatabase::class.java,
                     "aura_database"
                 )
@@ -32,7 +37,7 @@ abstract class AppDatabase : RoomDatabase() {
                 .addCallback(object : RoomDatabase.Callback() {
                     // A recreated database has no community rows, so the sync cursor must start over.
                     override fun onDestructiveMigration(db: SupportSQLiteDatabase) {
-                        CommunitySyncManager.resetCursor(context.applicationContext)
+                        CommunitySyncManager.resetCursor(appContext)
                     }
                 })
                 .build()

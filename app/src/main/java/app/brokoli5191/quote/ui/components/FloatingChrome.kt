@@ -2,11 +2,20 @@ package app.brokoli5191.quote.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -36,6 +45,28 @@ fun floatingBottomBarHeight(): Dp =
  */
 @Composable
 fun bottomBarContentPadding(): Dp = floatingBottomBarHeight() + 32.dp
+
+/**
+ * Centers an empty or no-results state between [top] and whichever is higher, the keyboard or the
+ * floating bottom bar, and lets it scroll when that space is too small (short screens, large font
+ * scale, landscape), so nothing it holds ends up behind the keyboard or the bar.
+ */
+@Composable
+fun CenteredEmptyState(top: Dp, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    val keyboard = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
+    val bottom = maxOf(keyboard, bottomBarContentPadding())
+    BoxWithConstraints(modifier.fillMaxSize().padding(top = top, bottom = bottom)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .heightIn(min = maxHeight),
+            contentAlignment = Alignment.Center
+        ) {
+            content()
+        }
+    }
+}
 
 /**
  * Backdrop behind chrome that floats over scrolling content (headers, tab switchers, bottom

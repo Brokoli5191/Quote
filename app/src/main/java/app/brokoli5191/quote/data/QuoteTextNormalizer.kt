@@ -49,6 +49,14 @@ internal fun quoteMatchKey(value: String): String = normalizeQuoteText(value)
     .replace(WHITESPACE_REGEX, " ")
     .trim()
 
+/**
+ * Letters and digits only: equal for a bundled text and its corrected version, which only restores
+ * the spaces and punctuation the source lost ("bornAnd once" → "born, and once").
+ */
+internal fun quoteCompactKey(value: String): String = normalizeQuoteText(value)
+    .lowercase()
+    .filter { it.isLetterOrDigit() }
+
 internal class QuoteMarkPairs(
     val pairs: Map<Int, Int>,
     val unmatchedOpen: List<Int>,

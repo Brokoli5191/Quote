@@ -105,6 +105,7 @@ import app.brokoli5191.quote.data.alternateLanguage
 import app.brokoli5191.quote.data.alternateText
 import app.brokoli5191.quote.data.hasUnknownAuthor
 import app.brokoli5191.quote.data.storedQuoteTextLength
+import app.brokoli5191.quote.data.parseQuoteTags
 import app.brokoli5191.quote.data.submissionLength
 import app.brokoli5191.quote.data.tagLabel
 import app.brokoli5191.quote.ui.LocalAppLanguage
@@ -115,6 +116,7 @@ import app.brokoli5191.quote.ui.categoryText
 import app.brokoli5191.quote.ui.editKeepsReview
 import app.brokoli5191.quote.ui.localizeUi
 import app.brokoli5191.quote.ui.uiText
+import app.brokoli5191.quote.ui.components.CenteredEmptyState
 import app.brokoli5191.quote.ui.components.AnimatedTranslation
 import app.brokoli5191.quote.ui.components.AuthorAvatar
 import app.brokoli5191.quote.ui.components.AuthorSheet
@@ -296,6 +298,9 @@ fun SavedScreen(viewModel: QuoteViewModel) {
     var deleteTargets by rememberQuoteTargets(ownQuote)
     var withdrawTargets by rememberQuoteTargets(ownQuote)
     var editTargets by rememberQuoteTargets(ownQuote)
+    val editOpen = editTargets.isNotEmpty()
+    LaunchedEffect(editOpen) { viewModel.setSavedEditOpen(editOpen) }
+    DisposableEffect(Unit) { onDispose { viewModel.setSavedEditOpen(false) } }
     var editResubmit by rememberSaveable { mutableStateOf(false) }
     // Kept by name, like Library's: the sheet is about the author, not about one quote.
     var sheetAuthor by rememberSaveable { mutableStateOf<String?>(null) }
@@ -413,7 +418,10 @@ fun SavedScreen(viewModel: QuoteViewModel) {
                     // scroll out from under the FAB.
                     LazyColumn(
                         state = if (inFavorites) favoritesListState else myQuotesListState,
-                        modifier = Modifier.fillMaxSize(),
+                        // Search keeps the keyboard open; the last results must scroll above it.
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .imePadding(),
                         contentPadding = PaddingValues(
                             start = 16.dp,
                             top = contentTop + 16.dp,
@@ -798,12 +806,7 @@ private fun ScrollToTopOnChange(listState: LazyListState, quotes: List<QuoteEnti
 
 @Composable
 private fun EmptyCollectionState(inFavorites: Boolean, topPadding: Dp) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(top = topPadding),
-        contentAlignment = Alignment.Center
-    ) {
+    CenteredEmptyState(top = topPadding) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -837,12 +840,7 @@ private fun EmptyCollectionState(inFavorites: Boolean, topPadding: Dp) {
 
 @Composable
 private fun NoMatchesState(topPadding: Dp, onClear: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(top = topPadding),
-        contentAlignment = Alignment.Center
-    ) {
+    CenteredEmptyState(top = topPadding) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -2296,8 +2294,8 @@ private fun EditQuoteSheet(
     val textTooLong = textLength > SubmissionLimits.MAX_TEXT_LENGTH
     val authorLength = submissionLength(author)
     val authorTooLong = authorLength > SubmissionLimits.MAX_AUTHOR_LENGTH
-    val parsedTags = tags.split(',').map(String::trim).filter(String::isNotEmpty)
-    val tagsInvalid = parsedTags.distinctBy { it.lowercase() }.size > SubmissionLimits.MAX_TAGS ||
+    val parsedTags = parseQuoteTags(tags)
+    val tagsInvalid = parsedTags.size > SubmissionLimits.MAX_TAGS ||
         parsedTags.any { submissionLength(it) > SubmissionLimits.MAX_TAG_LENGTH }
     val reviewed = quote.submissionStatus == QuoteSubmissionStatus.REJECTED ||
         quote.submissionStatus == QuoteSubmissionStatus.REMOVED

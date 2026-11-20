@@ -289,6 +289,26 @@ class BackupManagerTest {
     }
 
     @Test
+    fun favoriteSavedBeforeATextCorrection_marksTheCorrectedBundledRow() = runBlocking {
+        val device = Device()
+        device.insert(bundled("There is a crack in everything. That's how the light gets in.", "Leonard Cohen"))
+        val backup = """
+            {"formatVersion": 3, "quotes": [
+              {"text": "There is a crack in everything.That's how the light gets in", "author": "Leonard Cohen",
+               "category": "Life", "isFavorite": true, "isUserAdded": false, "savedDate": "1710000000000",
+               "origin": "bundled"}
+            ]}
+        """.trimIndent()
+
+        import(device, backup)
+
+        val row = device.quotes().single()
+        assertEquals("There is a crack in everything. That's how the light gets in.", row.text)
+        assertTrue(row.isFavorite)
+        assertEquals("1710000000000", row.savedDate)
+    }
+
+    @Test
     fun currentBackup_keepsBundledFavoritesThatLeftTheSeed() = runBlocking {
         val device = Device()
         device.insert(bundled("Know thyself.", "Socrates"))

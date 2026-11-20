@@ -48,7 +48,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import app.brokoli5191.quote.data.alternateLanguage
 import app.brokoli5191.quote.data.alternateText
@@ -300,13 +299,14 @@ fun DailyScreen(viewModel: QuoteViewModel) {
                                 }
                             }
 
-                            Spacer(Modifier.height(12.dp))
+                            // The chips' 48dp touch targets add 8dp above and below the 32dp chip,
+                            // so the spacers are that much smaller: the visible gaps stay 12dp and 8dp.
+                            Spacer(Modifier.height(4.dp))
                             QuoteTags(tags = tags, onTagClick = { tag ->
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 viewModel.openLibrarySearch(tag.raw)
                             })
 
-                            Spacer(Modifier.height(8.dp))
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 DailyActionButton(
                                     icon = if (quote.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
@@ -539,14 +539,12 @@ private data class QuoteTag(val raw: String, val label: String)
 // A single line of chips: the tags that fit completely, in order, never wrapped or cut off.
 @Composable
 private fun QuoteTags(tags: List<QuoteTag>, onTagClick: (QuoteTag) -> Unit) {
-    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
-        SingleLineFitRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp) {
-            tags.forEach { tag ->
-                SuggestionChip(
-                    onClick = { onTagClick(tag) },
-                    label = { Text(tag.label, maxLines = 1, softWrap = false) }
-                )
-            }
+    SingleLineFitRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp) {
+        tags.forEach { tag ->
+            SuggestionChip(
+                onClick = { onTagClick(tag) },
+                label = { Text(tag.label, maxLines = 1, softWrap = false) }
+            )
         }
     }
 }

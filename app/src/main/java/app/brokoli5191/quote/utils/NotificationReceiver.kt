@@ -20,6 +20,13 @@ class NotificationReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val prefs = context.getSharedPreferences("aura_prefs", Context.MODE_PRIVATE)
         if (!prefs.getBoolean("daily_reminder_enabled", false)) return
+        // A clock or time zone set back after today's reminder re-arms it for "today" again; one a day.
+        val today = dailyDateKey()
+        if (prefs.getString(NotificationScheduler.KEY_LAST_REMINDER_DATE, null) == today) {
+            NotificationScheduler.ensureScheduled(context)
+            return
+        }
+        prefs.edit().putString(NotificationScheduler.KEY_LAST_REMINDER_DATE, today).commit()
         // The alarm is one-shot, so arm tomorrow's first.
         NotificationScheduler.ensureScheduled(context)
 
@@ -30,7 +37,7 @@ class NotificationReceiver : BroadcastReceiver() {
             try {
                 val repository = QuoteRepository(AppDatabase.getInstance(context).quoteDao(), InstallationSeed.get(context))
                 val quote = repository.getDailyQuote(
-                    dailyDateKey(),
+                    today,
                     prefs.getString("quote_source_mode", QuoteSourceMode.ALL) ?: QuoteSourceMode.ALL,
                     language,
                     prefs.getBoolean("show_anonymous_quotes", false)

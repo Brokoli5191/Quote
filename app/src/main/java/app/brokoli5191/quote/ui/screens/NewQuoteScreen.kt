@@ -67,6 +67,7 @@ import androidx.compose.ui.unit.sp
 import app.brokoli5191.quote.data.SubmissionLimits
 import app.brokoli5191.quote.data.QuoteLanguage
 import app.brokoli5191.quote.data.storedQuoteTextLength
+import app.brokoli5191.quote.data.parseQuoteTags
 import app.brokoli5191.quote.data.submissionLength
 import app.brokoli5191.quote.ui.QuoteDraft
 import app.brokoli5191.quote.ui.QuoteViewModel
@@ -157,7 +158,7 @@ fun NewQuoteScreen(
     val authorAtLimit = authorLength >= SubmissionLimits.MAX_AUTHOR_LENGTH
     val textBlank = text.isNotEmpty() && text.isBlank()
     val quoteInvalid = text.isNotEmpty() && textLength < SubmissionLimits.MIN_TEXT_LENGTH
-    val parsedTags = tags.split(',').map(String::trim).filter(String::isNotEmpty).distinctBy { it.lowercase() }
+    val parsedTags = parseQuoteTags(tags)
     val tagsInvalid = parsedTags.size > SubmissionLimits.MAX_TAGS ||
         parsedTags.any { submissionLength(it) > SubmissionLimits.MAX_TAG_LENGTH }
     val hasDraft = text.isNotBlank() || author.isNotBlank() || tags.isNotBlank()
