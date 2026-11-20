@@ -17,6 +17,33 @@ class QuoteWidgetProviderTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
     @Test
+    fun `settings restored from another device do not stick to a new widget with the same id`() {
+        // Before the app started once the list does not exist yet: nothing is dropped.
+        WidgetConfig.write(context, 12, WidgetConfig(font = "Monospace"))
+        WidgetConfig.dropForeign(context, 12)
+        assertTrue(WidgetConfig.exists(context, 12))
+
+        // Auto Backup brought widget 12's settings along, but this install never had widget 12.
+        WidgetConfig.markKnown(context, emptyList())
+        WidgetConfig.dropForeign(context, 12)
+        assertFalse(WidgetConfig.exists(context, 12))
+
+        // A widget this install rendered keeps its settings.
+        WidgetConfig.write(context, 13, WidgetConfig(font = "Sans"))
+        WidgetConfig.markKnown(context, listOf(13))
+        WidgetConfig.dropForeign(context, 13)
+        assertEquals("Sans", WidgetConfig.read(context, 13).font)
+    }
+
+    @Test
+    fun `widgets the launcher restored count as known`() {
+        WidgetConfig.write(context, 20, WidgetConfig(font = "Sans"))
+        restoreWidgetConfigs(context, intArrayOf(20), intArrayOf(21), placedIds = setOf(21))
+        WidgetConfig.dropForeign(context, 21)
+        assertEquals("Sans", WidgetConfig.read(context, 21).font)
+    }
+
+    @Test
     fun `restore moves settings when old and new ids overlap`() {
         WidgetConfig.write(context, 3, WidgetConfig(font = "Sans"))
         WidgetConfig.write(context, 4, WidgetConfig(font = "Monospace"))

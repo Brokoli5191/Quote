@@ -141,6 +141,7 @@ class QuoteWidgetProvider : AppWidgetProvider() {
             appWidgetId: Int,
             quote: QuoteEntity
         ) {
+            WidgetConfig.markKnown(context, listOf(appWidgetId))
             try {
                 val language = appLanguage(context)
                 val author = if (quote.hasUnknownAuthor) "" else quote.author
@@ -273,4 +274,5 @@ internal fun restoreWidgetConfigs(context: Context, oldIds: IntArray, newIds: In
     }
     (oldIds.filter { it !in placedIds } + newIds.toList()).forEach { WidgetConfig.delete(context, it) }
     restored.forEach { (newId, config) -> if (config != null) WidgetConfig.write(context, newId, config) }
+    WidgetConfig.markKnown(context, newIds.toList())
 }

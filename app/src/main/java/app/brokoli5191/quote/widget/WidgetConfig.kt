@@ -1,6 +1,7 @@
 package app.brokoli5191.quote.widget
 
 import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.Context
 import android.graphics.Color
 import android.os.Bundle
@@ -33,6 +34,42 @@ data class WidgetConfig(
 ) {
     companion object {
         private const val PREFS = "aura_prefs"
+
+        // Widget ids this install has rendered or restored. Kept out of every backup (see
+        // backup_rules.xml): widget ids are only meaningful on the device that handed them out.
+        private const val LOCAL_PREFS = "widget_local"
+        private const val KEY_KNOWN_IDS = "known_widget_ids"
+
+        /**
+         * Adds [ids] to the widgets this install has seen. The first call starts the list with the
+         * widgets placed now, so installs updated from a version without it keep their settings.
+         */
+        fun markKnown(context: Context, ids: Collection<Int>) {
+            val prefs = context.getSharedPreferences(LOCAL_PREFS, Context.MODE_PRIVATE)
+            val known = prefs.getStringSet(KEY_KNOWN_IDS, null) ?: placedIds(context)
+            val next = known + ids.map(Int::toString)
+            if (!prefs.contains(KEY_KNOWN_IDS) || next.size != known.size) {
+                prefs.edit().putStringSet(KEY_KNOWN_IDS, next).apply()
+            }
+        }
+
+        private fun placedIds(context: Context): Set<String> = runCatching {
+            AppWidgetManager.getInstance(context)
+                .getAppWidgetIds(ComponentName(context, QuoteWidgetProvider::class.java))
+                .mapTo(HashSet(), Int::toString)
+        }.getOrDefault(emptySet())
+
+        /**
+         * Drops settings Auto Backup brought along for [widgetId] from another device: a new widget
+         * there can get an id that a widget on the old device had. Settings of widgets this install
+         * has rendered, or that the launcher restored (see [QuoteWidgetProvider.onRestored]), stay.
+         * Before the list exists nothing is dropped, so no widget ever loses its own settings.
+         */
+        fun dropForeign(context: Context, widgetId: Int) {
+            val known = context.getSharedPreferences(LOCAL_PREFS, Context.MODE_PRIVATE)
+                .getStringSet(KEY_KNOWN_IDS, null) ?: return
+            if (exists(context, widgetId) && widgetId.toString() !in known) delete(context, widgetId)
+        }
 
         fun read(context: Context, widgetId: Int): WidgetConfig {
             val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

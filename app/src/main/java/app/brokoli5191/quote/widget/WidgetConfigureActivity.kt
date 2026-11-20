@@ -133,6 +133,7 @@ class WidgetConfigureActivity : ComponentActivity() {
             finish()
             return
         }
+        WidgetConfig.dropForeign(this, appWidgetId)
         reconfiguring = WidgetConfig.exists(this, appWidgetId)
         setResult(
             RESULT_CANCELED,
