@@ -144,8 +144,7 @@ class QuoteRepository(
      * today's quote and the no-repeat history stay attached. The swap runs under the lock that
      * favorite changes and the daily pick take, so a heart tapped meanwhile is applied afterwards
      * to the same row instead of being overwritten.
-     */
-    /**
+     *
      * Returns false when the bundled seed could not be read; the stored quotes stay as they are and
      * the caller tries again on the next start instead of marking this seed version as applied.
      */
